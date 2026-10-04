@@ -1,27 +1,39 @@
 /*
- * WebersLink AI assistant — server side.
+ * WebersLink AI assistant — server side (Google Gemini).
  *
  * POST /api/chat        { sessionId?, message }  -> Server-Sent Events stream
  * GET  /api/chat/status                          -> { enabled }
  *
- * Requires ANTHROPIC_API_KEY. Conversations are kept in memory for 2 hours
- * (append-only, so every assistant turn is replayed exactly as returned).
+ * Requires GEMINI_API_KEY (or GOOGLE_API_KEY). Optional: GEMINI_MODEL
+ * (default "gemini-flash-latest"), CHAT_DAILY_LIMIT (default 500).
+ * Conversations are kept in memory for 2 hours. Model turns are stored exactly
+ * as returned (including thought signatures) so multi-turn function calling works.
  */
 const crypto = require("crypto");
-const Anthropic = require("@anthropic-ai/sdk");
 
-const MODEL = process.env.CHAT_MODEL || "claude-opus-5-5";
-// Server-side refusal fallback is only accepted on these models.
-const FALLBACK_MODELS = new Set(["claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5"]);
+const API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
+const MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest";
 const DAILY_LIMIT = Number(process.env.CHAT_DAILY_LIMIT || 500); // messages per day, all visitors
 const MAX_MESSAGE_CHARS = 1000;
 const MAX_TURNS = 30; // visitor messages per conversation
 const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
 const MAX_SESSIONS = 2000;
 
-const enabled = Boolean(process.env.ANTHROPIC_API_KEY);
-const client = enabled ? new Anthropic() : null;
-if (!enabled) console.warn("ANTHROPIC_API_KEY not set — AI chat assistant is disabled.");
+// Load the SDK lazily and defensively: if it is missing or the Node version is too
+// old, the website keeps running and the chat simply stays hidden.
+let ai = null;
+if (API_KEY) {
+  try {
+    const { GoogleGenAI } = require("@google/genai");
+    const httpOptions = process.env.GEMINI_BASE_URL ? { baseUrl: process.env.GEMINI_BASE_URL } : undefined;
+    ai = new GoogleGenAI({ apiKey: API_KEY, ...(httpOptions ? { httpOptions } : {}) });
+  } catch (e) {
+    console.error("Could not load @google/genai — AI chat disabled:", e.message);
+  }
+} else {
+  console.warn("GEMINI_API_KEY not set — AI chat assistant is disabled.");
+}
+const enabled = Boolean(ai);
 
 const SYSTEM_PROMPT = `You are the AI assistant on weberslink.org, the website of WebersLink. You talk with business owners who are visiting the site, answer their questions, and help the right ones book a free strategy call.
 
@@ -64,23 +76,25 @@ Most Lead Systems go live in 2–3 weeks. E-commerce stores and larger projects 
 
 const TOOLS = [
   {
-    name: "save_lead",
-    description:
-      "Send the visitor's contact details to the WebersLink team so they can follow up. Call this once, only after the visitor has given at least their name and email and agreed to be contacted.",
-    eager_input_streaming: true,
-    input_schema: {
-      type: "object",
-      properties: {
-        name: { type: "string", description: "Visitor's name" },
-        email: { type: "string", description: "Visitor's email address" },
-        phone: { type: "string", description: "Phone or WhatsApp number, if given" },
-        business: { type: "string", description: "Business name and trade, if given" },
-        location: { type: "string", description: "City, region or country, if given" },
-        need: { type: "string", description: "Short summary of what they want help with and any key details (lead volume, current response time, plan of interest)" },
+    functionDeclarations: [
+      {
+        name: "save_lead",
+        description:
+          "Send the visitor's contact details to the WebersLink team so they can follow up. Call this once, only after the visitor has given at least their name and email and agreed to be contacted.",
+        parametersJsonSchema: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "Visitor's name" },
+            email: { type: "string", description: "Visitor's email address" },
+            phone: { type: "string", description: "Phone or WhatsApp number, if given" },
+            business: { type: "string", description: "Business name and trade, if given" },
+            location: { type: "string", description: "City, region or country, if given" },
+            need: { type: "string", description: "Short summary of what they want help with and any key details (lead volume, current response time, plan of interest)" },
+          },
+          required: ["name", "email", "need"],
+        },
       },
-      required: ["name", "email", "need"],
-      additionalProperties: false,
-    },
+    ],
   },
 ];
 
@@ -92,7 +106,7 @@ function getSession(id) {
   let s = id && sessions.get(id);
   if (!s) {
     if (sessions.size >= MAX_SESSIONS) sessions.delete(sessions.keys().next().value);
-    s = { id: crypto.randomBytes(16).toString("hex"), messages: [], turns: 0, leadSaved: false, updated: now };
+    s = { id: crypto.randomBytes(16).toString("hex"), contents: [], turns: 0, leadSaved: false, updated: now };
     sessions.set(s.id, s);
   }
   s.updated = now;
@@ -123,25 +137,15 @@ function validateLead(input) {
   if (!input || typeof input !== "object") return "Missing input.";
   for (const k of ["name", "email", "need"]) if (typeof input[k] !== "string" || !input[k].trim()) return `Missing ${k}.`;
   if (!EMAIL_RE.test(input.email.trim())) return "The email address doesn't look valid — ask the visitor to check it.";
-  for (const k of ["phone", "business", "location"]) if (input[k] !== undefined && typeof input[k] !== "string") return `Invalid ${k}.`;
   return null;
 }
 
-// After a mid-output fallback, blocks before the final fallback boundary that the
-// next model can't take back must be omitted when replaying the turn.
-function replayableContent(content) {
-  let lastFallback = -1;
-  content.forEach((b, i) => { if (b.type === "fallback") lastFallback = i; });
-  if (lastFallback < 0) return content;
-  const keepBefore = new Set(["text", "fallback"]);
-  return content.filter((b, i) => i > lastFallback || keepBefore.has(b.type));
-}
-
-function transcript(messages) {
+function transcript(contents) {
   const lines = [];
-  for (const m of messages) {
-    const parts = typeof m.content === "string" ? [{ type: "text", text: m.content }] : m.content;
-    for (const p of parts) if (p.type === "text" && p.text.trim()) lines.push(`${m.role === "user" ? "Visitor" : "AI"}: ${p.text.trim()}`);
+  for (const c of contents) {
+    for (const p of c.parts || []) {
+      if (typeof p.text === "string" && p.text.trim() && !p.thought) lines.push(`${c.role === "user" ? "Visitor" : "AI"}: ${p.text.trim()}`);
+    }
   }
   return lines.join("\n").slice(-4000);
 }
@@ -193,70 +197,68 @@ function handleChat(req, res, { deliverLead }) {
     sse(res, { type: "session", sessionId: session.id });
 
     // Work on a copy; commit to the session only when the turn completes cleanly.
-    const messages = [...session.messages, { role: "user", content: text }];
-    const useFallbacks = FALLBACK_MODELS.has(MODEL);
+    const contents = [...session.contents, { role: "user", parts: [{ text }] }];
     let closed = false;
     res.on("close", () => { if (!res.writableEnded) closed = true; });
-
     let emitted = false;
+
     try {
       for (let step = 0; step < 4; step++) {
         let needBreak = emitted;
-        const stream = client.beta.messages.stream({
+        const stream = await ai.models.generateContentStream({
           model: MODEL,
-          max_tokens: 8000,
-          system: SYSTEM_PROMPT,
-          tools: TOOLS,
-          messages,
-          output_config: { effort: "low" },
-          cache_control: { type: "ephemeral" },
-          ...(useFallbacks ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" } : {}),
-        });
-        stream.on("text", (delta) => {
-          if (closed) return;
-          if (needBreak) { delta = "\n\n" + delta.replace(/^\s+/, ""); needBreak = false; }
-          emitted = true;
-          sse(res, { type: "text", text: delta });
+          contents,
+          config: {
+            systemInstruction: SYSTEM_PROMPT,
+            tools: TOOLS,
+            maxOutputTokens: 4096,
+          },
         });
 
-        let message;
-        try {
-          message = await stream.finalMessage();
-        } catch (err) {
-          if (err instanceof Anthropic.APIError) throw err;
-          // A streamed tool input that could not be parsed: re-issue the turn.
-          if (step < 3) continue;
-          throw err;
+        const modelParts = [];
+        const calls = [];
+        let finishReason = "";
+        let blocked = false;
+        for await (const chunk of stream) {
+          if (chunk.promptFeedback && chunk.promptFeedback.blockReason) blocked = true;
+          const cand = chunk.candidates && chunk.candidates[0];
+          if (!cand) continue;
+          if (cand.finishReason) finishReason = cand.finishReason;
+          for (const part of (cand.content && cand.content.parts) || []) {
+            modelParts.push(part); // keep every part as returned (incl. thought signatures)
+            if (part.functionCall) calls.push(part.functionCall);
+            else if (typeof part.text === "string" && part.text && !part.thought && !closed) {
+              let delta = part.text;
+              if (needBreak) { delta = "\n\n" + delta.replace(/^\s+/, ""); needBreak = false; }
+              emitted = true;
+              sse(res, { type: "text", text: delta });
+            }
+          }
         }
 
-        if (message.stop_reason === "refusal") {
-          sse(res, { type: "text", text: "\n\nSorry — I can't help with that. I'm happy to answer questions about WebersLink's services, or you can book a call with the team." });
-          // Don't commit a refused turn; the visitor can simply ask something else.
-          session.messages.push({ role: "user", content: text }, { role: "assistant", content: [{ type: "text", text: "Sorry — I can't help with that." }] });
+        if (blocked || /SAFETY|PROHIBITED|BLOCKLIST|SPII|RECITATION/.test(finishReason)) {
+          sse(res, { type: "text", text: (emitted ? "\n\n" : "") + "Sorry — I can't help with that. I'm happy to answer questions about WebersLink's services, or you can book a call with the team." });
+          // Record the exchange without the blocked content so the chat can continue.
+          session.contents.push({ role: "user", parts: [{ text }] }, { role: "model", parts: [{ text: "Sorry — I can't help with that." }] });
           break;
         }
 
-        messages.push({ role: "assistant", content: replayableContent(message.content) });
+        if (modelParts.length) contents.push({ role: "model", parts: modelParts });
 
-        if (message.stop_reason !== "tool_use") {
-          if (message.stop_reason === "max_tokens") sse(res, { type: "text", text: "…" });
-          session.messages = messages;
+        if (!calls.length) {
+          if (finishReason === "MAX_TOKENS") sse(res, { type: "text", text: "…" });
+          if (!modelParts.length) throw new Error(`Empty response (finishReason: ${finishReason || "none"})`);
+          session.contents = contents;
           break;
         }
 
-        const results = [];
-        for (const block of message.content) {
-          if (block.type !== "tool_use") continue;
-          if (block.name !== "save_lead") {
-            results.push({ type: "tool_result", tool_use_id: block.id, content: "Unknown tool.", is_error: true });
-            continue;
-          }
-          const problem = session.leadSaved ? "Already saved for this conversation — don't call save_lead again." : validateLead(block.input);
-          if (problem) {
-            results.push({ type: "tool_result", tool_use_id: block.id, content: problem, is_error: true });
-            continue;
-          }
-          const input = block.input;
+        const responses = [];
+        for (const call of calls) {
+          const reply = (response) => responses.push({ functionResponse: { ...(call.id ? { id: call.id } : {}), name: call.name, response } });
+          if (call.name !== "save_lead") { reply({ error: "Unknown function." }); continue; }
+          const input = call.args || {};
+          const problem = session.leadSaved ? "Already saved for this conversation — don't call save_lead again." : validateLead(input);
+          if (problem) { reply({ error: problem }); continue; }
           try {
             await deliverLead({
               type: "chat",
@@ -266,32 +268,30 @@ function handleChat(req, res, { deliverLead }) {
               business: String(input.business || "").slice(0, 200),
               location: String(input.location || "").slice(0, 120),
               message: input.need.slice(0, 1500),
-              conversation: transcript(messages),
+              conversation: transcript(contents),
               page: "AI chat",
               time: new Date().toISOString(),
               ip,
             });
             session.leadSaved = true;
             sse(res, { type: "lead_saved" });
-            results.push({ type: "tool_result", tool_use_id: block.id, content: "Saved. The team will reply by email within 24 hours." });
+            reply({ result: "Saved. The team will reply by email within 24 hours." });
           } catch (e) {
             console.error("Chat lead delivery failed:", e.message);
-            results.push({ type: "tool_result", tool_use_id: block.id, content: "Saving failed. Ask the visitor to use the booking form on this page or email hassan@weberslink.org.", is_error: true });
+            reply({ error: "Saving failed. Ask the visitor to use the booking form on this page or email hassan@weberslink.org." });
           }
         }
-        messages.push({ role: "user", content: results });
+        contents.push({ role: "user", parts: responses });
       }
     } catch (err) {
-      if (err instanceof Anthropic.RateLimitError) {
-        console.error("Chat rate limited:", err.message);
-        sse(res, { type: "error", error: "I'm getting a lot of questions right now — please try again in a minute, or use the booking form." });
-      } else if (err instanceof Anthropic.APIError) {
-        console.error(`Chat API error ${err.status}:`, err.message);
-        sse(res, { type: "error", error: "Sorry, something went wrong on my side. Please try again, or use the booking form." });
-      } else {
-        console.error("Chat error:", err && err.message);
-        sse(res, { type: "error", error: "Sorry, something went wrong. Please try again." });
-      }
+      const status = err && err.status;
+      console.error(`Chat error${status ? " " + status : ""}:`, err && err.message);
+      sse(res, {
+        type: "error",
+        error: status === 429
+          ? "I'm getting a lot of questions right now — please try again in a minute, or use the booking form."
+          : "Sorry, something went wrong on my side. Please try again, or use the booking form.",
+      });
       session.turns = Math.max(0, session.turns - 1);
     } finally {
       session.busy = false;

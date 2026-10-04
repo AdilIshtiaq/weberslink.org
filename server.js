@@ -225,6 +225,10 @@ const server = http.createServer((req, res) => {
   if (req.method === "POST" && req.url === "/api/lead") return handleLead(req, res);
   if (req.method === "POST" && req.url === "/api/chat") return chat.handleChat(req, res, { deliverLead });
   if (req.method === "GET" && req.url === "/api/chat/status") return chat.handleStatus(req, res);
+  if (req.method === "GET" && req.url === "/api/health") {
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+    return res.end(JSON.stringify({ ok: true, version: require("./package.json").version, node: process.version, chat: chat.enabled, email: Boolean(smtpReady) }));
+  }
   if ((req.method === "GET" || req.method === "HEAD") && seoRedirect(req, res)) return;
   if (req.method !== "GET" && req.method !== "HEAD") {
     res.writeHead(405);
