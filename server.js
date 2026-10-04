@@ -2,6 +2,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
+const chat = require("./chat");
 
 let nodemailer = null;
 try {
@@ -58,6 +59,7 @@ async function deliverLead(lead) {
   if (!transporter) return;
 
   const isAudit = lead.type === "audit";
+  const isChat = lead.type === "chat";
   const rows = Object.entries(lead)
     .filter(([k]) => k !== "ip")
     .map(([k, v]) => `<tr><td style="padding:4px 12px 4px 0;color:#666">${esc(k)}</td><td style="padding:4px 0">${esc(v)}</td></tr>`)
@@ -66,8 +68,12 @@ async function deliverLead(lead) {
     from: `"WebersLink Website" <${process.env.SMTP_USER}>`,
     to: LEAD_TO,
     replyTo: lead.email,
-    subject: isAudit ? `New audit request — ${lead.website || lead.email}` : `New call request — ${lead.name} (${lead.service || "general"})`,
-    html: `<h2>${isAudit ? "Free website audit request" : "Strategy call request"}</h2><table>${rows}</table>`,
+    subject: isAudit
+      ? `New audit request — ${lead.website || lead.email}`
+      : isChat
+        ? `New AI chat lead — ${lead.name}${lead.business ? " (" + lead.business + ")" : ""}`
+        : `New call request — ${lead.name} (${lead.service || "general"})`,
+    html: `<h2>${isAudit ? "Free website audit request" : isChat ? "Lead from the AI chat assistant" : "Strategy call request"}</h2><table style="white-space:pre-wrap">${rows}</table>`,
   });
   await transporter.sendMail({
     from: `"WebersLink" <${process.env.SMTP_USER}>`,
@@ -75,7 +81,7 @@ async function deliverLead(lead) {
     subject: isAudit ? "Your free website audit is on its way" : "Thanks — let's find a time to talk",
     text: isAudit
       ? `Hi${lead.name ? " " + lead.name : ""},\n\nThanks for requesting a free audit of ${lead.website}. We'll review your site and send a short video walkthrough with the top improvements within 48 hours.\n\n— The WebersLink team\nhttps://weberslink.org`
-      : `Hi ${lead.name},\n\nThanks for reaching out to WebersLink. We've received your details and will reply within 24 hours with a few times for your free strategy call (in your time zone: ${lead.timezone || "—"}).\n\nIf it's urgent, just reply to this email.\n\n— The WebersLink team\nhttps://weberslink.org`,
+      : `Hi ${lead.name},\n\nThanks for reaching out to WebersLink. We've received your details and will reply within 24 hours with a few times for your free strategy call${lead.timezone ? ` (in your time zone: ${lead.timezone})` : ""}.\n\nIf it's urgent, just reply to this email.\n\n— The WebersLink team\nhttps://weberslink.org`,
   });
 }
 
@@ -217,6 +223,8 @@ function seoRedirect(req, res) {
 
 const server = http.createServer((req, res) => {
   if (req.method === "POST" && req.url === "/api/lead") return handleLead(req, res);
+  if (req.method === "POST" && req.url === "/api/chat") return chat.handleChat(req, res, { deliverLead });
+  if (req.method === "GET" && req.url === "/api/chat/status") return chat.handleStatus(req, res);
   if ((req.method === "GET" || req.method === "HEAD") && seoRedirect(req, res)) return;
   if (req.method !== "GET" && req.method !== "HEAD") {
     res.writeHead(405);

@@ -233,6 +233,7 @@ ${footer()}
 ${stickyCta()}
 <script src="/config.js"></script>
 <script src="/assets/site.js" defer></script>
+<script src="/assets/chat-widget.js" defer></script>
 </body>
 </html>
 `;
