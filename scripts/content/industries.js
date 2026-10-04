@@ -38,7 +38,7 @@ module.exports = [
 <p>Roofing · Remodeling &amp; renovation · Kitchen &amp; bath · Plumbing · HVAC · Electrical · Handyman · Landscaping · Painting · Cleaning · Pest control · Pool service · Solar · Flooring</p>
 `,
     faqs: [
-      ["How much does a contractor website cost?", "Our contractor websites start at $1,490 for up to 5 pages. Most contractors choose Growth (from $2,990) for more service and area pages, an AI assistant and automated follow-up."],
+      ["How much does a contractor website cost?", "Contractor websites start at $1,490 one-time. Most contractors choose the Lead System — $490/month plus a $1,490 setup — for more service and area pages, an AI assistant that answers every lead in 60 seconds, booking, follow-up and review requests."],
       ["Will my website help me show up on Google Maps?", "Your Google Business Profile drives Map Pack rankings, and your website strongly supports it. We optimise both together and set up a review-request process."],
       ["Can customers upload photos of the job?", "Yes — quote forms can include photo upload so you can price jobs faster."],
     ],

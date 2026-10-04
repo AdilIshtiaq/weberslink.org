@@ -59,7 +59,7 @@ module.exports = [
 </ol>
 
 <h2>What WebersLink charges</h2>
-<p>We publish our prices: <strong>Launch</strong> from <strong>$1,490</strong> (up to 5 custom pages), <strong>Growth</strong> from <strong>$2,990</strong> (website + AI chat assistant + booking + automation) and <strong>Scale</strong> from <strong>$990/month</strong> (ongoing SEO, ads and automation). Every project gets a fixed quote before work starts. See <a href="/services/web-design">our web design service</a>.</p>
+<p>We publish our prices: a <strong>Website</strong> you own outright from <strong>$1,490</strong> one-time, the <strong>Lead System</strong> at <strong>$490/month</strong> + $1,490 setup (website, AI assistant, booking, follow-up and reviews — hosted and managed), and <strong>Growth Engine</strong> at <strong>$990/month</strong> + setup (adds local SEO, Google Business Profile and ads). Every project gets a fixed quote before work starts. See <a href="/services/web-design">our web design service</a>.</p>
 `,
     faqs: [
       ["What is a reasonable price for a small business website?", "For a professionally designed, mobile-friendly site with proper SEO, $1,500–$6,000 is a reasonable range for most small service businesses, plus modest monthly hosting and maintenance."],
@@ -116,7 +116,7 @@ module.exports = [
 </ol>
 
 <h2>WebersLink's approach</h2>
-<p>We include a trained AI assistant in our <strong>Growth</strong> package (from $2,990 with a website) and can add one to an existing site for a fixed quote. Learn more about our <a href="/services/ai-chatbots">AI chatbots for small businesses</a>.</p>
+<p>We include a trained, managed AI assistant in our <strong>Lead System</strong> ($490/month + $1,490 setup, website included) and can add one to an existing site for a fixed quote. Learn more about our <a href="/services/ai-chatbots">AI chatbots for small businesses</a>.</p>
 `,
     faqs: [
       ["Are free AI chatbots good enough?", "Free tiers are fine for testing, but they usually limit conversations, branding and integrations. Most businesses that rely on a chatbot for leads end up on a paid plan."],

@@ -41,15 +41,15 @@ module.exports = [
   <li><strong>Design</strong> — homepage and key pages in Figma. You comment, we refine.</li>
   <li><strong>Build</strong> — development, forms, integrations, SEO setup and testing on real devices.</li>
   <li><strong>Launch</strong> — domain, hosting, redirects from your old site, analytics and Search Console.</li>
-  <li><strong>Support</strong> — 30 days of fixes and small changes included (60 days on Growth).</li>
+  <li><strong>Support</strong> — 30 days of fixes on one-time websites; ongoing management on monthly plans.</li>
 </ol>
 
 <h2>Pricing</h2>
-<p>Our <strong>Launch</strong> package starts at <strong>$1,490</strong> for up to 5 custom pages. <strong>Growth</strong> starts at <strong>$2,990</strong> and adds up to 10 pages, a blog, an AI chat assistant, online booking and lead automation. See <a href="/#pricing">all packages</a>, or read <a href="/blog/small-business-website-cost">how much a small business website costs in 2026</a>.</p>
+<p>A website you own outright starts at <strong>$1,490</strong> one-time for up to 5 custom pages. Most clients choose the <strong>Lead System</strong> — <strong>$490/month</strong> plus a $1,490 setup — which adds up to 10 pages, hosting and maintenance, an AI assistant, online booking, automatic follow-up and review requests. See <a href="/#pricing">all packages</a>, or read <a href="/blog/small-business-website-cost">how much a small business website costs in 2026</a>.</p>
 `,
     faqs: [
-      ["How much does a small business website cost?", "Our websites start at $1,490 for up to 5 custom pages and $2,990 for a Growth site with AI chat, booking and automation. You get a fixed quote before work starts."],
-      ["How long does it take to build a website?", "Most Launch websites go live in 2–3 weeks and Growth projects in 3–5 weeks, depending on how quickly content and feedback come back."],
+      ["How much does a small business website cost?", "A website you own outright starts at $1,490 one-time for up to 5 pages. Our Lead System — website plus AI assistant, booking and follow-up, hosted and managed — is $490/month plus a $1,490 setup."],
+      ["How long does it take to build a website?", "Most websites and Lead Systems go live in 2–3 weeks, depending on how quickly content and feedback come back."],
       ["Do you work with businesses outside Pakistan?", "Yes — almost all of our clients are in the US, UK and Europe. We schedule calls in your time zone and reply within 24 hours."],
       ["Will my website rank on Google?", "Every site ships with technical and on-page SEO done properly. Ranking for competitive terms also takes content and links over time — our <a href=\"/services/seo\">SEO service</a> handles that."],
     ],
@@ -92,7 +92,7 @@ module.exports = [
 <p>AI assistants work best for businesses that get repeat questions and book appointments: contractors and home services, clinics, consultants, agencies, real estate, and e-commerce stores answering product and delivery questions.</p>
 
 <h2>Pricing</h2>
-<p>An AI chat assistant is included in our <strong>Growth</strong> package (from $2,990, with a website). If you already have a website, we can add an assistant on its own — book a call for a fixed quote. Ongoing AI usage costs are usually modest for small businesses; we explain them up front. Read <a href="/blog/ai-chatbot-cost">how much an AI chatbot costs</a> for typical ranges.</p>
+<p>An AI assistant is included in our <strong>Lead System</strong> ($490/month + $1,490 setup), together with your website, booking and follow-up — and we tune it every month. If you already have a website, we can add an assistant on its own — book a call for a fixed quote. Ongoing AI usage costs are usually modest for small businesses; we explain them up front. Read <a href="/blog/ai-chatbot-cost">how much an AI chatbot costs</a> for typical ranges.</p>
 `,
     faqs: [
       ["Will the chatbot give wrong answers?", "We train it only on your approved information and add rules so it says \"let me get a human\" rather than guessing. We test it before launch and review real conversations afterwards."],
@@ -136,7 +136,7 @@ module.exports = [
 <div class="callout"><i>⚡</i><div><strong>Start small.</strong> Most clients start with instant response + a 3-step follow-up. It takes days to set up and is usually the single biggest win.</div></div>
 
 <h2>Pricing</h2>
-<p>Lead automation is included in our <strong>Growth</strong> package (from $2,990) and our monthly <strong>Scale</strong> plan (from $990/month) adds new automations every month. Stand-alone automation projects are quoted after a short call.</p>
+<p>Lead automation is included in our <strong>Lead System</strong> ($490/month + setup), and <strong>Growth Engine</strong> ($990/month + setup) adds new automations every month. Stand-alone automation projects are quoted after a short call.</p>
 `,
     faqs: [
       ["Which CRM should I use?", "If you don't have one yet, we'll recommend one based on your team size and budget — often HubSpot's free CRM, Pipedrive or a simple Airtable base."],
@@ -180,12 +180,12 @@ module.exports = [
 <div class="callout"><i>📍</i><div><strong>Local businesses:</strong> your Google Business Profile often drives more calls than your website. We optimise both together.</div></div>
 
 <h2>Pricing</h2>
-<p>Ongoing SEO is part of our <strong>Scale</strong> plan from <strong>$990/month</strong>, month-to-month. Every <a href="/services/web-design">website we build</a> also ships with on-page and technical SEO done properly from day one.</p>
+<p>Ongoing local SEO is part of our <strong>Growth Engine</strong> plan — <strong>$990/month</strong> plus setup, month-to-month. Every <a href="/services/web-design">website we build</a> also ships with on-page and technical SEO done properly from day one.</p>
 `,
     faqs: [
       ["Can you guarantee first-page rankings?", "No honest agency can — Google's results depend on competition and many factors outside anyone's control. We guarantee the work: technical fixes, content and links, with transparent monthly reporting."],
       ["Do you do local SEO for businesses in the US and UK?", "Yes. We optimise Google Business Profiles, build location and service-area pages and manage listings for businesses across the US, UK and Europe."],
-      ["Is there a minimum contract?", "No. Our Scale plan is month-to-month."],
+      ["Is there a minimum contract?", "No. Our plans are month-to-month and you can cancel anytime."],
     ],
   },
 
@@ -223,7 +223,7 @@ module.exports = [
 <p>WooCommerce gives you full ownership, no platform transaction fees and unlimited flexibility, and it pairs with a WordPress content site for SEO. Shopify is simpler to host and maintain. We'll recommend the right one for your catalogue, team and budget on a free call.</p>
 `,
     faqs: [
-      ["How much does a WooCommerce store cost?", "Small stores usually fit our Growth package (from $2,990). Larger catalogues or custom features are quoted after a short call."],
+      ["How much does a WooCommerce store cost?", "Stores are quoted individually after a short call, based on your catalogue size and features."],
       ["Can you migrate my store from another platform?", "Yes — we can migrate products, customers and orders from Shopify, Wix and other platforms, with redirects to protect your SEO."],
       ["Can I manage products myself?", "Yes. We hand over a store your team can update, with a short training session and written guide."],
     ],
@@ -271,7 +271,7 @@ module.exports = [
     faqs: [
       ["Will a redesign hurt my Google rankings?", "Not if it's done properly. We map and redirect every old URL, keep content that ranks and monitor Search Console after launch."],
       ["Can you redesign my site on the same platform?", "Yes. We can redesign on your existing WordPress, or move you to a faster platform if that's the better option."],
-      ["How much does a website redesign cost?", "Redesigns are priced like new builds — from $1,490 for up to 5 pages — with a fixed quote after the audit."],
+      ["How much does a website redesign cost?", "Redesigns start at $1,490 one-time for up to 5 pages, or are included in the Lead System setup — with a fixed quote after the audit."],
     ],
   },
 ];
