@@ -177,6 +177,19 @@ section{position:relative}
 @keyframes spin{from{transform:rotateX(-22deg) rotateY(0)}to{transform:rotateX(-22deg) rotateY(360deg)}}
 @media(max-width:860px){.proc-grid{grid-template-columns:1fr;gap:24px}.cube-wrap{position:relative;top:0;height:260px}.cube{width:130px;height:130px}.cube .f1{transform:translateZ(65px)}.cube .f2{transform:rotateY(90deg) translateZ(65px)}.cube .f3{transform:rotateY(180deg) translateZ(65px)}.cube .f4{transform:rotateY(-90deg) translateZ(65px)}.cube .f5{transform:rotateX(90deg) translateZ(65px)}.cube .f6{transform:rotateX(-90deg) translateZ(65px)}}
 
+/* ---------- Testimonials (Notion quote blocks) ---------- */
+.ts-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;perspective:1400px}
+.ts{background:var(--white);border:1px solid var(--line-l);border-radius:10px;padding:26px 24px 22px;display:flex;flex-direction:column;transition:transform .5s var(--ease),box-shadow .4s;transform-style:preserve-3d}
+.ts:hover{box-shadow:0 30px 60px -24px rgba(0,0,0,.22)}
+.ts-stars{font-size:13px;letter-spacing:3px;color:var(--grey-9);margin-bottom:14px}
+.ts blockquote{border-left:3px solid var(--ink);padding-left:14px;font-size:15.5px;color:var(--grey-9);line-height:1.65;flex:1}
+.ts-auth{display:flex;align-items:center;gap:12px;margin-top:22px;padding-top:16px;border-top:1px solid var(--line-l)}
+.ts-av{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-weight:600;font-size:14px;color:var(--black);background:linear-gradient(145deg,#fafafa,#a3a5aa 60%,#5a5a5a);box-shadow:inset 0 1px 0 rgba(255,255,255,.7)}
+.ts-name{font-size:14px;font-weight:600;color:var(--ink)}
+.ts-role{font-size:13px;color:var(--grey-5)}
+@media(max-width:960px){.ts-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:620px){.ts-grid{grid-template-columns:1fr}}
+
 /* ---------- Stack ---------- */
 .stack{display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid var(--line-l);border-left:1px solid var(--line-l)}
 .stack div{border-right:1px solid var(--line-l);border-bottom:1px solid var(--line-l);padding:28px 22px;transition:background .3s}
@@ -232,6 +245,7 @@ footer{overflow:hidden;border-top:1px solid var(--line-d);padding:48px 0 36px;ba
       <a href="#services">Services</a>
       <a href="#work">Work</a>
       <a href="#process">Process</a>
+      <a href="#reviews">Reviews</a>
       <a href="#contact">Contact</a>
     </nav>
     <a href="#contact" class="btn btn-light">Start a project</a>
@@ -474,6 +488,51 @@ footer{overflow:hidden;border-top:1px solid var(--line-d);padding:48px 0 36px;ba
   </div>
 </section>
 
+<!-- TESTIMONIALS -->
+<section class="light pad" id="reviews">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="kicker rv">Client reviews</div>
+        <h2 class="h2 rv d1">What our clients <em>say.</em></h2>
+      </div>
+      <p class="sub rv d2">Feedback from the businesses behind the projects above.</p>
+    </div>
+    <div class="ts-grid">
+      <figure class="ts tilt-soft rv">
+        <div class="ts-stars" aria-label="5 out of 5 stars">★★★★★</div>
+        <blockquote>WebersLink understood our product variations and WhatsApp ordering flow immediately. The storefront has held up well under real traffic, and communication throughout was clear and direct.</blockquote>
+        <figcaption class="ts-auth"><span class="ts-av">O</span><span><span class="ts-name">Operations Lead</span><br><span class="ts-role">Eyewear E-Commerce Brand</span></span></figcaption>
+      </figure>
+      <figure class="ts tilt-soft rv d1">
+        <div class="ts-stars" aria-label="5 out of 5 stars">★★★★★</div>
+        <blockquote>Our equipment catalog needed to read as credible to hospital buyers, not just look modern. The WebersLink team got that balance right — the certifications and product sections came together exactly as briefed.</blockquote>
+        <figcaption class="ts-auth"><span class="ts-av">M</span><span><span class="ts-name">Marketing Manager</span><br><span class="ts-role">Medical Equipment Manufacturer</span></span></figcaption>
+      </figure>
+      <figure class="ts tilt-soft rv d2">
+        <div class="ts-stars" aria-label="5 out of 5 stars">★★★★★</div>
+        <blockquote>WebersLink took a fairly complex brand — services, pricing, case studies — and organized it into a site that actually explains what we do. Clean handover, minimal back-and-forth.</blockquote>
+        <figcaption class="ts-auth"><span class="ts-av">F</span><span><span class="ts-name">Founder</span><br><span class="ts-role">Digital Design Agency</span></span></figcaption>
+      </figure>
+      <figure class="ts tilt-soft rv">
+        <div class="ts-stars" aria-label="5 out of 5 stars">★★★★★</div>
+        <blockquote>Our homes are the product, so the website had to match that quality. WebersLink handled the design-build process, the galleries and the Matterport integration without us having to chase anything.</blockquote>
+        <figcaption class="ts-auth"><span class="ts-av">P</span><span><span class="ts-name">Principal</span><br><span class="ts-role">Luxury Home Building Company</span></span></figcaption>
+      </figure>
+      <figure class="ts tilt-soft rv d1">
+        <div class="ts-stars" aria-label="5 out of 5 stars">★★★★★</div>
+        <blockquote>We needed something simple: let customers pick a service, get a quote, and book. WebersLink built exactly that, with the licensing and trust details baked in from the start, not bolted on after.</blockquote>
+        <figcaption class="ts-auth"><span class="ts-av">O</span><span><span class="ts-name">Owner</span><br><span class="ts-role">Home Improvement Services Company</span></span></figcaption>
+      </figure>
+      <figure class="ts tilt-soft rv d2">
+        <div class="ts-stars" aria-label="5 out of 5 stars">★★★★★</div>
+        <blockquote>Turning a sci-fi universe into a website could have gone wrong in a dozen ways. WebersLink got the tone right — cinematic, not gimmicky — and the character sections genuinely pull readers in.</blockquote>
+        <figcaption class="ts-auth"><span class="ts-av">A</span><span><span class="ts-name">Author</span><br><span class="ts-role">Sci-Fi Publishing</span></span></figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
 <!-- STACK -->
 <section class="white pad">
   <div class="wrap">
@@ -526,7 +585,7 @@ footer{overflow:hidden;border-top:1px solid var(--line-d);padding:48px 0 36px;ba
   <div class="wrap">
     <div class="foot">
       <a href="#top" class="logo"><span class="logo-mark">W</span>WebersLink</a>
-      <nav class="foot-links"><a href="#about">About</a><a href="#services">Services</a><a href="#work">Work</a><a href="#process">Process</a><a href="#contact">Contact</a></nav>
+      <nav class="foot-links"><a href="#about">About</a><a href="#services">Services</a><a href="#work">Work</a><a href="#process">Process</a><a href="#reviews">Reviews</a><a href="#contact">Contact</a></nav>
     </div>
     <div class="foot-big" aria-hidden="true">WebersLink</div>
     <div class="copy"><span>© <span id="yr">2026</span> WebersLink. All rights reserved.</span><span>weberslink.org</span></div>
