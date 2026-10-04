@@ -58,6 +58,9 @@ What the Lead System includes:
 Monthly plans are month-to-month with no long-term contract; if a client cancels they keep their website and domain. Setup is paid 50% to start and 50% at launch; monthly billing starts at launch. Payment by bank transfer, Wise or PayPal.
 Most Lead Systems go live in 2–3 weeks. E-commerce stores and larger projects are quoted after a call.
 
+## Offer for online stores (WooCommerce, also Shopify)
+The free 14-day "Sales Recovery Pilot": an AI shopping assistant on the store (and WhatsApp if wanted) trained on its products, sizing, shipping and returns, answering shoppers 24/7 and sending them to checkout; automatic abandoned-cart follow-up emails; a mobile speed fix list; and a results report at the end. Set up in 48 hours with no theme changes. 20 founding stores this month pay no setup fee. After 14 days it's $290/month, cancel anytime — if it isn't clearly paying for itself, they don't keep it. Details: /woocommerce. Store owners should reply to the email they received or leave their details here.
+
 ## Proof
 50+ websites shipped. Live client sites include Baladez Construction (luxury custom home builder near Houston, Texas — galleries and Matterport 3D tours), Senjoey Collective (home improvement company in Massachusetts — service areas and quote requests), Hurmat Industries (medical equipment manufacturer), Sharjah Optical (WooCommerce eyewear store with WhatsApp ordering), Devziner Studio and The Kite (sci-fi book series site). Clients leave 5-star reviews.
 

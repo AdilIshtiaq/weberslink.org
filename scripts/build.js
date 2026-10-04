@@ -18,6 +18,7 @@ const pages = [
   ...require("./content/services"),
   ...require("./content/industries"),
   ...require("./content/guides"),
+  ...require("./content/offers"),
 ];
 const byPath = Object.fromEntries(pages.map((p) => [p.path, p]));
 
