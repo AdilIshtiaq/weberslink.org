@@ -195,8 +195,29 @@ function serveStatic(req, res) {
   });
 }
 
+// ---------- SEO redirects: one canonical host and clean URLs ----------
+const CANONICAL_HOST = process.env.CANONICAL_HOST || "weberslink.org";
+function redirect(res, location) {
+  res.writeHead(301, { Location: location, "Cache-Control": "public, max-age=86400" });
+  res.end();
+}
+function seoRedirect(req, res) {
+  const host = (req.headers.host || "").toLowerCase();
+  const [rawPath, query] = req.url.split("?");
+  const qs = query ? "?" + query : "";
+  if (host === "www." + CANONICAL_HOST) return redirect(res, `https://${CANONICAL_HOST}${req.url}`), true;
+  let p = rawPath.replace(/\/{2,}/g, "/");
+  if (/\/index\.html$/.test(p)) p = p.replace(/index\.html$/, "");
+  else if (/\.html$/.test(p) && p !== "/404.html") p = p.replace(/\.html$/, "");
+  if (p.length > 1 && p.endsWith("/") && !fs.existsSync(path.join(PUBLIC_DIR, p, "index.html"))) p = p.replace(/\/+$/, "");
+  if (!p.endsWith("/") && !path.extname(p) && fs.existsSync(path.join(PUBLIC_DIR, p, "index.html"))) p += "/";
+  if (p !== rawPath) return redirect(res, p + qs), true;
+  return false;
+}
+
 const server = http.createServer((req, res) => {
   if (req.method === "POST" && req.url === "/api/lead") return handleLead(req, res);
+  if ((req.method === "GET" || req.method === "HEAD") && seoRedirect(req, res)) return;
   if (req.method !== "GET" && req.method !== "HEAD") {
     res.writeHead(405);
     return res.end("Method not allowed");
