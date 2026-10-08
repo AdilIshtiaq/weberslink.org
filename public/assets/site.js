@@ -56,12 +56,13 @@
     $$('#navLinks a').forEach(function (a) { a.addEventListener('click', function () { nav.classList.remove('open'); menuBtn.setAttribute('aria-expanded', false); }); });
   }
 
-  // Owner shortcut: the outreach dashboard link appears only in a browser where it has been signed in to,
-  // so visitors never see it. (The dashboard sets / clears the flag; it is a convenience, not a credential.)
+  // Login link: goes to the sign-in page for the outreach dashboard. It reads "Dashboard" in a browser
+  // where the owner is already signed in (the dashboard sets that local flag; it is not a credential).
   try {
     var navLinks = $('#navLinks');
-    if (navLinks && localStorage.getItem('wl_owner') === '1') {
-      var ol = document.createElement('a'); ol.href = '/admin/outreach'; ol.textContent = 'Outreach';
+    if (navLinks) {
+      var ol = document.createElement('a'); ol.href = '/admin/outreach'; ol.rel = 'nofollow';
+      ol.textContent = localStorage.getItem('wl_owner') === '1' ? 'Dashboard' : 'Login';
       navLinks.appendChild(ol);
     }
   } catch (e) {}
