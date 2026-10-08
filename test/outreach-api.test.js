@@ -112,9 +112,12 @@ test("dry run via the dashboard works and is logged; second start is refused whi
 });
 
 test("cron endpoint needs the secret token", async () => {
-  assert.strictEqual((await api("GET", "/api/outreach/cron", undefined, { auth: false })).status, 403);
-  assert.strictEqual((await api("GET", "/api/outreach/cron?token=wrong-token-0123456789", undefined, { auth: false })).status, 403);
-  const ok = await api("GET", "/api/outreach/cron?token=" + process.env.OUTREACH_CRON_TOKEN, undefined, { auth: false });
+  assert.strictEqual((await api("GET", "/api/outreach/cron?token=" + process.env.OUTREACH_CRON_TOKEN, undefined, { auth: false })).status, 405, "GET never starts a run");
+  assert.strictEqual((await api("POST", "/api/outreach/cron", {}, { auth: false })).status, 403);
+  assert.strictEqual((await api("POST", "/api/outreach/cron?token=wrong-token-0123456789", {}, { auth: false })).status, 403);
+  const ok = await api("POST", "/api/outreach/cron?token=" + process.env.OUTREACH_CRON_TOKEN, {}, { auth: false });
+  const viaHeader = await api("POST", "/api/outreach/cron", {}, { auth: false, headers: { "x-cron-token": process.env.OUTREACH_CRON_TOKEN } });
+  assert.ok([202, 409].includes(viaHeader.status));
   assert.ok([202, 409].includes(ok.status));
   await new Promise((r) => setTimeout(r, 300));
 });

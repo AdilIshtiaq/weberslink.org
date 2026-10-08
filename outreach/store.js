@@ -46,15 +46,16 @@ function parseCsv(text) {
   return rows.slice(1).map((r) => Object.fromEntries(header.map((h, i) => [h, r[i] === undefined ? "" : r[i]])));
 }
 
-function csvCell(v) {
+function csvCell(v, safe = false) {
   let s = v === undefined || v === null ? "" : String(v);
-  // Stop spreadsheet formula injection if someone opens an export in Excel.
-  if (/^[=+@\t]/.test(s) || (/^-/.test(s) && !/^-?\d/.test(s))) s = "'" + s;
+  // `safe` (used only for downloads) stops spreadsheet formula injection. Working files stay raw so the
+  // text that goes into emails is never altered.
+  if (safe && (/^[=+@\t]/.test(s) || (/^-/.test(s) && !/^-?\d/.test(s)))) s = "'" + s;
   return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
-function toCsv(rows, fields) {
-  return [fields.join(",")].concat(rows.map((r) => fields.map((f) => csvCell(r[f])).join(","))).join("\n") + "\n";
+function toCsv(rows, fields, safe = false) {
+  return [fields.join(",")].concat(rows.map((r) => fields.map((f) => csvCell(r[f], safe)).join(","))).join("\n") + "\n";
 }
 
 function readCsv(name) {
@@ -70,6 +71,29 @@ function atomicWrite(file, text) {
 
 function writeCsv(name, rows, fields) {
   atomicWrite(P(name), toCsv(rows, fields));
+}
+
+/** A CSV file re-written for download: same data, formula-injection safe for Excel. */
+function exportCsv(name) {
+  const rows = readCsv(name);
+  if (!rows.length) return "";
+  return toCsv(rows, Object.keys(rows[0]), true);
+}
+
+/** Strict-enough address check: rejects list separators, quotes, brackets and spaces that confuse mail routing. */
+const EMAIL_OK = /^[^\s@,;<>"()\[\]\\]+@[^\s@,;<>"()\[\]\\]+\.[^\s@,;<>"()\[\]\\]+$/;
+const isEmail = (s) => typeof s === "string" && s.length <= 254 && EMAIL_OK.test(s);
+
+/** Per-install signing key for login cookies, created once in the data folder (null if it can't be). */
+function sessionKey() {
+  try {
+    ensureDir();
+    const f = P("session.key");
+    try { const k = fs.readFileSync(f, "utf8").trim(); if (k.length >= 32) return k; } catch (e) { /* create below */ }
+    const k = require("crypto").randomBytes(32).toString("hex");
+    fs.writeFileSync(f, k, { mode: 0o600 });
+    return k;
+  } catch (e) { return null; }
 }
 
 function readJson(name, fallback) {
@@ -136,5 +160,5 @@ function addSuppression(value) {
   fs.appendFileSync(P("do_not_contact.csv"), value.trim().toLowerCase() + "\n");
 }
 
-module.exports = { DATA_DIR, P, ensureDir, TRACK_FIELDS, ENGINE_FIELDS, SENT_FIELDS, parseCsv, toCsv, readCsv, writeCsv, readJson, writeJson,
+module.exports = { exportCsv, isEmail, sessionKey, DATA_DIR, P, ensureDir, TRACK_FIELDS, ENGINE_FIELDS, SENT_FIELDS, parseCsv, toCsv, readCsv, writeCsv, readJson, writeJson,
   loadTracking, saveTracking, saveRow, updateLead, appendSentLog, appendLog, loadSuppression, addSuppression, atomicWrite };

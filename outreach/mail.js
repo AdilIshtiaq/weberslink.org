@@ -6,6 +6,7 @@
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const MailComposer = require("nodemailer/lib/mail-composer");
+const { freshReply } = require("./inbound");
 
 function passwordFor(box) {
   // Passwords only ever come from environment variables: never from files or the dashboard.
@@ -28,7 +29,8 @@ class Mailbox {
     if (!this.transport) {
       const port = Number(this.conf.smtp_port || 465);
       this.transport = nodemailer.createTransport({
-        host: this.conf.smtp_host || "smtp.hostinger.com", port, secure: port === 465,
+        host: this.conf.smtp_host || "smtp.hostinger.com", port, secure: port === 465, requireTLS: port !== 465, // never fall back to plain text
+        
         auth: { user: this.addr, pass: this.pw }, connectionTimeout: 30000, socketTimeout: 60000,
       });
     }
@@ -76,24 +78,37 @@ class Mailbox {
     } finally { await client.logout().catch(() => {}); }
   }
 
-  /** Recent inbox messages in the shape classify() expects. Never marks anything as read. */
-  async scanInbox(sinceDays = 45, max = 600) {
+  /**
+   * New inbox messages, oldest first, in the shape classify() expects. Never marks anything as read.
+   * opts: { sinceDays, afterUid, uidValidity, max } - with afterUid (and an unchanged uidValidity) only newer
+   * messages are fetched, so each run reads each message once. Returns { messages, maxUid, uidValidity }.
+   */
+  async scanInbox(opts = {}) {
     const { simpleParser } = require("mailparser");
+    const max = opts.max || 2000;
     const client = await this.imap();
-    const out = [];
+    const messages = [];
+    let maxUid = opts.afterUid || 0, uidValidity = opts.uidValidity;
     try {
       const lock = await client.getMailboxLock("INBOX", { readOnly: true });
       try {
-        const since = new Date(Date.now() - sinceDays * 864e5);
-        const uids = (await client.search({ since }, { uid: true })) || [];
-        for (const uid of uids.slice(-max)) {
-          const m = await client.fetchOne(String(uid), { source: true }, { uid: true });
+        uidValidity = Number(client.mailbox.uidValidity);
+        const incremental = opts.afterUid && String(opts.uidValidity) === String(uidValidity);
+        const found = incremental
+          ? await client.search({ uid: `${opts.afterUid + 1}:*` }, { uid: true })
+          : await client.search({ since: new Date(Date.now() - (opts.sinceDays || 45) * 864e5) }, { uid: true });
+        const uids = (found || []).filter((u) => !incremental || u > opts.afterUid).sort((a, b) => a - b).slice(0, max);
+        if (!incremental) maxUid = 0;
+        for (const uid of uids) {
+          // Headers + text only: attachments are cut off at 150 KB so one huge message can't stall a run.
+          const m = await client.fetchOne(String(uid), { source: { maxLength: 150000 } }, { uid: true });
+          maxUid = Math.max(maxUid, uid);
           if (!m || !m.source) continue;
-          out.push(await parseIncoming(await simpleParser(m.source)));
+          try { messages.push(await parseIncoming(await simpleParser(m.source))); } catch (e) { /* unreadable message: skip it */ }
         }
       } finally { lock.release(); }
     } finally { await client.logout().catch(() => {}); }
-    return out;
+    return { messages, maxUid, uidValidity };
   }
 
   close() { try { this.transport && this.transport.close(); } catch (e) { /* ignore */ } this.transport = null; }
@@ -105,7 +120,7 @@ async function parseIncoming(p) {
   for (const a of p.attachments || []) {
     if (/^(message\/|text\/rfc822)/.test(a.contentType || "") && a.content) body += "\n" + a.content.toString("utf8", 0, 8000);
   }
-  const fresh = (p.text || "").split(/\n\s*(?:On .{5,200}wrote:|-{2,}\s*Original Message|From: .*\n)/)[0];
+  const fresh = freshReply(p.text || "");
   const from = p.from && p.from.value && p.from.value[0] ? p.from.value[0] : {};
   return {
     from: String(from.address || "").toLowerCase(),

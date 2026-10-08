@@ -5,7 +5,7 @@
  * Without a password every endpoint answers 503, so the feature is off by default.
  * Login gives a signed, HttpOnly, SameSite=Strict cookie (12 hours). The dashboard page itself is public HTML with
  * no data in it; all data comes through these endpoints.
- * Cron: set OUTREACH_CRON_TOKEN (16+ chars) and call GET/POST /api/outreach/cron?token=... from Hostinger cron.
+ * Cron: set OUTREACH_CRON_TOKEN (16+ chars) and POST /api/outreach/cron with header x-cron-token (or ?token=) from Hostinger cron.
  */
 const crypto = require("crypto");
 const fs = require("fs");
@@ -18,10 +18,12 @@ const xlsx = require("./xlsx");
 const PASSWORD = process.env.ADMIN_PASSWORD || "";
 const USERNAME = (process.env.ADMIN_USERNAME || "").trim().toLowerCase();
 const CRON_TOKEN = process.env.OUTREACH_CRON_TOKEN || "";
-const SECRET = process.env.ADMIN_SESSION_SECRET || crypto.createHash("sha256").update("wl-outreach:" + (USERNAME ? USERNAME + ":" : "") + PASSWORD).digest("hex");
+// Cookie signing key: explicit env var, else a random per-install key kept in the data folder (so a stolen cookie
+// can't be used to crack the password offline), else (read-only disk) a key derived from the credentials.
+const SECRET = process.env.ADMIN_SESSION_SECRET || store.sessionKey() || crypto.createHash("sha256").update("wl-outreach:" + (USERNAME ? USERNAME + ":" : "") + PASSWORD).digest("hex");
 const COOKIE = "wl_admin";
 const SESSION_MS = 12 * 3600 * 1000;
-const enabled = PASSWORD.length >= 8;
+const enabled = PASSWORD.length >= 10;
 
 const sha = (s) => crypto.createHash("sha256").update(String(s)).digest();
 const safeEqual = (a, b) => crypto.timingSafeEqual(sha(a), sha(b));
@@ -57,20 +59,23 @@ function cookieOf(req, name) {
 const isHttps = (req) => Boolean(req.socket.encrypted) || String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim() === "https";
 const authed = (req) => validToken(cookieOf(req, COOKIE));
 
-// ---- failed-login throttling (per IP and overall: X-Forwarded-For is easy to fake) ----
+// ---- failed-login throttling ----
+// Per IP: 5 wrong passwords in 10 minutes blocks that IP. Overall: if lots of wrong passwords arrive from many
+// addresses, every attempt is slowed down and only a few run at once - brute force stays impractical, but nobody
+// (including you) is ever locked out for good by someone else's bad guesses.
 let testSends = [];
 const fails = new Map();
 let globalFails = [];
+let inflightLogins = 0;
 function recent(list) { const now = Date.now(); return list.filter((t) => now - t < 10 * 60 * 1000); }
-function throttled(ip) {
-  globalFails = recent(globalFails);
-  return recent(fails.get(ip) || []).length >= 5 || globalFails.length >= 20;
-}
+const ipBlocked = (ip) => recent(fails.get(ip) || []).length >= 5;
+const underPressure = () => { globalFails = recent(globalFails); return globalFails.length >= 20; };
 function noteFail(ip) {
   fails.set(ip, recent(fails.get(ip) || []).concat(Date.now()));
   globalFails.push(Date.now());
   if (fails.size > 5000) fails.clear();
 }
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---- helpers ----
 function send(res, code, obj, headers = {}) {
@@ -94,7 +99,12 @@ async function readJson(req, limit = 200 * 1024) {
   if (!raw.trim()) return {};
   try { return JSON.parse(raw); } catch (e) { throw Object.assign(new Error("Invalid JSON"), { status: 400 }); }
 }
-const clientIp = (req) => String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+// Behind the host's proxy the real client is the LAST X-Forwarded-For entry (the one the proxy appended); earlier
+// entries are written by the client and can be faked.
+const clientIp = (req) => {
+  const xff = String(req.headers["x-forwarded-for"] || "").split(",").map((x) => x.trim()).filter(Boolean);
+  return xff.length ? xff[xff.length - 1] : String(req.socket.remoteAddress || "");
+};
 
 const LEAD_VIEW = ["email", "first_name", "store", "domain", "country", "category", "step", "status", "mailbox", "variant", "last_sent", "psi", "note", "loom_sent"];
 
@@ -102,7 +112,8 @@ async function route(req, res, url, method) {
   const p = url.pathname.replace(/^\/api\/outreach/, "") || "/";
 
   // --- cron (token auth, not cookie) ---
-  if (p === "/cron" && (method === "GET" || method === "POST")) {
+  if (p === "/cron") {
+    if (method !== "POST") return send(res, 405, { ok: false, error: "Use POST." }, { Allow: "POST" });
     const tok = url.searchParams.get("token") || req.headers["x-cron-token"] || "";
     if (CRON_TOKEN.length < 16 || !tok || !safeEqual(tok, CRON_TOKEN)) return send(res, 403, { ok: false, error: "Forbidden" });
     const r = eng.startRun({ source: "cron" });
@@ -112,7 +123,12 @@ async function route(req, res, url, method) {
   // --- session ---
   if (p === "/login" && method === "POST") {
     const ip = clientIp(req);
-    if (throttled(ip)) return send(res, 429, { ok: false, error: "Too many attempts. Try again in 10 minutes." });
+    if (ipBlocked(ip)) return send(res, 429, { ok: false, error: "Too many attempts. Try again in 10 minutes." });
+    if (underPressure()) {
+      if (inflightLogins >= 3) return send(res, 429, { ok: false, error: "Busy. Try again in a minute." });
+      inflightLogins++;
+      try { await pause(1500); } finally { inflightLogins--; }
+    }
     const body = await readJson(req, 2000);
     // Check both before answering so the reply never reveals which one was wrong.
     const userOk = !USERNAME || (typeof body.username === "string" && safeEqual(body.username.trim().toLowerCase(), USERNAME));
@@ -209,7 +225,7 @@ async function route(req, res, url, method) {
   }
   if (p === "/dnc" && method === "POST") {
     const v = String((await readJson(req)).value || "").trim().toLowerCase();
-    if (!/^(@[a-z0-9.-]+\.[a-z]{2,}|[^\s@]+@[^\s@]+\.[^\s@]+)$/.test(v)) return send(res, 400, { ok: false, error: "Enter an email or @domain.com" });
+    if (!(/^@[a-z0-9.-]+\.[a-z]{2,}$/.test(v) || store.isEmail(v))) return send(res, 400, { ok: false, error: "Enter an email or @domain.com" });
     store.addSuppression(v);
     eng.loadState(eng.loadConfig());
     return send(res, 200, { ok: true });
@@ -256,7 +272,7 @@ async function route(req, res, url, method) {
     const name = { tracking: "tracking.csv", sent: "sent_log.csv" }[url.searchParams.get("file")];
     if (!name) return send(res, 400, { ok: false, error: "Unknown file." });
     let data = "";
-    try { data = fs.readFileSync(store.P(name), "utf8"); } catch (e) { /* empty export */ }
+    try { data = store.exportCsv(name); } catch (e) { /* empty export */ }
     res.writeHead(200, { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="${name}"`, "Cache-Control": "no-store" });
     return res.end(data);
   }
@@ -269,7 +285,7 @@ function handle(req, res) {
   let url;
   try { url = new URL(req.url, "http://x"); } catch (e) { return false; }
   if (url.pathname !== "/api/outreach" && !url.pathname.startsWith("/api/outreach/")) return false;
-  if (!enabled) { send(res, 503, { ok: false, error: "Outreach is off. Set ADMIN_PASSWORD (8+ characters) on the server to turn it on." }); return true; }
+  if (!enabled) { send(res, 503, { ok: false, error: "Outreach is off. Set ADMIN_PASSWORD (10+ characters) on the server to turn it on." }); return true; }
   route(req, res, url, req.method).catch((e) => {
     if (!res.headersSent) send(res, e.status || 500, { ok: false, error: e.status ? e.message : "Server error" });
     if (!e.status) console.error("outreach error:", e);
