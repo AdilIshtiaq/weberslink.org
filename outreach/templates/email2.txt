@@ -1,0 +1,9 @@
+Subject: {domain} after midnight
+
+{greeting}
+
+One number: Baymard's research puts average cart abandonment at about 70%. If {store} gets 100 carts a week at {currency}60 each, that is roughly {currency}4,200 left behind every week. Some of it is simply a question nobody answered in time.
+
+The video is free and takes me 3 minutes to record. Should I send it?
+
+{sender_first_name}

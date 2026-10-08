@@ -1,0 +1,9 @@
+Subject: {domain} after midnight
+
+{greeting}
+
+I'll stop here so I don't fill your inbox.
+
+If shopper questions or abandoned carts become a priority for {store}, reply "video" and I'll send the free audit within 24 hours. Until then, I hope you have a great season.
+
+{sender_first_name}
