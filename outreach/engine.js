@@ -273,14 +273,16 @@ function dueFollowups(track, cfg, now = new Date()) {
   });
 }
 
+const withTimeout = (promise, ms) => Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error("DNS timeout"), { code: "ETIMEOUT" })), ms).unref())]);
+
 async function domainReceivesMail(domain) {
   try {
-    const mx = await dns.resolveMx(domain);
+    const mx = await withTimeout(dns.resolveMx(domain), 6000);
     if (mx.length) return "yes";
   } catch (e) {
     if (!["ENODATA", "ENOTFOUND", "ENODOMAIN"].includes(e.code)) return "unknown"; // lookup itself failed: don't block
   }
-  try { return (await dns.resolve4(domain)).length ? "yes" : "no"; } catch (e) {
+  try { return (await withTimeout(dns.resolve4(domain), 6000)).length ? "yes" : "no"; } catch (e) {
     return ["ENODATA", "ENOTFOUND", "ENODOMAIN"].includes(e.code) ? "no" : "unknown";
   }
 }
@@ -534,6 +536,7 @@ function status(cfg = loadConfig(), now = new Date()) {
     daysLeft: remaining && daily ? Math.ceil(remaining / daily) : 0,
     replied: track.filter((t) => t.status === "replied").sort((a, b) => String(b.replied_at).localeCompare(String(a.replied_at))).map((t) => ({
       email: t.email, store: t.store, mailbox: t.mailbox, note: t.note, repliedAt: t.replied_at, loomSent: t.loom_sent === "1", domain: t.domain })),
+    problems: readiness(cfg, cfg.mailboxes.filter((m) => m.enabled && m.email).map((m) => new Mailbox(m)), { live: !cfg.sending.dry_run }),
     running: run.running, startedAt: run.startedAt, runMode: run.mode, last: run.last, log: run.lines.slice(-200),
   };
 }
