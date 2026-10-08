@@ -12,7 +12,7 @@ const DATA_DIR = path.resolve(process.env.OUTREACH_DATA_DIR || path.join(__dirna
 const P = (...a) => path.join(DATA_DIR, ...a);
 
 const TRACK_FIELDS = ["email", "first_name", "store", "domain", "country", "category", "niche", "step", "status", "mailbox", "variant",
-  "last_sent", "subject", "first_message_id", "last_message_id", "psi", "lcp", "mx", "note", "replied_at", "loom_sent"];
+  "last_sent", "subject", "first_message_id", "last_message_id", "psi", "lcp", "mx", "note", "replied_at", "loom_sent", "sending"];
 // Fields the engine owns. The dashboard owns the rest (loom_sent), so a run never overwrites them.
 const ENGINE_FIELDS = TRACK_FIELDS.filter((f) => f !== "loom_sent");
 const SENT_FIELDS = ["date", "mode", "mailbox", "email", "store", "step", "variant", "subject"];
@@ -111,8 +111,14 @@ function appendSentLog(row) {
   fs.appendFileSync(file, (fresh ? SENT_FIELDS.join(",") + "\n" : "") + SENT_FIELDS.map((f) => csvCell(row[f])).join(",") + "\n");
 }
 
+const MAX_LOG_BYTES = 5 * 1024 * 1024;
 function appendLog(line) {
-  try { ensureDir(); fs.appendFileSync(P("run_log.txt"), line + "\n"); } catch (e) { /* logging must never break a run */ }
+  try {
+    ensureDir();
+    const f = P("run_log.txt");
+    try { if (fs.statSync(f).size > MAX_LOG_BYTES) fs.renameSync(f, f + ".1"); } catch (e) { /* no log yet */ }
+    fs.appendFileSync(f, line + "\n");
+  } catch (e) { /* logging must never break a run */ }
 }
 
 function loadSuppression() {

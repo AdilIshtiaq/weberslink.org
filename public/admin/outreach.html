@@ -168,6 +168,7 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
 
     <section id="v-dashboard">
       <div class="panel problems" id="problems" hidden><h3>Fix these before live sending</h3><ul id="problemList"></ul></div>
+      <div class="panel problems" id="heldBox" hidden><h3>Needs your check <small>a send was interrupted: look in your Sent folder, then choose</small></h3><div id="heldList"></div></div>
       <div class="cards" id="cards"></div>
       <div class="panel"><h3>Mailboxes <small>each one warms up automatically</small></h3><div class="scroll"><table id="mbTable"></table></div></div>
       <div class="grid2">
@@ -253,11 +254,15 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
         </div>
         <button class="btn primary" type="submit">Save settings</button>
       </form>
+      <div class="panel" style="margin-top:20px"><h3>Before you go live <small>save settings first</small></h3>
+        <div class="toolbar"><input type="email" id="testTo" placeholder="Your own email, e.g. you@gmail.com" style="max-width:320px"><button class="btn sm" id="testSend" type="button">Send test email</button><button class="btn sm" id="dnsBtn" type="button">Check domain DNS</button></div>
+        <p class="hint">The test sends one sample email from each mailbox. Check it lands in your inbox, not spam.</p>
+        <div id="goLive"></div>
+      </div>
     </section>
   </main>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <script>
 (function () {
   "use strict";
@@ -339,6 +344,10 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
       ["Bounced", c.bounced || 0], ["Days to finish", s.daysLeft || "–"]
     ].map(function (x) { return '<div class="card"><div class="n">' + esc(x[1]) + '</div><div class="l">' + esc(x[0]) + "</div></div>"; }).join("");
 
+    $("heldBox").hidden = !s.held.length;
+    $("heldList").innerHTML = s.held.map(function (x) {
+      return '<div class="reply"><div><div class="who">' + esc(x.store || x.email) + '</div><div class="meta">' + esc(x.email) + " · email " + esc(x.step) + " · " + esc(x.mailbox || "") + '</div></div><div class="acts"><button class="btn sm" data-held="retry_held" data-email="' + esc(x.email) + '">It was NOT sent: allow retry</button><button class="btn sm danger" data-held="skip_held" data-email="' + esc(x.email) + '">It was sent: never email again</button></div></div>';
+    }).join("");
     $("problems").hidden = !s.problems.length;
     $("problemList").innerHTML = s.problems.map(function (p) { return "<li>" + esc(p) + "</li>"; }).join("");
 
@@ -375,6 +384,11 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
   $("runBtn").addEventListener("click", function () { start(state.status.dryRun); });
   $("testBtn").addEventListener("click", function () { start(true); });
   $("stopBtn").addEventListener("click", function () { api("POST", "/api/outreach/stop", {}).then(function () { toast("Stopping after the current email…"); refresh(); }).catch(fail); });
+
+  $("heldList").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-held]"); if (!b) return;
+    api("POST", "/api/outreach/leads/action", { email: b.dataset.email, action: b.dataset.held }).then(function () { toast("Updated"); refresh(); }).catch(fail);
+  });
 
   // ---------------------------------------------------------------- replies
   function renderReplies() {
@@ -416,18 +430,14 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
   });
   $("importFile").addEventListener("change", function (e) {
     var f = e.target.files[0]; e.target.value = ""; if (!f) return;
-    if (!window.XLSX) return fail(new Error("The spreadsheet reader is still loading (or blocked). Try again in a moment."));
+    if (f.size > 8 * 1024 * 1024) return fail(new Error("That file is over 8 MB."));
     var rd = new FileReader();
     rd.onload = function () {
-      try {
-        var wb = XLSX.read(rd.result, { type: "array" });
-        var name = wb.SheetNames.filter(function (n) { return n.trim().toLowerCase() === "leads"; })[0] || wb.SheetNames[0];
-        var rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { defval: "", raw: false });
-        if (!rows.length) return fail(new Error("No rows found in sheet “" + name + "”."));
-        api("POST", "/api/outreach/leads/import", { rows: rows }).then(function (r) {
-          toast("Imported " + r.added + " new leads (" + r.existing + " already there, " + r.invalid + " skipped)"); state.leadPage = 0; loadLeads(); refresh();
-        }).catch(fail);
-      } catch (err) { fail(err); }
+      var bytes = new Uint8Array(rd.result), bin = "", i;
+      for (i = 0; i < bytes.length; i += 32768) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
+      api("POST", "/api/outreach/leads/import-file", { name: f.name, data: btoa(bin) }).then(function (r) {
+        toast("Imported " + r.added + " new leads (" + r.existing + " already there, " + r.invalid + " skipped)"); state.leadPage = 0; loadLeads(); refresh();
+      }).catch(fail);
     };
     rd.readAsArrayBuffer(f);
   });
@@ -518,6 +528,26 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
       mailboxes: boxes
     };
     api("PUT", "/api/outreach/config", body).then(function (r) { state.config = r.config; toast("Settings saved"); loadSettings(); refresh(); }).catch(fail);
+  });
+
+  // ---------------------------------------------------------------- go-live checks
+  $("testSend").addEventListener("click", function () {
+    var to = $("testTo").value.trim(); if (!to) return fail(new Error("Enter your own email address first."));
+    $("testSend").disabled = true;
+    api("POST", "/api/outreach/test-email", { to: to }).then(function (r) {
+      $("goLive").innerHTML = r.problems ? '<ul class="bad" style="margin-left:18px">' + r.problems.map(function (p) { return "<li>" + esc(p) + "</li>"; }).join("") + "</ul>" :
+        "<table>" + r.results.map(function (x) { return "<tr><td>" + esc(x.mailbox) + "</td><td>" + (x.ok ? '<span class="ok">sent: check inbox and spam</span>' : '<span class="bad">' + esc(x.error) + "</span>") + "</td></tr>"; }).join("") + "</table>";
+    }).catch(fail).finally(function () { $("testSend").disabled = false; });
+  });
+  $("dnsBtn").addEventListener("click", function () {
+    $("dnsBtn").disabled = true; $("goLive").innerHTML = '<p class="hint">Checking…</p>';
+    api("GET", "/api/outreach/dns").then(function (r) {
+      $("goLive").innerHTML = r.domains.length ? r.domains.map(function (d) {
+        return "<h3 style='margin:14px 0 6px'>" + esc(d.domain) + "</h3><table>" + d.checks.map(function (c) {
+          return "<tr><td style='width:70px'>" + esc(c.name) + '</td><td class="' + (c.status === "ok" ? "ok" : c.status === "bad" ? "bad" : "warn") + '" style="width:60px">' + (c.status === "ok" ? "OK" : c.status === "bad" ? "Fix" : "Check") + "</td><td class='hint'>" + esc(c.detail) + "</td></tr>";
+        }).join("") + "</table>";
+      }).join("") : '<p class="hint">Add a mailbox and save first.</p>';
+    }).catch(fail).finally(function () { $("dnsBtn").disabled = false; });
   });
 
   // ---------------------------------------------------------------- boot

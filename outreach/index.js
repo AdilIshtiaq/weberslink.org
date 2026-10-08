@@ -13,6 +13,7 @@ const path = require("path");
 const store = require("./store");
 const tpl = require("./templates");
 const eng = require("./engine");
+const xlsx = require("./xlsx");
 
 const PASSWORD = process.env.ADMIN_PASSWORD || "";
 const USERNAME = (process.env.ADMIN_USERNAME || "").trim().toLowerCase();
@@ -26,15 +27,25 @@ const sha = (s) => crypto.createHash("sha256").update(String(s)).digest();
 const safeEqual = (a, b) => crypto.timingSafeEqual(sha(a), sha(b));
 const sign = (v) => crypto.createHmac("sha256", SECRET).update(v).digest("hex");
 
+// Token = expiry.nonce.signature. Logging out revokes the nonce (kept in memory until the token would have expired).
+const revoked = new Map();
 function makeToken() {
-  const exp = String(Date.now() + SESSION_MS);
-  return `${exp}.${sign(exp)}`;
+  const body = `${Date.now() + SESSION_MS}.${crypto.randomBytes(8).toString("hex")}`;
+  return `${body}.${sign(body)}`;
+}
+function parseToken(tok) {
+  const parts = String(tok || "").split(".");
+  if (parts.length !== 3) return null;
+  const [exp, nonce, sig] = parts;
+  const want = sign(`${exp}.${nonce}`);
+  if (!exp || !nonce || sig.length !== want.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(want))) return null;
+  return { exp: Number(exp), nonce };
 }
 function validToken(tok) {
-  const [exp, sig] = String(tok || "").split(".");
-  if (!exp || !sig || Number(exp) < Date.now()) return false;
-  const want = sign(exp);
-  return sig.length === want.length && crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(want));
+  const t = parseToken(tok);
+  if (!t || t.exp < Date.now()) return false;
+  for (const [n, exp] of revoked) if (exp < Date.now()) revoked.delete(n);
+  return !revoked.has(t.nonce);
 }
 function cookieOf(req, name) {
   for (const part of String(req.headers.cookie || "").split(";")) {
@@ -47,6 +58,7 @@ const isHttps = (req) => Boolean(req.socket.encrypted) || String(req.headers["x-
 const authed = (req) => validToken(cookieOf(req, COOKIE));
 
 // ---- failed-login throttling (per IP and overall: X-Forwarded-For is easy to fake) ----
+let testSends = [];
 const fails = new Map();
 let globalFails = [];
 function recent(list) { const now = Date.now(); return list.filter((t) => now - t < 10 * 60 * 1000); }
@@ -110,6 +122,8 @@ async function route(req, res, url, method) {
     return send(res, 200, { ok: true }, { "Set-Cookie": cookie });
   }
   if (p === "/logout" && method === "POST") {
+    const t = parseToken(cookieOf(req, COOKIE));
+    if (t) revoked.set(t.nonce, t.exp);
     return send(res, 200, { ok: true }, { "Set-Cookie": `${COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0` });
   }
   if (p === "/session" && method === "GET") return send(res, 200, { ok: true, authed: authed(req), usernameRequired: Boolean(USERNAME) });
@@ -140,6 +154,15 @@ async function route(req, res, url, method) {
   }
   if (p === "/stop" && method === "POST") { eng.requestStop(); return send(res, 200, { ok: true }); }
 
+  if (p === "/test-email" && method === "POST") {
+    testSends = recent(testSends);
+    if (testSends.length >= 5) return send(res, 429, { ok: false, error: "Five test emails in 10 minutes is the limit. Try again shortly." });
+    const body = await readJson(req);
+    testSends.push(Date.now());
+    try { return send(res, 200, { ok: true, ...(await eng.sendTest(String(body.to || "").trim())) }); } catch (e) { return send(res, 400, { ok: false, error: e.message }); }
+  }
+  if (p === "/dns" && method === "GET") return send(res, 200, { ok: true, domains: await eng.dnsHealth() });
+
   if (p === "/preview" && method === "GET") {
     const n = Math.min(20, Math.max(1, parseInt(url.searchParams.get("n"), 10) || 5));
     try { return send(res, 200, { ok: true, emails: eng.previewNext(n) }); } catch (e) { return send(res, 400, { ok: false, error: e.message }); }
@@ -158,11 +181,25 @@ async function route(req, res, url, method) {
     if (!Array.isArray(body.rows) || body.rows.length > 20000) return send(res, 400, { ok: false, error: "Send up to 20,000 rows." });
     return send(res, 200, { ok: true, ...eng.importLeads(body.rows, eng.loadConfig()) });
   }
+  if (p === "/leads/import-file" && method === "POST") {
+    const body = await readJson(req, 12 * 1024 * 1024);
+    const name = String(body.name || "");
+    const buf = Buffer.from(String(body.data || ""), "base64");
+    if (!buf.length) return send(res, 400, { ok: false, error: "The file was empty." });
+    let rows;
+    if (/\.xlsx$/i.test(name)) rows = xlsx.readSheet(buf, "Leads");
+    else if (/\.csv$/i.test(name)) rows = store.parseCsv(buf.toString("utf8"));
+    else return send(res, 400, { ok: false, error: "Please choose an .xlsx or .csv file (in Excel: File > Save As)." });
+    if (!rows.length) return send(res, 400, { ok: false, error: "No rows found in the file." });
+    if (rows.length > 20000) return send(res, 400, { ok: false, error: "Up to 20,000 rows at a time." });
+    return send(res, 200, { ok: true, ...eng.importLeads(rows, eng.loadConfig()) });
+  }
   if (p === "/leads/action" && method === "POST") {
     const body = await readJson(req);
     const email = String(body.email || "");
     let r = null;
-    if (body.action === "loom_sent") r = store.updateLead(email, { loom_sent: "1" });
+    if (body.action === "retry_held" || body.action === "skip_held") r = eng.resolveHeld(email, body.action === "retry_held" ? "retry" : "skip");
+    else if (body.action === "loom_sent") r = store.updateLead(email, { loom_sent: "1" });
     else if (body.action === "loom_unsent") r = store.updateLead(email, { loom_sent: "" });
     else if (body.action === "dnc") {
       const row = store.loadTracking().find((t) => t.email.toLowerCase() === email.toLowerCase());

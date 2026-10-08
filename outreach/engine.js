@@ -267,7 +267,7 @@ function bounceCheck(track, box, cfg) {
 function dueFollowups(track, cfg, now = new Date()) {
   const gaps = cfg.sending.followup_gaps_days;
   return track.filter((t) => {
-    if (t.status !== "active") return false;
+    if (t.status !== "active" || t.sending) return false;
     const step = Number(t.step || 0);
     return step >= 1 && step <= 3 && daysSince(t.last_sent, cfg, now) >= (gaps[step - 1] || gaps[gaps.length - 1]);
   });
@@ -326,6 +326,8 @@ async function runOnce(opts = {}, deps = {}) {
   log(`=== Run start v${VERSION} (${dry ? "DRY RUN" : "LIVE"}) - ${boxes.length} mailbox(es)${sendDay ? "" : " - not a send day, checking inboxes only"}`);
 
   let track = loadState(cfg);
+  const held = track.filter((t) => t.sending);
+  if (held.length) log(`  WARNING: ${held.length} lead(s) were mid-send when an earlier run stopped unexpectedly and are on hold. Check your Sent folder, then resolve them in the dashboard.`);
   try {
     // 1. inboxes
     if (!dry || cfg.sending.check_inbox_in_dry_run) {
@@ -385,15 +387,24 @@ async function runOnce(opts = {}, deps = {}) {
           if (run.stop) return false;
         }
         let sent;
+        // Write-ahead marker: if the process dies between the SMTP send and the save below, this lead is
+        // held for a human check instead of being emailed twice.
+        t.sending = String(step);
+        store.saveRow(t);
         try {
           sent = await box.send({ to: t.email, subject, text: r.text, html, inReplyTo: step > 1 ? refs[refs.length - 1] : undefined, references: step > 1 ? refs : undefined });
         } catch (e) {
           if (e.code === "EENVELOPE" || (/recipient/i.test(e.message || "") && e.responseCode >= 500)) {
-            t.status = "bounced"; t.note = "recipient refused by server"; t.mailbox = box.addr;
+            t.status = "bounced"; t.note = "recipient refused by server"; t.mailbox = box.addr; t.sending = "";
             log(`  REFUSED ${t.email}`);
             store.saveRow(t);
             return true;
           }
+          // A timeout or dropped connection may have happened after the server accepted the message: keep the
+          // marker so a person checks the Sent folder. Any other failure definitely did not send: clear it.
+          const unsure = ["ETIMEDOUT", "ESOCKET"].includes(e.code);
+          if (unsure) log(`  UNSURE whether ${t.email} was sent (${e.code}). Held for a manual check in the dashboard - it will not be retried automatically.`);
+          else { t.sending = ""; store.saveRow(t); }
           log(`  Could not send from ${box.addr} (${e.code || e.responseCode || "error"}: ${String(e.message).slice(0, 120)}). Stopping this mailbox for today.`);
           budget[box.addr.toLowerCase()] = 0;
           return false;
@@ -403,7 +414,7 @@ async function runOnce(opts = {}, deps = {}) {
         if (!mb.first_live_send) mb.first_live_send = today(cfg, now);
         store.writeJson("mailboxes.json", state);
         log(`  SENT ${tag} ${box.addr} -> ${t.email} (${t.store})`);
-        t.step = String(step); t.last_sent = clock().toISOString(); t.last_message_id = sent.messageId;
+        t.sending = ""; t.step = String(step); t.last_sent = clock().toISOString(); t.last_message_id = sent.messageId;
         if (step === 1) { t.first_message_id = sent.messageId; t.subject = subject; t.status = "active"; t.mailbox = box.addr; t.variant = variant; }
         if (step === 4) t.status = "finished";
         store.saveRow(t);
@@ -426,7 +437,7 @@ async function runOnce(opts = {}, deps = {}) {
 
     // 4. new leads, spread across mailboxes with budget left
     let rr = 0;
-    for (const t of track.filter((x) => x.status === "new")) {
+    for (const t of track.filter((x) => x.status === "new" && !x.sending)) {
       if (run.stop) break;
       const open = boxes.filter((b) => (budget[b.addr.toLowerCase()] || 0) > 0);
       if (!open.length) break;
@@ -506,7 +517,7 @@ function previewNext(n, cfg = loadConfig(), boxes) {
       subject: step > 1 ? (/^re:/i.test(t.subject) ? t.subject : "Re: " + t.subject) : r.subject, text: r.text, html: r.html });
   };
   for (const t of dueFollowups(track, cfg)) { if (out.length >= n) break; add(t, Number(t.step) + 1); }
-  for (const t of track.filter((x) => x.status === "new")) { if (out.length >= n) break; add(t, 1); }
+  for (const t of track.filter((x) => x.status === "new" && !x.sending)) { if (out.length >= n) break; add(t, 1); }
   return out;
 }
 
@@ -536,10 +547,70 @@ function status(cfg = loadConfig(), now = new Date()) {
     daysLeft: remaining && daily ? Math.ceil(remaining / daily) : 0,
     replied: track.filter((t) => t.status === "replied").sort((a, b) => String(b.replied_at).localeCompare(String(a.replied_at))).map((t) => ({
       email: t.email, store: t.store, mailbox: t.mailbox, note: t.note, repliedAt: t.replied_at, loomSent: t.loom_sent === "1", domain: t.domain })),
+    held: track.filter((t) => t.sending).map((t) => ({ email: t.email, store: t.store, step: t.sending, mailbox: t.mailbox })),
     problems: readiness(cfg, cfg.mailboxes.filter((m) => m.enabled && m.email).map((m) => new Mailbox(m)), { live: !cfg.sending.dry_run }),
     running: run.running, startedAt: run.startedAt, runMode: run.mode, last: run.last, log: run.lines.slice(-200),
   };
 }
 
-module.exports = { VERSION, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dailyLimitFor, bounceCheck, dueFollowups, runOnce,
+// ---------------------------------------------------------------- go-live checks
+/** Sends one sample "email 1" from every enabled mailbox to `to`. Returns { problems } or { results }. */
+async function sendTest(to, cfg = loadConfig(), deps = {}) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(to))) throw new Error("Enter a valid email address to send the test to.");
+  const boxes = deps.mailboxes || cfg.mailboxes.filter((m) => m.enabled && m.email).map((m) => new Mailbox(m));
+  const problems = readiness(cfg, boxes, { live: true });
+  if (problems.length) return { problems };
+  const track = store.loadTracking();
+  const sample = { ...(track.find((t) => t.psi) || tpl.SAMPLE_LEAD), email: String(to) };
+  const results = [];
+  for (const box of boxes) {
+    try {
+      const variant = tpl.pickVariant(sample, 1);
+      const r = tpl.render(1, sample, cfg, variant);
+      await box.send({ to, subject: "[TEST] " + r.subject, text: r.text, html: cfg.sending.html_emails ? r.html : undefined }, { saveCopy: false });
+      results.push({ mailbox: box.addr, ok: true });
+    } catch (e) { results.push({ mailbox: box.addr, ok: false, error: String(e.message).slice(0, 160) }); }
+    finally { box.close && box.close(); }
+  }
+  log(`Test email sent to ${to}: ${results.filter((r) => r.ok).length} of ${results.length} mailbox(es) OK`);
+  return { results };
+}
+
+/** MX / SPF / DKIM / DMARC status for each sending domain. `resolver` is injectable for tests. */
+async function dnsHealth(cfg = loadConfig(), resolver = dns) {
+  const lookup = async (fn, ...args) => { try { return await withTimeout(fn.apply(resolver, args), 6000); } catch (e) { return ["ENODATA", "ENOTFOUND", "ENODOMAIN"].includes(e.code) ? [] : null; } };
+  const flat = (txt) => (txt || []).map((r) => r.join("")).filter(Boolean);
+  const domains = [...new Set(cfg.mailboxes.filter((m) => m.enabled && /@/.test(m.email)).map((m) => m.email.split("@")[1].toLowerCase()))];
+  const out = [];
+  for (const domain of domains) {
+    const mx = await lookup(resolver.resolveMx, domain);
+    const txt = flat(await lookup(resolver.resolveTxt, domain));
+    const spf = txt.filter((t) => /^v=spf1/i.test(t));
+    let dkim = null;
+    for (const sel of ["hostingermail-a", "hostingermail-b", "hostingermail-c", "hostingermail1", "default", "selector1", "google"]) {
+      const c = await lookup(resolver.resolveCname, `${sel}._domainkey.${domain}`);
+      const t = c && c.length ? c : flat(await lookup(resolver.resolveTxt, `${sel}._domainkey.${domain}`));
+      if (t && t.length) { dkim = sel; break; }
+    }
+    const dmarc = flat(await lookup(resolver.resolveTxt, `_dmarc.${domain}`)).filter((t) => /^v=dmarc1/i.test(t));
+    out.push({ domain, checks: [
+      { name: "MX", status: mx === null ? "unknown" : mx.length ? "ok" : "bad", detail: mx === null ? "lookup failed" : mx.length ? mx.map((m) => m.exchange).join(", ") : "missing: this domain cannot receive replies" },
+      { name: "SPF", status: spf.length === 1 ? "ok" : spf.length ? "bad" : "bad", detail: spf.length === 1 ? spf[0] : spf.length ? "more than one SPF record: merge them into one" : "missing: add the SPF record from Hostinger > Emails > DNS" },
+      { name: "DKIM", status: dkim ? "ok" : "warn", detail: dkim ? `selector ${dkim}` : "not found: enable DKIM in Hostinger > Emails > DNS (your selector may be one we don't try)" },
+      { name: "DMARC", status: dmarc.length ? "ok" : "warn", detail: dmarc.length ? dmarc[0] : "missing: add TXT _dmarc  v=DMARC1; p=none; rua=mailto:you@yourdomain" },
+    ] });
+  }
+  return out;
+}
+
+/** Resolve a lead held by the write-ahead marker. "retry": it was not sent, allow sending again. "skip": never email them. */
+function resolveHeld(email, action) {
+  const row = store.loadTracking().find((t) => t.email.toLowerCase() === String(email).toLowerCase());
+  if (!row || !row.sending) return null;
+  if (action === "retry") return store.updateLead(row.email, { sending: "", note: `hold cleared ${new Date().toISOString().slice(0, 10)}` });
+  if (action === "skip") return store.updateLead(row.email, { sending: "", status: "do-not-contact", note: "held after unsure send; skipped by you" });
+  return null;
+}
+
+module.exports = { sendTest, dnsHealth, resolveHeld, VERSION, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dailyLimitFor, bounceCheck, dueFollowups, runOnce,
   startRun, requestStop, previewNext, status, readiness, applyRules, loadState, tzParts, isSendDay, today, daysSince, run, log };
