@@ -56,6 +56,17 @@
     $$('#navLinks a').forEach(function (a) { a.addEventListener('click', function () { nav.classList.remove('open'); menuBtn.setAttribute('aria-expanded', false); }); });
   }
 
+  // Login link: goes to the sign-in page for the outreach dashboard. It reads "Dashboard" in a browser
+  // where the owner is already signed in (the dashboard sets that local flag; it is not a credential).
+  try {
+    var navLinks = $('#navLinks');
+    if (navLinks) {
+      var ol = document.createElement('a'); ol.href = '/admin/outreach'; ol.rel = 'nofollow';
+      ol.textContent = localStorage.getItem('wl_owner') === '1' ? 'Dashboard' : 'Login';
+      navLinks.appendChild(ol);
+    }
+  } catch (e) {}
+
   // ---------- Reveal ----------
   if ('IntersectionObserver' in window) {
     var io = new IntersectionObserver(function (entries) {

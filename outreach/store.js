@@ -12,7 +12,7 @@ const DATA_DIR = path.resolve(process.env.OUTREACH_DATA_DIR || path.join(__dirna
 const P = (...a) => path.join(DATA_DIR, ...a);
 
 const TRACK_FIELDS = ["email", "first_name", "store", "domain", "country", "category", "niche", "step", "status", "mailbox", "variant",
-  "last_sent", "subject", "first_message_id", "last_message_id", "psi", "lcp", "mx", "note", "replied_at", "loom_sent"];
+  "last_sent", "subject", "first_message_id", "last_message_id", "psi", "lcp", "mx", "note", "replied_at", "loom_sent", "sending"];
 // Fields the engine owns. The dashboard owns the rest (loom_sent), so a run never overwrites them.
 const ENGINE_FIELDS = TRACK_FIELDS.filter((f) => f !== "loom_sent");
 const SENT_FIELDS = ["date", "mode", "mailbox", "email", "store", "step", "variant", "subject"];
@@ -46,15 +46,16 @@ function parseCsv(text) {
   return rows.slice(1).map((r) => Object.fromEntries(header.map((h, i) => [h, r[i] === undefined ? "" : r[i]])));
 }
 
-function csvCell(v) {
+function csvCell(v, safe = false) {
   let s = v === undefined || v === null ? "" : String(v);
-  // Stop spreadsheet formula injection if someone opens an export in Excel.
-  if (/^[=+@\t]/.test(s) || (/^-/.test(s) && !/^-?\d/.test(s))) s = "'" + s;
+  // `safe` (used only for downloads) stops spreadsheet formula injection. Working files stay raw so the
+  // text that goes into emails is never altered.
+  if (safe && (/^[=+@\t]/.test(s) || (/^-/.test(s) && !/^-?\d/.test(s)))) s = "'" + s;
   return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
-function toCsv(rows, fields) {
-  return [fields.join(",")].concat(rows.map((r) => fields.map((f) => csvCell(r[f])).join(","))).join("\n") + "\n";
+function toCsv(rows, fields, safe = false) {
+  return [fields.join(",")].concat(rows.map((r) => fields.map((f) => csvCell(r[f], safe)).join(","))).join("\n") + "\n";
 }
 
 function readCsv(name) {
@@ -70,6 +71,29 @@ function atomicWrite(file, text) {
 
 function writeCsv(name, rows, fields) {
   atomicWrite(P(name), toCsv(rows, fields));
+}
+
+/** A CSV file re-written for download: same data, formula-injection safe for Excel. */
+function exportCsv(name) {
+  const rows = readCsv(name);
+  if (!rows.length) return "";
+  return toCsv(rows, Object.keys(rows[0]), true);
+}
+
+/** Strict-enough address check: rejects list separators, quotes, brackets and spaces that confuse mail routing. */
+const EMAIL_OK = /^[^\s@,;<>"()\[\]\\]+@[^\s@,;<>"()\[\]\\]+\.[^\s@,;<>"()\[\]\\]+$/;
+const isEmail = (s) => typeof s === "string" && s.length <= 254 && EMAIL_OK.test(s);
+
+/** Per-install signing key for login cookies, created once in the data folder (null if it can't be). */
+function sessionKey() {
+  try {
+    ensureDir();
+    const f = P("session.key");
+    try { const k = fs.readFileSync(f, "utf8").trim(); if (k.length >= 32) return k; } catch (e) { /* create below */ }
+    const k = require("crypto").randomBytes(32).toString("hex");
+    fs.writeFileSync(f, k, { mode: 0o600 });
+    return k;
+  } catch (e) { return null; }
 }
 
 function readJson(name, fallback) {
@@ -111,8 +135,14 @@ function appendSentLog(row) {
   fs.appendFileSync(file, (fresh ? SENT_FIELDS.join(",") + "\n" : "") + SENT_FIELDS.map((f) => csvCell(row[f])).join(",") + "\n");
 }
 
+const MAX_LOG_BYTES = 5 * 1024 * 1024;
 function appendLog(line) {
-  try { ensureDir(); fs.appendFileSync(P("run_log.txt"), line + "\n"); } catch (e) { /* logging must never break a run */ }
+  try {
+    ensureDir();
+    const f = P("run_log.txt");
+    try { if (fs.statSync(f).size > MAX_LOG_BYTES) fs.renameSync(f, f + ".1"); } catch (e) { /* no log yet */ }
+    fs.appendFileSync(f, line + "\n");
+  } catch (e) { /* logging must never break a run */ }
 }
 
 function loadSuppression() {
@@ -130,5 +160,5 @@ function addSuppression(value) {
   fs.appendFileSync(P("do_not_contact.csv"), value.trim().toLowerCase() + "\n");
 }
 
-module.exports = { DATA_DIR, P, ensureDir, TRACK_FIELDS, ENGINE_FIELDS, SENT_FIELDS, parseCsv, toCsv, readCsv, writeCsv, readJson, writeJson,
+module.exports = { exportCsv, isEmail, sessionKey, DATA_DIR, P, ensureDir, TRACK_FIELDS, ENGINE_FIELDS, SENT_FIELDS, parseCsv, toCsv, readCsv, writeCsv, readJson, writeJson,
   loadTracking, saveTracking, saveRow, updateLead, appendSentLog, appendLog, loadSuppression, addSuppression, atomicWrite };
