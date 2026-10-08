@@ -138,6 +138,7 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
     <div class="mark">W</div>
     <h1>Outreach</h1>
     <p>Sign in to manage your cold-email campaign.</p>
+    <div class="field" id="userField" hidden><label for="un">Username</label><input id="un" type="text" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
     <div class="field"><label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password" required autofocus></div>
     <p class="bad" id="loginErr" hidden></p>
     <button class="btn primary" style="width:100%" type="submit">Sign in</button>
@@ -288,11 +289,11 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
   };
 
   // ---------------------------------------------------------------- auth
-  function showLogin() { $("app").hidden = true; $("login").hidden = false; clearTimeout(pollTimer); $("pw").focus(); }
+  function showLogin() { $("app").hidden = true; $("login").hidden = false; clearTimeout(pollTimer); $("userField").hidden = !state.needUser; $(state.needUser ? "un" : "pw").focus(); }
   function showApp() { $("login").hidden = true; $("app").hidden = false; try { localStorage.setItem("wl_owner", "1"); } catch (e) {} refresh(); }
   $("loginForm").addEventListener("submit", function (e) {
     e.preventDefault(); $("loginErr").hidden = true;
-    api("POST", "/api/outreach/login", { password: $("pw").value }).then(function () { $("pw").value = ""; showApp(); })
+    api("POST", "/api/outreach/login", { username: $("un").value, password: $("pw").value }).then(function () { $("pw").value = ""; showApp(); })
       .catch(function (err) { $("loginErr").textContent = err.message; $("loginErr").hidden = false; });
   });
   $("logout").addEventListener("click", function () { try { localStorage.removeItem("wl_owner"); } catch (e) {} api("POST", "/api/outreach/logout", {}).finally(showLogin); });
@@ -521,6 +522,7 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
 
   // ---------------------------------------------------------------- boot
   api("GET", "/api/outreach/session").then(function (r) {
+    state.needUser = Boolean(r.usernameRequired);
     if (!r.authed) return showLogin();
     var v = location.hash.slice(1); if (TITLES[v]) state.view = v;
     showApp(); go(state.view);

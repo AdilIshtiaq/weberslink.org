@@ -1,7 +1,8 @@
 /*
  * Outreach HTTP API, mounted by server.js under /api/outreach/*.
  *
- * Auth: set ADMIN_PASSWORD on the server. Without it every endpoint answers 503, so the feature is off by default.
+ * Auth: set ADMIN_PASSWORD on the server (and optionally ADMIN_USERNAME, which then must be entered too).
+ * Without a password every endpoint answers 503, so the feature is off by default.
  * Login gives a signed, HttpOnly, SameSite=Strict cookie (12 hours). The dashboard page itself is public HTML with
  * no data in it; all data comes through these endpoints.
  * Cron: set OUTREACH_CRON_TOKEN (16+ chars) and call GET/POST /api/outreach/cron?token=... from Hostinger cron.
@@ -14,8 +15,9 @@ const tpl = require("./templates");
 const eng = require("./engine");
 
 const PASSWORD = process.env.ADMIN_PASSWORD || "";
+const USERNAME = (process.env.ADMIN_USERNAME || "").trim().toLowerCase();
 const CRON_TOKEN = process.env.OUTREACH_CRON_TOKEN || "";
-const SECRET = process.env.ADMIN_SESSION_SECRET || crypto.createHash("sha256").update("wl-outreach:" + PASSWORD).digest("hex");
+const SECRET = process.env.ADMIN_SESSION_SECRET || crypto.createHash("sha256").update("wl-outreach:" + (USERNAME ? USERNAME + ":" : "") + PASSWORD).digest("hex");
 const COOKIE = "wl_admin";
 const SESSION_MS = 12 * 3600 * 1000;
 const enabled = PASSWORD.length >= 8;
@@ -100,14 +102,17 @@ async function route(req, res, url, method) {
     const ip = clientIp(req);
     if (throttled(ip)) return send(res, 429, { ok: false, error: "Too many attempts. Try again in 10 minutes." });
     const body = await readJson(req, 2000);
-    if (!body.password || !safeEqual(body.password, PASSWORD)) { noteFail(ip); return send(res, 401, { ok: false, error: "Wrong password." }); }
+    // Check both before answering so the reply never reveals which one was wrong.
+    const userOk = !USERNAME || (typeof body.username === "string" && safeEqual(body.username.trim().toLowerCase(), USERNAME));
+    const passOk = typeof body.password === "string" && body.password !== "" && safeEqual(body.password, PASSWORD);
+    if (!(userOk && passOk)) { noteFail(ip); return send(res, 401, { ok: false, error: USERNAME ? "Wrong username or password." : "Wrong password." }); }
     const cookie = `${COOKIE}=${encodeURIComponent(makeToken())}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${SESSION_MS / 1000}${isHttps(req) ? "; Secure" : ""}`;
     return send(res, 200, { ok: true }, { "Set-Cookie": cookie });
   }
   if (p === "/logout" && method === "POST") {
     return send(res, 200, { ok: true }, { "Set-Cookie": `${COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0` });
   }
-  if (p === "/session" && method === "GET") return send(res, 200, { ok: true, authed: authed(req) });
+  if (p === "/session" && method === "GET") return send(res, 200, { ok: true, authed: authed(req), usernameRequired: Boolean(USERNAME) });
 
   // everything below needs a valid session
   if (!authed(req)) return send(res, 401, { ok: false, error: "Please sign in." });

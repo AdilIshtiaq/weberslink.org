@@ -16,6 +16,7 @@ the Replies tab tracks this.
 | Variable | Required | Purpose |
 |---|---|---|
 | `ADMIN_PASSWORD` | yes (8+ chars) | Dashboard login. Unset = feature off. |
+| `ADMIN_USERNAME` | optional | If set, the sign-in page asks for this username too (not case-sensitive). If unset, the password alone is enough. |
 | `OUTREACH_PASSWORD_1`, `_2`, ... | to send | Password of mailbox 1, 2, ... (numbers follow the order in Settings). |
 | `OUTREACH_CRON_TOKEN` | for cron | 16+ random characters; lets a cron job start a run. |
 | `OUTREACH_DATA_DIR` | recommended | Absolute path outside the app folder, e.g. `/home/USER/outreach-data`, so a Git deploy never wipes your leads. Default: `../outreach-data`. |
