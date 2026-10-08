@@ -56,6 +56,16 @@
     $$('#navLinks a').forEach(function (a) { a.addEventListener('click', function () { nav.classList.remove('open'); menuBtn.setAttribute('aria-expanded', false); }); });
   }
 
+  // Owner shortcut: the outreach dashboard link appears only in a browser where it has been signed in to,
+  // so visitors never see it. (The dashboard sets / clears the flag; it is a convenience, not a credential.)
+  try {
+    var navLinks = $('#navLinks');
+    if (navLinks && localStorage.getItem('wl_owner') === '1') {
+      var ol = document.createElement('a'); ol.href = '/admin/outreach'; ol.textContent = 'Outreach';
+      navLinks.appendChild(ol);
+    }
+  } catch (e) {}
+
   // ---------- Reveal ----------
   if ('IntersectionObserver' in window) {
     var io = new IntersectionObserver(function (entries) {

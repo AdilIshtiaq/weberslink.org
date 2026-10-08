@@ -289,13 +289,13 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
 
   // ---------------------------------------------------------------- auth
   function showLogin() { $("app").hidden = true; $("login").hidden = false; clearTimeout(pollTimer); $("pw").focus(); }
-  function showApp() { $("login").hidden = true; $("app").hidden = false; refresh(); }
+  function showApp() { $("login").hidden = true; $("app").hidden = false; try { localStorage.setItem("wl_owner", "1"); } catch (e) {} refresh(); }
   $("loginForm").addEventListener("submit", function (e) {
     e.preventDefault(); $("loginErr").hidden = true;
     api("POST", "/api/outreach/login", { password: $("pw").value }).then(function () { $("pw").value = ""; showApp(); })
       .catch(function (err) { $("loginErr").textContent = err.message; $("loginErr").hidden = false; });
   });
-  $("logout").addEventListener("click", function () { api("POST", "/api/outreach/logout", {}).finally(showLogin); });
+  $("logout").addEventListener("click", function () { try { localStorage.removeItem("wl_owner"); } catch (e) {} api("POST", "/api/outreach/logout", {}).finally(showLogin); });
 
   // ---------------------------------------------------------------- navigation
   var TITLES = { dashboard: "Dashboard", replies: "Replies", leads: "Leads", templates: "Emails", settings: "Settings" };
