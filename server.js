@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
 const chat = require("./chat");
+const outreach = require("./outreach");
 
 let nodemailer = null;
 try {
@@ -222,6 +223,7 @@ function seoRedirect(req, res) {
 }
 
 const server = http.createServer((req, res) => {
+  if (outreach.handle(req, res)) return;
   if (req.method === "POST" && req.url === "/api/lead") return handleLead(req, res);
   if (req.method === "POST" && req.url === "/api/chat") return chat.handleChat(req, res, { deliverLead });
   if (req.method === "GET" && req.url === "/api/chat/status") return chat.handleStatus(req, res);
@@ -239,4 +241,5 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  outreach.startScheduler();
 });

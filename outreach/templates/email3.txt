@@ -1,0 +1,9 @@
+Subject: {domain} after midnight
+
+{greeting}
+
+We built an AI shopping assistant for Sharjah Optical, an online eyewear store. It answers sizing, shipping and returns questions around the clock and follows up on abandoned carts.
+
+I can show you what that would look like on {domain}, in a free 3-minute video. Reply "yes" and I'll send it within 24 hours.
+
+{sender_first_name}

@@ -1,0 +1,14 @@
+{
+  "name": "WebersLink Outreach",
+  "short_name": "Outreach",
+  "description": "Cold-email outreach dashboard",
+  "start_url": "/admin/outreach",
+  "scope": "/admin/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "icons": [
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
