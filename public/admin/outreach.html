@@ -55,6 +55,7 @@ a{color:var(--accent)}
 
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:9px 16px;border-radius:99px;border:1px solid var(--line-2);background:transparent;font-size:14px;font-weight:500;transition:background .15s,border-color .15s}
 .btn:hover{border-color:var(--text)}
+a.btn{color:var(--text);text-decoration:none}
 .btn.primary{background:var(--text);color:#000;border-color:var(--text)}
 .btn.primary:hover{background:#dcdcdc}
 .btn.danger{color:var(--bad);border-color:rgba(248,113,113,.4)}
@@ -189,6 +190,7 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
         <span style="flex:1"></span>
         <button class="btn sm" id="dncBtn">Never contact…</button>
         <a class="btn sm" href="/api/outreach/export?file=tracking" download>Export CSV</a>
+        <a class="btn sm" href="/api/outreach/export?file=sent" download>Sent log</a>
         <label class="btn primary sm" style="margin:0;cursor:pointer">Import leads<input type="file" id="importFile" accept=".xlsx,.xls,.csv" hidden></label>
       </div>
       <div class="panel"><div class="scroll"><table id="leadTable"></table></div><div class="toolbar" style="margin:14px 0 0"><button class="btn sm" id="prevPg">Previous</button><span class="hint" id="pgInfo"></span><button class="btn sm" id="nextPg">Next</button></div></div>

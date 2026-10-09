@@ -133,6 +133,23 @@ function daysSince(iso, cfg, now = new Date()) {
   if (!iso || Number.isNaN(d.getTime())) return 0;
   return daysBetween(tzParts(d, cfg.sending.timezone).date, today(cfg, now));
 }
+const addDays = (dateStr, n) => new Date(Date.parse(dateStr + "T12:00:00Z") + n * 864e5).toISOString().slice(0, 10);
+
+/** Plain-English "what happens next" for one lead, for the Leads table. */
+function nextEmail(t, cfg, now = new Date()) {
+  const send = cfg.sending.send_days.map((d) => d.toLowerCase().slice(0, 3));
+  const nextSendDay = (from) => { let d = from; for (let i = 0; i < 8 && !send.includes(tzParts(new Date(d + "T12:00:00Z"), "UTC").weekday); i++) d = addDays(d, 1); return d; };
+  const step = Number(t.step || 0);
+  if (t.sending) return "On hold (check it)";
+  if (t.status === "new") return "Email 1 on the next send day";
+  if (t.status === "finished") return "Sequence complete";
+  if (t.status !== "active" || step < 1 || step > 3) return "";
+  const lastDay = tzParts(new Date(t.last_sent), cfg.sending.timezone).date;
+  const gap = cfg.sending.followup_gaps_days[step - 1] || cfg.sending.followup_gaps_days[cfg.sending.followup_gaps_days.length - 1];
+  const due = nextSendDay(addDays(lastDay, gap));
+  return daysBetween(today(cfg, now), due) <= 0 ? `Email ${step + 1} due on the next run` : `Email ${step + 1} on ${due}`;
+}
+
 function isSendDay(cfg, now = new Date()) {
   return cfg.sending.send_days.map((d) => d.toLowerCase().slice(0, 3)).includes(tzParts(now, cfg.sending.timezone).weekday);
 }
@@ -726,5 +743,5 @@ function resolveHeld(email, action) {
   return null;
 }
 
-module.exports = { sendTest, dnsHealth, resolveHeld, VERSION, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dailyLimitFor, bounceCheck, dueFollowups, runOnce,
+module.exports = { nextEmail, sendTest, dnsHealth, resolveHeld, VERSION, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dailyLimitFor, bounceCheck, dueFollowups, runOnce,
   startRun, requestStop, previewNext, status, readiness, applyRules, loadState, tzParts, isSendDay, today, daysSince, run, log };

@@ -190,7 +190,8 @@ async function route(req, res, url, method) {
     const limit = Math.min(500, Math.max(1, parseInt(url.searchParams.get("limit"), 10) || 100));
     const offset = Math.max(0, parseInt(url.searchParams.get("offset"), 10) || 0);
     const all = store.loadTracking().filter((t) => (!st || t.status === st) && (!q || `${t.email} ${t.store} ${t.domain}`.toLowerCase().includes(q)));
-    return send(res, 200, { ok: true, total: all.length, rows: all.slice(offset, offset + limit).map((t) => Object.fromEntries(LEAD_VIEW.map((f) => [f, t[f]]))) });
+    const cfg = eng.loadConfig();
+    return send(res, 200, { ok: true, total: all.length, rows: all.slice(offset, offset + limit).map((t) => ({ ...Object.fromEntries(LEAD_VIEW.map((f) => [f, t[f]])), next: eng.nextEmail(t, cfg) })) });
   }
   if (p === "/leads/import" && method === "POST") {
     const body = await readJson(req, 8 * 1024 * 1024);

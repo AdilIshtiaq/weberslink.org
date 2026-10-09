@@ -65,6 +65,7 @@ test("leads: import (spreadsheet columns), list, filter, loom flag, do-not-conta
   const list = await api("GET", "/api/outreach/leads?q=shop2");
   assert.strictEqual(list.json.total, 1);
   assert.ok(!("first_message_id" in list.json.rows[0]), "internal ids are not exposed");
+  assert.match(list.json.rows[0].next, /Email 1 on the next send day/, "each lead says what happens next");
   assert.strictEqual((await api("POST", "/api/outreach/leads/action", { email: "o1@shop1.com", action: "loom_sent" })).status, 200);
   assert.strictEqual((await api("POST", "/api/outreach/leads/action", { email: "nobody@x.com", action: "loom_sent" })).status, 404);
   assert.strictEqual((await api("POST", "/api/outreach/leads/action", { email: "o2@shop2.com", action: "dnc" })).status, 200);
