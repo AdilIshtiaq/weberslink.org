@@ -48,7 +48,7 @@
     if (history.replaceState) history.replaceState(null, "", "#" + view);
     if (view === "leads") loadLeads();
     if (view === "templates") loadTemplates();
-    if (view === "settings") loadSettings();
+    if (view === "settings") { loadSettings(); showDataInfo(); }
     if (view === "replies" || view === "dashboard") renderStatus();
   }
   document.querySelectorAll(".nav-btn[data-view]").forEach(function (b) { b.addEventListener("click", function () { go(b.dataset.view); }); });
@@ -79,6 +79,13 @@
       ["Bounced", c.bounced || 0], ["Days to finish", s.daysLeft || "–"]
     ].map(function (x) { return '<div class="card"><div class="n">' + esc(x[1]) + '</div><div class="l">' + esc(x[0]) + "</div></div>"; }).join("");
 
+    var d = s.data || {}, warns = [];
+    if (d.insideApp) warns.push("Your data folder (" + d.dir + ") is inside the app's folder, so a redeploy can erase it. Set OUTREACH_DATA_DIR in Hostinger to a folder outside the app, restart, then restore a backup.");
+    if (d.dir && !d.writable) warns.push("The data folder (" + d.dir + ") can't be written to, so nothing you save will stick. Set OUTREACH_DATA_DIR to a folder you can write to.");
+    var haveData = (s.total || 0) > 0 || (s.mailboxes || []).length > 0;
+    if (haveData && (!s.lastBackup || Date.now() - Date.parse(s.lastBackup) > 7 * 864e5)) warns.push((s.lastBackup ? "Your last backup was over a week ago." : "You have never downloaded a backup.") + " Download one in Settings → Your data and backup, so a redeploy or mistake can't cost you your work.");
+    $("dataWarn").hidden = !warns.length;
+    $("dataWarnList").innerHTML = warns.map(function (w) { return "<li>" + esc(w) + "</li>"; }).join("");
     $("heldBox").hidden = !s.held.length;
     $("heldList").innerHTML = s.held.map(function (x) {
       return '<div class="reply"><div><div class="who">' + esc(x.store || x.email) + '</div><div class="meta">' + esc(x.email) + " · email " + esc(x.step) + " · " + esc(x.mailbox || "") + '</div></div><div class="acts"><button class="btn sm" data-held="retry_held" data-email="' + esc(x.email) + '">It was NOT sent: allow retry</button><button class="btn sm danger" data-held="skip_held" data-email="' + esc(x.email) + '">It was sent: never email again</button></div></div>';
@@ -176,6 +183,68 @@
       }).catch(fail);
     };
     rd.readAsArrayBuffer(f);
+  });
+
+  // ---------------------------------------------------------------- Gemini personalisation
+  var aiTimer, aiRows = [];
+  $("aiBtn").addEventListener("click", function () { $("aiBox").hidden = !$("aiBox").hidden; if (!$("aiBox").hidden) loadAi(); else clearTimeout(aiTimer); });
+  // Never redraw the review table while you are typing in it: only the status area updates.
+  function aiEditing() {
+    var a = document.activeElement, dirty = false;
+    $("aiBody").querySelectorAll("textarea.ai-line").forEach(function (t) { if (t.value !== t.defaultValue) dirty = true; });
+    return dirty || Boolean(a && a.classList && a.classList.contains("ai-line"));
+  }
+  function loadAi() {
+    clearTimeout(aiTimer);
+    Promise.all([api("GET", "/api/outreach/leads/research/status"), api("GET", "/api/outreach/leads/research/pending?limit=50")]).then(function (r) {
+      renderAi(r[0], r[1].rows, aiEditing());
+      if (r[0].job.running && !$("aiBox").hidden) aiTimer = setTimeout(loadAi, 2500);
+    }).catch(fail);
+  }
+  function renderAi(s, rows, keepTable) {
+    var c = s.counts, j = s.job, html = "";
+    if (!$("aiHead")) $("aiBody").innerHTML = '<div id="aiHead"></div><div id="aiTable"></div><p class="hint" style="margin-top:10px">Only approved lines go into emails (as <code>{custom_line_para}</code> in email 1; blank means the normal email). Check each against the store’s site: Gemini can be wrong. You can also add your own lines in a spreadsheet column named “first line”.</p>';
+    if (!s.configured) {
+      $("aiHead").innerHTML = '<p class="warn">Gemini is not set up yet.</p><p class="hint">Create a free key in Google AI Studio, then in Hostinger add an environment variable named <code>GEMINI_OUTREACH_KEY</code> with that key as its value, and restart the app. Never paste the key anywhere else.</p>';
+      $("aiTable").innerHTML = ""; return;
+    }
+    if (s.sharedKey) html += '<p class="warn">This is using your website chat key, so research shares its daily quota. Add a separate <code>GEMINI_OUTREACH_KEY</code> to protect the chat widget.</p>';
+    html += '<p class="hint">' + c.waiting + " waiting for research · " + c.pending + " to review · " + c.approved + " approved · " + c.rejected + " rejected · " + c.failed + " had no reliable detail · used today " + s.usedToday + " of " + s.dailyCap + "</p>";
+    if (j.running) {
+      html += '<p><b>Researching</b> “' + esc(j.current) + "” (" + j.done + " of " + j.total + ') <button class="btn sm danger" data-ai-stop="1">Stop</button></p>';
+    } else {
+      html += (j.message ? '<p class="hint">' + esc(j.message) + "</p>" : "") +
+        '<div class="toolbar"><select id="aiLimit"><option>10</option><option selected>25</option><option>50</option><option>100</option></select><button class="btn primary sm" id="aiStart"' + (c.waiting || c.failed ? "" : " disabled") + '>Research next leads</button>' +
+        '<label class="check" style="font-size:13px"><input type="checkbox" id="aiRetry"> also retry ones that found nothing</label></div>';
+    }
+    if (keepTable) html += '<p class="hint">You are editing a line, so the list below is paused. It refreshes when you approve or reject that line.</p>';
+    $("aiHead").innerHTML = html;
+    if (keepTable) return;
+    aiRows = rows;
+    var high = rows.filter(function (r) { return r.conf === "high"; }).length;
+    $("aiTable").innerHTML = rows.length ? '<div class="toolbar" style="margin-top:6px"><b>' + c.pending + ' suggestions to review</b><span style="flex:1"></span>' + (high ? '<button class="btn sm" data-ai-all="1">Approve the ' + high + " high-confidence shown</button>" : "") + "</div>" +
+      '<div class="scroll" style="max-height:420px;overflow:auto"><table><tr><th>Store</th><th>Suggested line (you can edit it)</th><th>Source</th><th>Confidence</th><th></th></tr>' + rows.map(function (r) {
+        return "<tr><td>" + esc(r.store || r.domain) + '<div class="hint">' + esc(r.email) + "</div></td><td><textarea class='ai-line' rows='3' maxlength='240' data-line='" + esc(r.email) + "'>" + esc(r.line) + "</textarea></td><td>" +
+          (r.source ? '<a href="' + esc(r.source) + '" target="_blank" rel="noopener noreferrer">page</a>' : "–") + '</td><td><span class="chip ' + esc(r.conf) + '">' + esc(r.conf) + '</span></td><td style="white-space:nowrap"><button class="btn primary sm" data-ai="approve" data-email="' + esc(r.email) + '">Approve</button> <button class="btn sm" data-ai="reject" data-email="' + esc(r.email) + '">Reject</button></td></tr>';
+      }).join("") + "</table></div>" : "";
+  }
+  $("aiBody").addEventListener("click", function (e) {
+    var t = e.target;
+    if (t.id === "aiStart") {
+      api("POST", "/api/outreach/leads/research/start", { limit: Number($("aiLimit").value), retryFailed: Boolean($("aiRetry") && $("aiRetry").checked) }).then(function () { toast("Research started"); loadAi(); }).catch(fail);
+    } else if (t.getAttribute("data-ai-stop")) {
+      api("POST", "/api/outreach/leads/research/stop", {}).then(function () { toast("Stopping after the current store…"); loadAi(); }).catch(fail);
+    } else if (t.getAttribute("data-ai-all")) {
+      // Only the high-confidence lines currently on screen, exactly as shown, and only the ones you have not edited.
+      var items = aiRows.filter(function (r) {
+        var box = $("aiBody").querySelector('textarea[data-line="' + CSS.escape(r.email) + '"]');
+        return r.conf === "high" && box && box.value === r.line;
+      }).map(function (r) { return { email: r.email, line: r.line }; });
+      api("POST", "/api/outreach/leads/research/approve-shown", { items: items }).then(function (r) { toast("Approved " + r.approved + " lines"); loadAi(); }).catch(fail);
+    } else if (t.getAttribute("data-ai")) {
+      var email = t.dataset.email, box = $("aiBody").querySelector('textarea[data-line="' + CSS.escape(email) + '"]');
+      api("POST", "/api/outreach/leads/research/review", { email: email, action: t.dataset.ai, line: box ? box.value : undefined }).then(function () { toast(t.dataset.ai === "approve" ? "Approved" : "Rejected"); var row = t.closest("tr"); if (row) row.remove(); aiRows = aiRows.filter(function (r) { return r.email !== email; }); loadAi(); }).catch(function (e2) { fail(e2); });
+    }
   });
 
   // ---------------------------------------------------------------- list cleaner
@@ -311,6 +380,26 @@
       mailboxes: boxes
     };
     api("PUT", "/api/outreach/config", body).then(function (r) { state.config = r.config; toast("Settings saved"); loadSettings(); refresh(); }).catch(fail);
+  });
+
+  // ---------------------------------------------------------------- data + backup
+  function showDataInfo() {
+    var d = (state.status && state.status.data) || {}, lb = state.status && state.status.lastBackup;
+    $("dataInfo").textContent = d.dir ? "Saved in " + d.dir + " (" + (d.explicit ? "set by OUTREACH_DATA_DIR" : "default location; set OUTREACH_DATA_DIR in Hostinger to choose it yourself") + "). " + (lb ? "Last backup downloaded " + ago(lb) + "." : "No backup downloaded yet.") : "";
+  }
+  $("bkDownload").addEventListener("click", function () { setTimeout(function () { refresh().then(showDataInfo); }, 1500); });
+  $("bkRestore").addEventListener("change", function (e) {
+    var f = e.target.files[0]; e.target.value = ""; if (!f) return;
+    if (f.size > 50 * 1024 * 1024) return fail(new Error("That file is too large to be an outreach backup."));
+    var rd = new FileReader();
+    rd.onload = function () {
+      var bundle; try { bundle = JSON.parse(rd.result); } catch (err) { return fail(new Error("That isn't a valid backup file.")); }
+      if (!bundle || bundle.format !== "weberslink-outreach-backup") return fail(new Error("That isn't an outreach backup file."));
+      var n = Object.keys(bundle.files || {}).length;
+      if (!confirm("Restore this backup (made " + String(bundle.createdAt || "").slice(0, 10) + ", " + n + " files)?\n\nIt REPLACES your current settings and leads. A safety copy of the current data is saved first.")) return;
+      api("POST", "/api/outreach/backup/restore", { backup: bundle }).then(function (r) { toast("Restored " + r.restored.length + " files"); loadSettings(); refresh().then(showDataInfo); }).catch(fail);
+    };
+    rd.readAsText(f);
   });
 
   // ---------------------------------------------------------------- go-live checks

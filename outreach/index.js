@@ -15,6 +15,8 @@ const tpl = require("./templates");
 const eng = require("./engine");
 const xlsx = require("./xlsx");
 const cleaner = require("./cleaner");
+const research = require("./research");
+const backup = require("./backup");
 
 const PASSWORD = process.env.ADMIN_PASSWORD || "";
 const USERNAME = (process.env.ADMIN_USERNAME || "").trim().toLowerCase();
@@ -151,7 +153,16 @@ async function route(req, res, url, method) {
     return send(res, 415, { ok: false, error: "JSON required." }); // blocks cross-site form posts
   }
 
-  if (p === "/status" && method === "GET") return send(res, 200, { ok: true, ...eng.status(), server: { cron: CRON_TOKEN.length >= 16 } });
+  if (p === "/status" && method === "GET") return send(res, 200, { ok: true, ...eng.status(), data: store.info(), lastBackup: backup.lastBackup(), server: { cron: CRON_TOKEN.length >= 16 } });
+  if (p === "/backup" && method === "GET") {
+    const b = backup.create();
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Content-Disposition": `attachment; filename="outreach-backup-${new Date().toISOString().slice(0, 10)}.json"`, "Cache-Control": "no-store" });
+    return res.end(JSON.stringify(b));
+  }
+  if (p === "/backup/restore" && method === "POST") {
+    const body = await readJson(req, 60 * 1024 * 1024);
+    try { return send(res, 200, { ok: true, ...backup.restore(body.backup) }); } catch (e) { return send(res, e.status || 500, { ok: false, error: e.status ? e.message : "Restore failed." }); }
+  }
 
   if (p === "/config" && method === "GET") return send(res, 200, { ok: true, config: eng.loadConfig() });
   if (p === "/config" && method === "PUT") {
@@ -211,6 +222,23 @@ async function route(req, res, url, method) {
     if (!rows.length) return send(res, 400, { ok: false, error: "No rows found in the file." });
     if (rows.length > 20000) return send(res, 400, { ok: false, error: "Up to 20,000 rows at a time." });
     return send(res, 200, { ok: true, ...eng.importLeads(rows, eng.loadConfig()) });
+  }
+  if (p === "/leads/research/status" && method === "GET") return send(res, 200, { ok: true, ...research.status() });
+  if (p === "/leads/research/start" && method === "POST") {
+    const body = await readJson(req);
+    const r = research.startJob({ limit: Math.max(1, Math.min(100, parseInt(body.limit, 10) || 25)), retryFailed: body.retryFailed === true });
+    return send(res, r.started ? 202 : r.reason && /already/.test(r.reason) ? 409 : 400, { ok: r.started, ...(r.started ? {} : { error: r.reason }) });
+  }
+  if (p === "/leads/research/stop" && method === "POST") { research.stopJob(); return send(res, 200, { ok: true }); }
+  if (p === "/leads/research/pending" && method === "GET") return send(res, 200, { ok: true, rows: research.pending(Math.min(200, Math.max(1, parseInt(url.searchParams.get("limit"), 10) || 50))) });
+  if (p === "/leads/research/review" && method === "POST") {
+    const body = await readJson(req);
+    const r = research.review(String(body.email || ""), String(body.action || ""), body.line);
+    return r.error ? send(res, 400, { ok: false, error: r.error }) : send(res, 200, { ok: true });
+  }
+  if (p === "/leads/research/approve-shown" && method === "POST") {
+    const body = await readJson(req);
+    return send(res, 200, { ok: true, approved: research.approveShown(body.items) });
   }
   if (p === "/leads/clean/start" && method === "POST") {
     const r = cleaner.startScan({ mx: eng.domainReceivesMail });
@@ -312,6 +340,10 @@ function handle(req, res) {
  * Restarts can't cause extra sends: the per-mailbox daily budget counts what was already sent today.
  */
 function startScheduler() {
+  if (enabled) {
+    const d = store.info();
+    console.log(`Outreach data folder: ${d.dir} (${d.explicit ? "set by OUTREACH_DATA_DIR" : "default; set OUTREACH_DATA_DIR to choose it"})${d.insideApp ? " WARNING: inside the app folder, a redeploy can erase it" : ""}${d.writable ? "" : " WARNING: not writable"}`);
+  }
   const raw = process.env.OUTREACH_AUTO_RUN_HOUR;
   if (!enabled || raw === undefined || raw === "") return;
   const hour = Number(raw);

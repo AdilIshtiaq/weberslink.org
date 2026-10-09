@@ -89,6 +89,8 @@ function fieldsFor(lead, cfg) {
     speedNote = `\n\nAlso, Google's mobile test gives ${domain} ${score}/100, so pages are slow on phones too. I'll cover that in the video.`;
   }
   const firstName = String(lead.first_name || "").trim();
+  // Only a line a person approved (or supplied in the spreadsheet) is ever used. Pending or rejected AI drafts stay out.
+  const customLine = lead.research_status === "approved" ? String(lead.custom_line || "").replace(/\s+/g, " ").trim() : "";
   return {
     domain,
     category: category ? category.toLowerCase().replace(/&/g, "and") : "online",
@@ -96,6 +98,8 @@ function fieldsFor(lead, cfg) {
     country: lead.country || "",
     currency: String(lead.country || "").toUpperCase() === "UK" ? "£" : "$",
     speed_note: speedNote,
+    custom_line: customLine,
+    custom_line_para: customLine ? customLine + "\n\n" : "",
     questions: shopperQuestions(lead),
     store: lead.store || domain,
     psi,
@@ -110,7 +114,7 @@ function fieldsFor(lead, cfg) {
   };
 }
 
-const SAMPLE_LEAD = { store: "Example Store", domain: "example.com", psi: "34", lcp: "6.1", first_name: "", country: "US", category: "Apparel", niche: "Fashion & Apparel", email: "owner@example.com" };
+const SAMPLE_LEAD = { custom_line: "I saw that Example Store sells organic cotton basics with free returns.", research_status: "approved", store: "Example Store", domain: "example.com", psi: "34", lcp: "6.1", first_name: "", country: "US", category: "Apparel", niche: "Fashion & Apparel", email: "owner@example.com" };
 
 function renderHtml(main, cfg) {
   const sig = cfg.signature;

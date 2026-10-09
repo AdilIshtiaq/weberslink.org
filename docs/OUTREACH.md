@@ -30,9 +30,13 @@ Safety behaviour worth knowing:
 | `ADMIN_USERNAME` | optional | If set, the sign-in page asks for this username too (not case-sensitive). |
 | `OUTREACH_PASSWORD_<n>` | to send | Password of mailbox number `<n>`. The number is shown under each mailbox in Settings and never changes, even if you remove or reorder mailboxes. |
 | `OUTREACH_CRON_TOKEN` | for cron | 16+ random characters; lets a cron job start a run. |
-| `OUTREACH_DATA_DIR` | recommended | Absolute path outside the app folder, e.g. `/home/USER/outreach-data`, so a Git deploy never wipes your leads. Default: `../outreach-data`. |
+| `OUTREACH_DATA_DIR` | **strongly recommended** | Absolute path to a folder OUTSIDE the app folder, e.g. `/home/USER/outreach-data` (your home folder is shown in Hostinger's File Manager). This is where your settings, leads, history and login key live. Default if unset: `outreach-data` in the account's home folder. The dashboard shows the folder in use and warns if it is inside the app. |
 | `OUTREACH_ALLOWED_HOSTS` | optional | Comma-separated mail servers allowed besides Hostinger's. Mailbox passwords are only ever sent to allowed servers. |
 | `OUTREACH_AUTO_RUN_HOUR` | optional | 0-23, hour (Settings time zone) after which the app starts the daily run itself while awake. |
+| `GEMINI_OUTREACH_KEY` | for Gemini | Free key from Google AI Studio, used only by "Personalise (Gemini)". Falls back to the website chat key (`GEMINI_API_KEY`), but then research shares the chat widget's quota, so use a separate key. |
+| `GEMINI_OUTREACH_DAILY_MAX` | optional | Most Gemini lookups per day (default 150). |
+| `GEMINI_OUTREACH_GAP_SECONDS` | optional | Pause between lookups (default 7), to stay inside free-tier rate limits. |
+| `GEMINI_OUTREACH_MODEL` | optional | Model name (default `gemini-flash-latest`). |
 | `ADMIN_SESSION_SECRET` | optional | Login-cookie signing key. Default: a random key stored in the data folder. |
 
 Passwords are never stored in files or in the dashboard, and `outreach-data/` is git-ignored (this repo is public).
@@ -47,6 +51,18 @@ It returns immediately (202) and the run continues in the background. A second t
 A crashed run's lock is taken over automatically. Runs use the Dry run / Live setting from Settings. Pick a time that
 is morning in the time zone of your leads.
 
+## Where your data lives, and backups
+Everything you save (settings, leads and their progress, sent history, do-not-contact list, edited emails, the login key) is
+kept in files in the data folder, not in the code. **If that folder is inside the app's folder, a redeploy can erase it**
+(you would find your settings gone and be asked to log in again). So:
+1. Set `OUTREACH_DATA_DIR` to a folder outside the app (see the table below) and restart. Settings -> "Your data and backup"
+   and the startup log show which folder is in use; the dashboard warns if it is inside the app.
+2. **Download a backup** (Settings -> Your data and backup) after any big change and at least weekly (the dashboard reminds you).
+   It is one file with your settings, leads, history and email edits. It never contains passwords.
+3. If data ever disappears: log in, go to Settings -> **Restore from backup**, choose the file. The current data is validated
+   first, a safety copy of whatever was there is saved, and a bad or wrong file changes nothing.
+After a redeploy you still need the environment variables (passwords etc.) in Hostinger; they are not part of the backup.
+
 ## List cleaner (free, built in)
 Keeps bad addresses out of the queue so bounces stay low:
 - **At import**, clearly bad addresses are set aside automatically (status `skipped-bad-address`, with the reason): invalid
@@ -60,6 +76,31 @@ Keeps bad addresses out of the queue so bounces stay low:
   (default 3%) and start with a small first batch.
 - **Settings -> Use cautious settings** fills in a gentle plan for a single mailbox on your main domain: 5/10/15/20
   emails a day by week, at most 20 per mailbox, pause at 3% bounces. Click Save settings afterwards.
+
+## Personalise with Gemini (optional, free tier)
+Leads -> **Personalise (Gemini)** asks Gemini to read each waiting store's own website and suggest ONE factual
+opening line (for example "I saw that Lens Hub sells prescription sunglasses with free UK returns."). You review every
+line; only **approved** lines go into emails.
+- "Approve the N high-confidence shown" only approves the lines currently on screen, exactly as you see them (never
+  new arrivals, never a line you've started editing). Lines the model writes must pass strict checks: one sentence
+  starting "I saw that" or "I noticed that", no links or web addresses (even disguised), numbers, risky topics
+  (security, legal, compliance) or pushy wording.
+- Free-mail addresses (gmail.com ...) and platform sites (etsy.com ...) are not researched. A temporary Gemini outage
+  never marks a lead as failed, and pauses the job after 3 problems in a row.
+- Research runs slowly in the background in batches of 10-100 leads you choose, and stops cleanly when Gemini's quota
+  or your daily limit is reached (nothing is lost; run it again later). "Retry failed" re-tries stores where nothing
+  reliable was found.
+- Safeguards: Google (not this server) fetches the site; the model is told to treat page text as data and never invent;
+  suggestions must be one sentence with no links, addresses, markup or placeholders, and must cite a page on the store's
+  own domain, otherwise they are dropped. You can edit a line before approving; an edited line gets the same checks.
+- **Check each line against the store's site: Gemini can be wrong.** An invented detail in a sales email is deceptive.
+- The approved line appears in email 1 where the template has `{custom_line_para}` (the bundled email 1 / 1B do, right
+  after the greeting; blank means the normal email). If you edited those templates earlier, add the field from the
+  Emails tab ("Insert" chips).
+- You can also supply your own lines: put them in a spreadsheet column named "first line" (or "custom line"); they are
+  checked and treated as approved.
+- Only the store's name, website and category are sent to Google, never personal details. Free-tier limits and
+  grounding quotas change; check your quota in Google AI Studio.
 
 ## First-time checklist
 1. Set the env variables above, restart the app, sign in.
@@ -77,7 +118,7 @@ Every email carries the postal address and an opt-out line. A mailbox pauses its
 A/B versions share one body and differ only in subject; judge after about 100 leads each.
 
 ## Tests
-`npm test` (about 54 tests: engine, API, auth, regression tests for an independent code review; no network or real
+`npm test` (about 73 tests: engine, API, auth, regression tests for an independent code review; no network or real
 mailboxes needed).
 
 ## Not covered by tests

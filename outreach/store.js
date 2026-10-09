@@ -8,13 +8,33 @@
 const fs = require("fs");
 const path = require("path");
 
-const DATA_DIR = path.resolve(process.env.OUTREACH_DATA_DIR || path.join(__dirname, "..", "outreach-data"));
+const os = require("os");
+const APP_ROOT = path.resolve(__dirname, "..");
+// Where your leads, settings and login key live. Set OUTREACH_DATA_DIR to be certain. Without it we use a folder in the
+// account's HOME directory (which survives redeploys far more often than a folder next to the app), falling back to
+// ../outreach-data only if there is no usable home directory.
+function defaultDataDir() {
+  const home = os.homedir();
+  return home && home !== "/" ? path.join(home, "outreach-data") : path.join(APP_ROOT, "..", "outreach-data");
+}
+const DATA_DIR = path.resolve(process.env.OUTREACH_DATA_DIR || defaultDataDir());
+const EXPLICIT_DIR = Boolean(process.env.OUTREACH_DATA_DIR);
+const isInside = (child, parent) => { const r = path.relative(path.resolve(parent), path.resolve(child)); return r === "" || (!r.startsWith("..") && !path.isAbsolute(r)); };
+
+/** Facts about the data folder, shown in the dashboard so a risky setup is visible, not silent. */
+function info() {
+  let writable = false, files = 0;
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.accessSync(DATA_DIR, fs.constants.W_OK); writable = true; files = fs.readdirSync(DATA_DIR).length; } catch (e) { /* reported as not writable */ }
+  return { dir: DATA_DIR, explicit: EXPLICIT_DIR, insideApp: isInside(DATA_DIR, APP_ROOT), writable, files };
+}
 const P = (...a) => path.join(DATA_DIR, ...a);
 
 const TRACK_FIELDS = ["email", "first_name", "store", "domain", "country", "category", "niche", "step", "status", "mailbox", "variant",
-  "last_sent", "subject", "first_message_id", "last_message_id", "psi", "lcp", "mx", "note", "replied_at", "loom_sent", "sending"];
-// Fields the engine owns. The dashboard owns the rest (loom_sent), so a run never overwrites them.
-const ENGINE_FIELDS = TRACK_FIELDS.filter((f) => f !== "loom_sent");
+  "last_sent", "subject", "first_message_id", "last_message_id", "psi", "lcp", "mx", "note", "replied_at", "loom_sent", "sending",
+  "custom_line", "research_status", "research_source", "research_conf"];
+// Fields the dashboard owns (a run never overwrites them): the "video sent" tick and the personalised first line.
+const DASHBOARD_FIELDS = ["loom_sent", "custom_line", "research_status", "research_source", "research_conf"];
+const ENGINE_FIELDS = TRACK_FIELDS.filter((f) => !DASHBOARD_FIELDS.includes(f));
 const SENT_FIELDS = ["date", "mode", "mailbox", "email", "store", "step", "variant", "subject"];
 
 function ensureDir() {
@@ -160,5 +180,5 @@ function addSuppression(value) {
   fs.appendFileSync(P("do_not_contact.csv"), value.trim().toLowerCase() + "\n");
 }
 
-module.exports = { exportCsv, isEmail, sessionKey, DATA_DIR, P, ensureDir, TRACK_FIELDS, ENGINE_FIELDS, SENT_FIELDS, parseCsv, toCsv, readCsv, writeCsv, readJson, writeJson,
+module.exports = { info, isInside, EXPLICIT_DIR, DASHBOARD_FIELDS, exportCsv, isEmail, sessionKey, DATA_DIR, P, ensureDir, TRACK_FIELDS, ENGINE_FIELDS, SENT_FIELDS, parseCsv, toCsv, readCsv, writeCsv, readJson, writeJson,
   loadTracking, saveTracking, saveRow, updateLead, appendSentLog, appendLog, loadSuppression, addSuppression, atomicWrite };
