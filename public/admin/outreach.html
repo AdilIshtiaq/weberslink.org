@@ -169,6 +169,7 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
 
     <section id="v-dashboard">
       <div class="panel problems" id="problems" hidden><h3>Fix these before live sending</h3><ul id="problemList"></ul></div>
+      <div class="panel problems" id="dataWarn" hidden><h3>Protect your data</h3><ul id="dataWarnList"></ul></div>
       <div class="panel problems" id="heldBox" hidden><h3>Needs your check <small>a send was interrupted: look in your Sent folder, then choose</small></h3><div id="heldList"></div></div>
       <div class="cards" id="cards"></div>
       <div class="panel"><h3>Mailboxes <small>each one warms up automatically</small></h3><div class="scroll"><table id="mbTable"></table></div></div>
@@ -261,6 +262,11 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
         </div>
         <button class="btn primary" type="submit">Save settings</button>
       </form>
+      <div class="panel" style="margin-top:20px"><h3>Your data and backup <small>settings, leads, history and email edits</small></h3>
+        <p class="hint" id="dataInfo"></p>
+        <div class="toolbar"><a class="btn sm" id="bkDownload" href="/api/outreach/backup" download>Download backup</a><label class="btn sm" style="cursor:pointer;margin:0">Restore from backup<input type="file" id="bkRestore" accept=".json,application/json" hidden></label></div>
+        <p class="hint">The backup file contains your leads, so keep it private. Passwords are never included (they live only in Hostinger). Restoring replaces your current settings and leads; a safety copy of what was there is saved first.</p>
+      </div>
       <div class="panel" style="margin-top:20px"><h3>Before you go live <small>save settings first</small></h3>
         <div class="toolbar"><input type="email" id="testTo" placeholder="Your own email, e.g. you@gmail.com" style="max-width:320px"><button class="btn sm" id="testSend" type="button">Send test email</button><button class="btn sm" id="dnsBtn" type="button">Check domain DNS</button></div>
         <p class="hint">The test sends one sample email from each mailbox. Check it lands in your inbox, not spam.</p>

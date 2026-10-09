@@ -30,7 +30,7 @@ Safety behaviour worth knowing:
 | `ADMIN_USERNAME` | optional | If set, the sign-in page asks for this username too (not case-sensitive). |
 | `OUTREACH_PASSWORD_<n>` | to send | Password of mailbox number `<n>`. The number is shown under each mailbox in Settings and never changes, even if you remove or reorder mailboxes. |
 | `OUTREACH_CRON_TOKEN` | for cron | 16+ random characters; lets a cron job start a run. |
-| `OUTREACH_DATA_DIR` | recommended | Absolute path outside the app folder, e.g. `/home/USER/outreach-data`, so a Git deploy never wipes your leads. Default: `../outreach-data`. |
+| `OUTREACH_DATA_DIR` | **strongly recommended** | Absolute path to a folder OUTSIDE the app folder, e.g. `/home/USER/outreach-data` (your home folder is shown in Hostinger's File Manager). This is where your settings, leads, history and login key live. Default if unset: `outreach-data` in the account's home folder. The dashboard shows the folder in use and warns if it is inside the app. |
 | `OUTREACH_ALLOWED_HOSTS` | optional | Comma-separated mail servers allowed besides Hostinger's. Mailbox passwords are only ever sent to allowed servers. |
 | `OUTREACH_AUTO_RUN_HOUR` | optional | 0-23, hour (Settings time zone) after which the app starts the daily run itself while awake. |
 | `GEMINI_OUTREACH_KEY` | for Gemini | Free key from Google AI Studio, used only by "Personalise (Gemini)". Falls back to the website chat key (`GEMINI_API_KEY`), but then research shares the chat widget's quota, so use a separate key. |
@@ -50,6 +50,18 @@ Hostinger can stop idle Node apps, so use a cron job as the reliable trigger (hP
 It returns immediately (202) and the run continues in the background. A second trigger while one is running is refused.
 A crashed run's lock is taken over automatically. Runs use the Dry run / Live setting from Settings. Pick a time that
 is morning in the time zone of your leads.
+
+## Where your data lives, and backups
+Everything you save (settings, leads and their progress, sent history, do-not-contact list, edited emails, the login key) is
+kept in files in the data folder, not in the code. **If that folder is inside the app's folder, a redeploy can erase it**
+(you would find your settings gone and be asked to log in again). So:
+1. Set `OUTREACH_DATA_DIR` to a folder outside the app (see the table below) and restart. Settings -> "Your data and backup"
+   and the startup log show which folder is in use; the dashboard warns if it is inside the app.
+2. **Download a backup** (Settings -> Your data and backup) after any big change and at least weekly (the dashboard reminds you).
+   It is one file with your settings, leads, history and email edits. It never contains passwords.
+3. If data ever disappears: log in, go to Settings -> **Restore from backup**, choose the file. The current data is validated
+   first, a safety copy of whatever was there is saved, and a bad or wrong file changes nothing.
+After a redeploy you still need the environment variables (passwords etc.) in Hostinger; they are not part of the backup.
 
 ## List cleaner (free, built in)
 Keeps bad addresses out of the queue so bounces stay low:
@@ -106,7 +118,7 @@ Every email carries the postal address and an opt-out line. A mailbox pauses its
 A/B versions share one body and differ only in subject; judge after about 100 leads each.
 
 ## Tests
-`npm test` (about 68 tests: engine, API, auth, regression tests for an independent code review; no network or real
+`npm test` (about 73 tests: engine, API, auth, regression tests for an independent code review; no network or real
 mailboxes needed).
 
 ## Not covered by tests

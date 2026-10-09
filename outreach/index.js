@@ -16,6 +16,7 @@ const eng = require("./engine");
 const xlsx = require("./xlsx");
 const cleaner = require("./cleaner");
 const research = require("./research");
+const backup = require("./backup");
 
 const PASSWORD = process.env.ADMIN_PASSWORD || "";
 const USERNAME = (process.env.ADMIN_USERNAME || "").trim().toLowerCase();
@@ -152,7 +153,16 @@ async function route(req, res, url, method) {
     return send(res, 415, { ok: false, error: "JSON required." }); // blocks cross-site form posts
   }
 
-  if (p === "/status" && method === "GET") return send(res, 200, { ok: true, ...eng.status(), server: { cron: CRON_TOKEN.length >= 16 } });
+  if (p === "/status" && method === "GET") return send(res, 200, { ok: true, ...eng.status(), data: store.info(), lastBackup: backup.lastBackup(), server: { cron: CRON_TOKEN.length >= 16 } });
+  if (p === "/backup" && method === "GET") {
+    const b = backup.create();
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Content-Disposition": `attachment; filename="outreach-backup-${new Date().toISOString().slice(0, 10)}.json"`, "Cache-Control": "no-store" });
+    return res.end(JSON.stringify(b));
+  }
+  if (p === "/backup/restore" && method === "POST") {
+    const body = await readJson(req, 60 * 1024 * 1024);
+    try { return send(res, 200, { ok: true, ...backup.restore(body.backup) }); } catch (e) { return send(res, e.status || 500, { ok: false, error: e.status ? e.message : "Restore failed." }); }
+  }
 
   if (p === "/config" && method === "GET") return send(res, 200, { ok: true, config: eng.loadConfig() });
   if (p === "/config" && method === "PUT") {
@@ -330,6 +340,10 @@ function handle(req, res) {
  * Restarts can't cause extra sends: the per-mailbox daily budget counts what was already sent today.
  */
 function startScheduler() {
+  if (enabled) {
+    const d = store.info();
+    console.log(`Outreach data folder: ${d.dir} (${d.explicit ? "set by OUTREACH_DATA_DIR" : "default; set OUTREACH_DATA_DIR to choose it"})${d.insideApp ? " WARNING: inside the app folder, a redeploy can erase it" : ""}${d.writable ? "" : " WARNING: not writable"}`);
+  }
   const raw = process.env.OUTREACH_AUTO_RUN_HOUR;
   if (!enabled || raw === undefined || raw === "") return;
   const hour = Number(raw);

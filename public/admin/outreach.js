@@ -48,7 +48,7 @@
     if (history.replaceState) history.replaceState(null, "", "#" + view);
     if (view === "leads") loadLeads();
     if (view === "templates") loadTemplates();
-    if (view === "settings") loadSettings();
+    if (view === "settings") { loadSettings(); showDataInfo(); }
     if (view === "replies" || view === "dashboard") renderStatus();
   }
   document.querySelectorAll(".nav-btn[data-view]").forEach(function (b) { b.addEventListener("click", function () { go(b.dataset.view); }); });
@@ -79,6 +79,13 @@
       ["Bounced", c.bounced || 0], ["Days to finish", s.daysLeft || "–"]
     ].map(function (x) { return '<div class="card"><div class="n">' + esc(x[1]) + '</div><div class="l">' + esc(x[0]) + "</div></div>"; }).join("");
 
+    var d = s.data || {}, warns = [];
+    if (d.insideApp) warns.push("Your data folder (" + d.dir + ") is inside the app's folder, so a redeploy can erase it. Set OUTREACH_DATA_DIR in Hostinger to a folder outside the app, restart, then restore a backup.");
+    if (d.dir && !d.writable) warns.push("The data folder (" + d.dir + ") can't be written to, so nothing you save will stick. Set OUTREACH_DATA_DIR to a folder you can write to.");
+    var haveData = (s.total || 0) > 0 || (s.mailboxes || []).length > 0;
+    if (haveData && (!s.lastBackup || Date.now() - Date.parse(s.lastBackup) > 7 * 864e5)) warns.push((s.lastBackup ? "Your last backup was over a week ago." : "You have never downloaded a backup.") + " Download one in Settings → Your data and backup, so a redeploy or mistake can't cost you your work.");
+    $("dataWarn").hidden = !warns.length;
+    $("dataWarnList").innerHTML = warns.map(function (w) { return "<li>" + esc(w) + "</li>"; }).join("");
     $("heldBox").hidden = !s.held.length;
     $("heldList").innerHTML = s.held.map(function (x) {
       return '<div class="reply"><div><div class="who">' + esc(x.store || x.email) + '</div><div class="meta">' + esc(x.email) + " · email " + esc(x.step) + " · " + esc(x.mailbox || "") + '</div></div><div class="acts"><button class="btn sm" data-held="retry_held" data-email="' + esc(x.email) + '">It was NOT sent: allow retry</button><button class="btn sm danger" data-held="skip_held" data-email="' + esc(x.email) + '">It was sent: never email again</button></div></div>';
@@ -373,6 +380,26 @@
       mailboxes: boxes
     };
     api("PUT", "/api/outreach/config", body).then(function (r) { state.config = r.config; toast("Settings saved"); loadSettings(); refresh(); }).catch(fail);
+  });
+
+  // ---------------------------------------------------------------- data + backup
+  function showDataInfo() {
+    var d = (state.status && state.status.data) || {}, lb = state.status && state.status.lastBackup;
+    $("dataInfo").textContent = d.dir ? "Saved in " + d.dir + " (" + (d.explicit ? "set by OUTREACH_DATA_DIR" : "default location; set OUTREACH_DATA_DIR in Hostinger to choose it yourself") + "). " + (lb ? "Last backup downloaded " + ago(lb) + "." : "No backup downloaded yet.") : "";
+  }
+  $("bkDownload").addEventListener("click", function () { setTimeout(function () { refresh().then(showDataInfo); }, 1500); });
+  $("bkRestore").addEventListener("change", function (e) {
+    var f = e.target.files[0]; e.target.value = ""; if (!f) return;
+    if (f.size > 50 * 1024 * 1024) return fail(new Error("That file is too large to be an outreach backup."));
+    var rd = new FileReader();
+    rd.onload = function () {
+      var bundle; try { bundle = JSON.parse(rd.result); } catch (err) { return fail(new Error("That isn't a valid backup file.")); }
+      if (!bundle || bundle.format !== "weberslink-outreach-backup") return fail(new Error("That isn't an outreach backup file."));
+      var n = Object.keys(bundle.files || {}).length;
+      if (!confirm("Restore this backup (made " + String(bundle.createdAt || "").slice(0, 10) + ", " + n + " files)?\n\nIt REPLACES your current settings and leads. A safety copy of the current data is saved first.")) return;
+      api("POST", "/api/outreach/backup/restore", { backup: bundle }).then(function (r) { toast("Restored " + r.restored.length + " files"); loadSettings(); refresh().then(showDataInfo); }).catch(fail);
+    };
+    rd.readAsText(f);
   });
 
   // ---------------------------------------------------------------- go-live checks
