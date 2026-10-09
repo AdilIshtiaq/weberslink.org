@@ -57,7 +57,7 @@ test("import handles spreadsheet columns, duplicates, bad rows and countries", (
   reset();
   const rows = [...leads(3), { Email: "owner0@store0.com" }, { Email: "not-an-email" }, ...leads(1, "UK").map((r) => ({ ...r, Email: "uk@shop.co.uk" })), { Email: "ca@x.ca", Country: "Canada" }];
   const res = eng.importLeads(rows, CONFIG);
-  assert.deepStrictEqual(res, { added: 5, existing: 1, invalid: 1 });
+  assert.deepStrictEqual(res, { added: 5, existing: 1, invalid: 1, cleaned: 0 });
   const t = store.loadTracking();
   assert.strictEqual(t.find((x) => x.email === "ca@x.ca").status, "skipped-country");
   assert.strictEqual(t.find((x) => x.email === "uk@shop.co.uk").country, "UK");

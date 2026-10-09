@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "build": "node scripts/build.js",
-    "test": "node --test test/outreach.test.js test/outreach-api.test.js test/outreach-username.test.js test/outreach-hardening.test.js test/outreach-review.test.js test/outreach-tracking.test.js"
+    "test": "node --test test/outreach.test.js test/outreach-api.test.js test/outreach-username.test.js test/outreach-hardening.test.js test/outreach-review.test.js test/outreach-tracking.test.js test/outreach-cleaner.test.js"
   },
   "engines": {
     "node": ">=20"

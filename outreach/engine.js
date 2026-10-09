@@ -9,6 +9,7 @@ const fs = require("fs");
 const dns = require("dns").promises;
 const store = require("./store");
 const tpl = require("./templates");
+const cleaner = require("./cleaner");
 const { Mailbox, passwordFor } = require("./mail");
 const { stripOurFooter } = require("./inbound");
 
@@ -32,7 +33,7 @@ const DEFAULT_CONFIG = {
   sending: {
     dry_run: true, countries: ["US", "UK"], send_days: ["Mon", "Tue", "Wed", "Thu", "Fri"], timezone: "America/New_York",
     daily_limit: 40, ramp: [10, 20, 30, 40], followup_gaps_days: [3, 4, 7], min_delay_seconds: 90, max_delay_seconds: 240,
-    notify_email: "", html_emails: true, check_mx: true, bounce_pause_percent: 5, check_inbox_in_dry_run: false,
+    notify_email: "", html_emails: true, check_mx: true, bounce_pause_percent: 3, check_inbox_in_dry_run: false,
   },
   mailboxes: [],
 };
@@ -72,7 +73,7 @@ function sanitizeConfig(input) {
       min_delay_seconds: minD,
       max_delay_seconds: Math.max(minD, intIn(s.max_delay_seconds, 0, 7200, d.sending.max_delay_seconds)),
       notify_email: str(s.notify_email, 200), html_emails: s.html_emails !== false, check_mx: s.check_mx !== false,
-      bounce_pause_percent: intIn(s.bounce_pause_percent, 1, 50, 5), check_inbox_in_dry_run: Boolean(s.check_inbox_in_dry_run),
+      bounce_pause_percent: intIn(s.bounce_pause_percent, 1, 50, 3), check_inbox_in_dry_run: Boolean(s.check_inbox_in_dry_run),
     },
     mailboxes: sanitizeMailboxes(input.mailboxes),
   };
@@ -143,6 +144,7 @@ function nextEmail(t, cfg, now = new Date()) {
   if (t.sending) return "On hold (check it)";
   if (t.status === "new") return "Email 1 on the next send day";
   if (t.status === "finished") return "Sequence complete";
+  if (t.status === cleaner.SKIPPED) return t.note ? `Skipped: ${t.note}` : "Skipped by the list cleaner";
   if (t.status !== "active" || step < 1 || step > 3) return "";
   const lastDay = tzParts(new Date(t.last_sent), cfg.sending.timezone).date;
   const gap = cfg.sending.followup_gaps_days[step - 1] || cfg.sending.followup_gaps_days[cfg.sending.followup_gaps_days.length - 1];
@@ -215,7 +217,7 @@ function importLeads(rows, cfg) {
   const track = store.loadTracking();
   const have = new Map(track.map((t) => [t.email.toLowerCase(), t]));
   const allowed = new Set(cfg.sending.countries.map((c) => c.toUpperCase()));
-  const res = { added: 0, existing: 0, invalid: 0 };
+  const res = { added: 0, existing: 0, invalid: 0, cleaned: 0 };
   const pick = (r, ...names) => { for (const n of names) for (const k of Object.keys(r)) if (k.trim().toLowerCase() === n) return String(r[k] == null ? "" : r[k]).trim(); return ""; };
   const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? String(Math.round(n)) : ""; };
   for (const r of rows) {
@@ -237,6 +239,8 @@ function importLeads(rows, cfg) {
     }
     const t = Object.fromEntries(store.TRACK_FIELDS.map((f) => [f, ""]));
     Object.assign(t, lead, { step: "0", status: allowed.has(lead.country) ? "new" : "skipped-country" });
+    const verdict = cleaner.assess(email); // clearly bad addresses never enter the queue (restorable in the dashboard)
+    if (verdict.action === "remove") { t.status = cleaner.SKIPPED; t.note = verdict.reason; res.cleaned++; }
     track.push(t); have.set(key, t); res.added++;
   }
   applyRules(track, cfg);
@@ -743,5 +747,5 @@ function resolveHeld(email, action) {
   return null;
 }
 
-module.exports = { nextEmail, sendTest, dnsHealth, resolveHeld, VERSION, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dailyLimitFor, bounceCheck, dueFollowups, runOnce,
+module.exports = { domainReceivesMail, nextEmail, sendTest, dnsHealth, resolveHeld, VERSION, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dailyLimitFor, bounceCheck, dueFollowups, runOnce,
   startRun, requestStop, previewNext, status, readiness, applyRules, loadState, tzParts, isSendDay, today, daysSince, run, log };
