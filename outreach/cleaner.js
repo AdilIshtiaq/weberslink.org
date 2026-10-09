@@ -151,4 +151,8 @@ function restore(email) {
   return store.updateLead(row.email, { status: "new", note: `restored by you ${new Date().toISOString().slice(0, 10)}` });
 }
 
-module.exports = { SKIPPED, assess, startScan, jobStatus, applyScan, restore };
+// Websites that belong to a platform, not to the store: a "domain" like this says nothing about the lead.
+const SHARED_HOSTS = new Set(["myshopify.com", "etsy.com", "wixsite.com", "squarespace.com", "weebly.com", "blogspot.com", "wordpress.com", "facebook.com", "instagram.com",
+  "linktr.ee", "amazon.com", "ebay.com", "godaddysites.com", "business.site", "webflow.io", "carrd.co", "tumblr.com", "medium.com", "github.io", "sites.google.com"]);
+
+module.exports = { FREE_MAIL, SHARED_HOSTS, SKIPPED, assess, startScan, jobStatus, applyScan, restore };

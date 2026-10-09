@@ -179,20 +179,27 @@
   });
 
   // ---------------------------------------------------------------- Gemini personalisation
-  var aiTimer;
+  var aiTimer, aiRows = [];
   $("aiBtn").addEventListener("click", function () { $("aiBox").hidden = !$("aiBox").hidden; if (!$("aiBox").hidden) loadAi(); else clearTimeout(aiTimer); });
+  // Never redraw the review table while you are typing in it: only the status area updates.
+  function aiEditing() {
+    var a = document.activeElement, dirty = false;
+    $("aiBody").querySelectorAll("textarea.ai-line").forEach(function (t) { if (t.value !== t.defaultValue) dirty = true; });
+    return dirty || Boolean(a && a.classList && a.classList.contains("ai-line"));
+  }
   function loadAi() {
     clearTimeout(aiTimer);
     Promise.all([api("GET", "/api/outreach/leads/research/status"), api("GET", "/api/outreach/leads/research/pending?limit=50")]).then(function (r) {
-      renderAi(r[0], r[1].rows);
+      renderAi(r[0], r[1].rows, aiEditing());
       if (r[0].job.running && !$("aiBox").hidden) aiTimer = setTimeout(loadAi, 2500);
     }).catch(fail);
   }
-  function renderAi(s, rows) {
+  function renderAi(s, rows, keepTable) {
     var c = s.counts, j = s.job, html = "";
+    if (!$("aiHead")) $("aiBody").innerHTML = '<div id="aiHead"></div><div id="aiTable"></div><p class="hint" style="margin-top:10px">Only approved lines go into emails (as <code>{custom_line_para}</code> in email 1; blank means the normal email). Check each against the store’s site: Gemini can be wrong. You can also add your own lines in a spreadsheet column named “first line”.</p>';
     if (!s.configured) {
-      $("aiBody").innerHTML = '<p class="warn">Gemini is not set up yet.</p><p class="hint">Create a free key in Google AI Studio, then in Hostinger add an environment variable named <code>GEMINI_OUTREACH_KEY</code> with that key as its value, and restart the app. Never paste the key anywhere else.</p>';
-      return;
+      $("aiHead").innerHTML = '<p class="warn">Gemini is not set up yet.</p><p class="hint">Create a free key in Google AI Studio, then in Hostinger add an environment variable named <code>GEMINI_OUTREACH_KEY</code> with that key as its value, and restart the app. Never paste the key anywhere else.</p>';
+      $("aiTable").innerHTML = ""; return;
     }
     if (s.sharedKey) html += '<p class="warn">This is using your website chat key, so research shares its daily quota. Add a separate <code>GEMINI_OUTREACH_KEY</code> to protect the chat widget.</p>';
     html += '<p class="hint">' + c.waiting + " waiting for research · " + c.pending + " to review · " + c.approved + " approved · " + c.rejected + " rejected · " + c.failed + " had no reliable detail · used today " + s.usedToday + " of " + s.dailyCap + "</p>";
@@ -201,17 +208,18 @@
     } else {
       html += (j.message ? '<p class="hint">' + esc(j.message) + "</p>" : "") +
         '<div class="toolbar"><select id="aiLimit"><option>10</option><option selected>25</option><option>50</option><option>100</option></select><button class="btn primary sm" id="aiStart"' + (c.waiting || c.failed ? "" : " disabled") + '>Research next leads</button>' +
-        '<label class="check" style="font-size:13px"><input type="checkbox" id="aiRetry"> also retry ones that failed</label></div>';
+        '<label class="check" style="font-size:13px"><input type="checkbox" id="aiRetry"> also retry ones that found nothing</label></div>';
     }
-    if (rows.length) {
-      html += '<div class="toolbar" style="margin-top:6px"><b>' + c.pending + ' suggestions to review</b><span style="flex:1"></span><button class="btn sm" data-ai-all="1">Approve all high-confidence</button></div>' +
-        '<div class="scroll" style="max-height:420px;overflow:auto"><table><tr><th>Store</th><th>Suggested line (you can edit it)</th><th>Source</th><th>Confidence</th><th></th></tr>' + rows.map(function (r) {
-          return "<tr><td>" + esc(r.store || r.domain) + '<div class="hint">' + esc(r.email) + "</div></td><td><textarea class='ai-line' rows='3' maxlength='240' data-line='" + esc(r.email) + "'>" + esc(r.line) + "</textarea></td><td>" +
-            (r.source ? '<a href="' + esc(r.source) + '" target="_blank" rel="noopener noreferrer">page</a>' : "–") + '</td><td><span class="chip ' + esc(r.conf) + '">' + esc(r.conf) + '</span></td><td style="white-space:nowrap"><button class="btn primary sm" data-ai="approve" data-email="' + esc(r.email) + '">Approve</button> <button class="btn sm" data-ai="reject" data-email="' + esc(r.email) + '">Reject</button></td></tr>';
-        }).join("") + "</table></div>";
-    }
-    html += '<p class="hint" style="margin-top:10px">Only approved lines go into emails (as <code>{custom_line_para}</code> in email 1; blank means the normal email). Check each against the store’s site: Gemini can be wrong. You can also add your own lines in a spreadsheet column named “first line”.</p>';
-    $("aiBody").innerHTML = html;
+    if (keepTable) html += '<p class="hint">You are editing a line, so the list below is paused. It refreshes when you approve or reject that line.</p>';
+    $("aiHead").innerHTML = html;
+    if (keepTable) return;
+    aiRows = rows;
+    var high = rows.filter(function (r) { return r.conf === "high"; }).length;
+    $("aiTable").innerHTML = rows.length ? '<div class="toolbar" style="margin-top:6px"><b>' + c.pending + ' suggestions to review</b><span style="flex:1"></span>' + (high ? '<button class="btn sm" data-ai-all="1">Approve the ' + high + " high-confidence shown</button>" : "") + "</div>" +
+      '<div class="scroll" style="max-height:420px;overflow:auto"><table><tr><th>Store</th><th>Suggested line (you can edit it)</th><th>Source</th><th>Confidence</th><th></th></tr>' + rows.map(function (r) {
+        return "<tr><td>" + esc(r.store || r.domain) + '<div class="hint">' + esc(r.email) + "</div></td><td><textarea class='ai-line' rows='3' maxlength='240' data-line='" + esc(r.email) + "'>" + esc(r.line) + "</textarea></td><td>" +
+          (r.source ? '<a href="' + esc(r.source) + '" target="_blank" rel="noopener noreferrer">page</a>' : "–") + '</td><td><span class="chip ' + esc(r.conf) + '">' + esc(r.conf) + '</span></td><td style="white-space:nowrap"><button class="btn primary sm" data-ai="approve" data-email="' + esc(r.email) + '">Approve</button> <button class="btn sm" data-ai="reject" data-email="' + esc(r.email) + '">Reject</button></td></tr>';
+      }).join("") + "</table></div>" : "";
   }
   $("aiBody").addEventListener("click", function (e) {
     var t = e.target;
@@ -220,10 +228,15 @@
     } else if (t.getAttribute("data-ai-stop")) {
       api("POST", "/api/outreach/leads/research/stop", {}).then(function () { toast("Stopping after the current store…"); loadAi(); }).catch(fail);
     } else if (t.getAttribute("data-ai-all")) {
-      api("POST", "/api/outreach/leads/research/approve-high", {}).then(function (r) { toast("Approved " + r.approved + " high-confidence lines"); loadAi(); }).catch(fail);
+      // Only the high-confidence lines currently on screen, exactly as shown, and only the ones you have not edited.
+      var items = aiRows.filter(function (r) {
+        var box = $("aiBody").querySelector('textarea[data-line="' + CSS.escape(r.email) + '"]');
+        return r.conf === "high" && box && box.value === r.line;
+      }).map(function (r) { return { email: r.email, line: r.line }; });
+      api("POST", "/api/outreach/leads/research/approve-shown", { items: items }).then(function (r) { toast("Approved " + r.approved + " lines"); loadAi(); }).catch(fail);
     } else if (t.getAttribute("data-ai")) {
-      var email = t.dataset.email, input = $("aiBody").querySelector("textarea[data-line='" + email.replace(/'/g, "\\'") + "']");
-      api("POST", "/api/outreach/leads/research/review", { email: email, action: t.dataset.ai, line: input ? input.value : undefined }).then(function () { toast(t.dataset.ai === "approve" ? "Approved" : "Rejected"); loadAi(); }).catch(fail);
+      var email = t.dataset.email, box = $("aiBody").querySelector('textarea[data-line="' + CSS.escape(email) + '"]');
+      api("POST", "/api/outreach/leads/research/review", { email: email, action: t.dataset.ai, line: box ? box.value : undefined }).then(function () { toast(t.dataset.ai === "approve" ? "Approved" : "Rejected"); var row = t.closest("tr"); if (row) row.remove(); aiRows = aiRows.filter(function (r) { return r.email !== email; }); loadAi(); }).catch(function (e2) { fail(e2); });
     }
   });
 

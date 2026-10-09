@@ -226,7 +226,10 @@ async function route(req, res, url, method) {
     const r = research.review(String(body.email || ""), String(body.action || ""), body.line);
     return r.error ? send(res, 400, { ok: false, error: r.error }) : send(res, 200, { ok: true });
   }
-  if (p === "/leads/research/approve-high" && method === "POST") return send(res, 200, { ok: true, approved: research.approveHigh() });
+  if (p === "/leads/research/approve-shown" && method === "POST") {
+    const body = await readJson(req);
+    return send(res, 200, { ok: true, approved: research.approveShown(body.items) });
+  }
   if (p === "/leads/clean/start" && method === "POST") {
     const r = cleaner.startScan({ mx: eng.domainReceivesMail });
     return send(res, r.started ? 202 : 409, { ok: r.started, ...(r.started ? {} : { error: r.reason }) });

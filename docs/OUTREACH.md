@@ -69,6 +69,12 @@ Keeps bad addresses out of the queue so bounces stay low:
 Leads -> **Personalise (Gemini)** asks Gemini to read each waiting store's own website and suggest ONE factual
 opening line (for example "I saw that Lens Hub sells prescription sunglasses with free UK returns."). You review every
 line; only **approved** lines go into emails.
+- "Approve the N high-confidence shown" only approves the lines currently on screen, exactly as you see them (never
+  new arrivals, never a line you've started editing). Lines the model writes must pass strict checks: one sentence
+  starting "I saw that" or "I noticed that", no links or web addresses (even disguised), numbers, risky topics
+  (security, legal, compliance) or pushy wording.
+- Free-mail addresses (gmail.com ...) and platform sites (etsy.com ...) are not researched. A temporary Gemini outage
+  never marks a lead as failed, and pauses the job after 3 problems in a row.
 - Research runs slowly in the background in batches of 10-100 leads you choose, and stops cleanly when Gemini's quota
   or your daily limit is reached (nothing is lost; run it again later). "Retry failed" re-tries stores where nothing
   reliable was found.
@@ -100,7 +106,7 @@ Every email carries the postal address and an opt-out line. A mailbox pauses its
 A/B versions share one body and differ only in subject; judge after about 100 leads each.
 
 ## Tests
-`npm test` (about 62 tests: engine, API, auth, regression tests for an independent code review; no network or real
+`npm test` (about 68 tests: engine, API, auth, regression tests for an independent code review; no network or real
 mailboxes needed).
 
 ## Not covered by tests
