@@ -47,6 +47,20 @@ It returns immediately (202) and the run continues in the background. A second t
 A crashed run's lock is taken over automatically. Runs use the Dry run / Live setting from Settings. Pick a time that
 is morning in the time zone of your leads.
 
+## List cleaner (free, built in)
+Keeps bad addresses out of the queue so bounces stay low:
+- **At import**, clearly bad addresses are set aside automatically (status `skipped-bad-address`, with the reason): invalid
+  or mistyped addresses (`gmial.com`, `.con`), throwaway domains, placeholder or scraped junk (`logo@2x.png`, `test@`),
+  and system mailboxes that never reach a person or attract spam traps (`noreply@`, `abuse@`, `postmaster@`).
+- **Leads -> Clean list** scans every lead still waiting, also checks each domain can receive mail, and shows a preview.
+  Nothing changes until you click **Apply cleaning**. Shared mailboxes (`info@`, `sales@`, `support@`) are kept unless
+  you tick "skip these too" (they are often read by the owner at small shops, but carry more spam-complaint risk).
+- Every set-aside lead stays in the list with its reason and a **Restore** button.
+- It cannot prove that one particular inbox exists (only paid verifiers can), so keep the bounce auto-pause on
+  (default 3%) and start with a small first batch.
+- **Settings -> Use cautious settings** fills in a gentle plan for a single mailbox on your main domain: 5/10/15/20
+  emails a day by week, at most 20 per mailbox, pause at 3% bounces. Click Save settings afterwards.
+
 ## First-time checklist
 1. Set the env variables above, restart the app, sign in.
 2. Settings: your name, company, **postal address**, notify email, mailboxes (lookalike domains, not weberslink.org). Save.
@@ -63,7 +77,7 @@ Every email carries the postal address and an opt-out line. A mailbox pauses its
 A/B versions share one body and differ only in subject; judge after about 100 leads each.
 
 ## Tests
-`npm test` (about 46 tests: engine, API, auth, regression tests for an independent code review; no network or real
+`npm test` (about 54 tests: engine, API, auth, regression tests for an independent code review; no network or real
 mailboxes needed).
 
 ## Not covered by tests

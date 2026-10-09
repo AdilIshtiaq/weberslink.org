@@ -14,6 +14,7 @@ const store = require("./store");
 const tpl = require("./templates");
 const eng = require("./engine");
 const xlsx = require("./xlsx");
+const cleaner = require("./cleaner");
 
 const PASSWORD = process.env.ADMIN_PASSWORD || "";
 const USERNAME = (process.env.ADMIN_USERNAME || "").trim().toLowerCase();
@@ -190,7 +191,8 @@ async function route(req, res, url, method) {
     const limit = Math.min(500, Math.max(1, parseInt(url.searchParams.get("limit"), 10) || 100));
     const offset = Math.max(0, parseInt(url.searchParams.get("offset"), 10) || 0);
     const all = store.loadTracking().filter((t) => (!st || t.status === st) && (!q || `${t.email} ${t.store} ${t.domain}`.toLowerCase().includes(q)));
-    return send(res, 200, { ok: true, total: all.length, rows: all.slice(offset, offset + limit).map((t) => Object.fromEntries(LEAD_VIEW.map((f) => [f, t[f]]))) });
+    const cfg = eng.loadConfig();
+    return send(res, 200, { ok: true, total: all.length, rows: all.slice(offset, offset + limit).map((t) => ({ ...Object.fromEntries(LEAD_VIEW.map((f) => [f, t[f]])), next: eng.nextEmail(t, cfg) })) });
   }
   if (p === "/leads/import" && method === "POST") {
     const body = await readJson(req, 8 * 1024 * 1024);
@@ -210,11 +212,22 @@ async function route(req, res, url, method) {
     if (rows.length > 20000) return send(res, 400, { ok: false, error: "Up to 20,000 rows at a time." });
     return send(res, 200, { ok: true, ...eng.importLeads(rows, eng.loadConfig()) });
   }
+  if (p === "/leads/clean/start" && method === "POST") {
+    const r = cleaner.startScan({ mx: eng.domainReceivesMail });
+    return send(res, r.started ? 202 : 409, { ok: r.started, ...(r.started ? {} : { error: r.reason }) });
+  }
+  if (p === "/leads/clean/status" && method === "GET") return send(res, 200, { ok: true, ...cleaner.jobStatus() });
+  if (p === "/leads/clean/apply" && method === "POST") {
+    const body = await readJson(req);
+    const r = cleaner.applyScan({ skipRoles: body.skipRoles === true });
+    return send(res, r.ok ? 200 : 400, r);
+  }
   if (p === "/leads/action" && method === "POST") {
     const body = await readJson(req);
     const email = String(body.email || "");
     let r = null;
-    if (body.action === "retry_held" || body.action === "skip_held") r = eng.resolveHeld(email, body.action === "retry_held" ? "retry" : "skip");
+    if (body.action === "restore") r = cleaner.restore(email);
+    else if (body.action === "retry_held" || body.action === "skip_held") r = eng.resolveHeld(email, body.action === "retry_held" ? "retry" : "skip");
     else if (body.action === "loom_sent") r = store.updateLead(email, { loom_sent: "1" });
     else if (body.action === "loom_unsent") r = store.updateLead(email, { loom_sent: "" });
     else if (body.action === "dnc") {

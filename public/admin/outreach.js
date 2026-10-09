@@ -73,7 +73,7 @@
     var nr = s.replied.filter(function (r) { return !r.loomSent; }).length;
     $("replyBadge").hidden = !nr; $("replyBadge").textContent = nr;
 
-    var c = s.byStatus || {}, started = (s.total || 0) - (c["new"] || 0) - (c["skipped-country"] || 0) - (c["skipped-no-mailserver"] || 0) - (c["do-not-contact"] || 0);
+    var c = s.byStatus || {}, started = (s.total || 0) - (c["new"] || 0) - (c["skipped-country"] || 0) - (c["skipped-no-mailserver"] || 0) - (c["do-not-contact"] || 0) - (c["skipped-bad-address"] || 0);
     $("cards").innerHTML = [
       ["Leads", s.total], ["Not yet contacted", s.remaining], ["In sequence", c.active || 0], ["Replied", c.replied || 0],
       ["Bounced", c.bounced || 0], ["Days to finish", s.daysLeft || "–"]
@@ -142,13 +142,14 @@
   });
 
   // ---------------------------------------------------------------- leads
-  var STATUSES = ["new", "active", "finished", "replied", "unsubscribed", "bounced", "do-not-contact", "skipped-country", "skipped-no-mailserver"];
+  var STATUSES = ["new", "active", "finished", "replied", "unsubscribed", "bounced", "do-not-contact", "skipped-bad-address", "skipped-country", "skipped-no-mailserver"];
   $("leadStatus").innerHTML += STATUSES.map(function (s) { return '<option value="' + s + '">' + s + "</option>"; }).join("");
   function loadLeads() {
     var q = new URLSearchParams({ q: $("leadQ").value, status: $("leadStatus").value, limit: PAGE, offset: state.leadPage * PAGE });
     api("GET", "/api/outreach/leads?" + q).then(function (r) {
-      $("leadTable").innerHTML = r.rows.length ? "<tr><th>Store</th><th>Email</th><th>Country</th><th>Status</th><th>Step</th><th>Mailbox</th><th>Ver.</th></tr>" + r.rows.map(function (t) {
-        return "<tr><td>" + esc(t.store || t.domain) + "</td><td>" + esc(t.email) + "</td><td>" + esc(t.country) + '</td><td><span class="chip ' + esc(t.status) + '">' + esc(t.status) + "</span></td><td>" + esc(t.step) + "</td><td>" + esc(t.mailbox) + "</td><td>" + esc((t.variant || "").toUpperCase()) + "</td></tr>";
+      $("leadTable").innerHTML = r.rows.length ? "<tr><th>Store</th><th>Email</th><th>Country</th><th>Status</th><th>Emails sent</th><th>Last sent</th><th>Next</th><th>Mailbox</th><th>Ver.</th></tr>" + r.rows.map(function (t) {
+        var sent = Number(t.step) || 0;
+        return "<tr><td>" + esc(t.store || t.domain) + "</td><td>" + esc(t.email) + "</td><td>" + esc(t.country) + '</td><td><span class="chip ' + esc(t.status) + '">' + esc(t.status === "skipped-bad-address" ? "set aside" : t.status) + "</span></td><td>" + (sent ? sent + " of 4" : "–") + "</td><td>" + esc((t.last_sent || "").slice(0, 10) || "–") + "</td><td class='hint'>" + esc(t.next || "") + (t.status === "skipped-bad-address" ? ' <button class="btn sm" data-restore="' + esc(t.email) + '">Restore</button>' : "") + "</td><td>" + esc(t.mailbox) + "</td><td>" + esc((t.variant || "").toUpperCase()) + "</td></tr>";
       }).join("") : '<tr><td class="empty">No leads match.</td></tr>';
       var from = r.total ? state.leadPage * PAGE + 1 : 0;
       $("pgInfo").textContent = from + "–" + Math.min(r.total, (state.leadPage + 1) * PAGE) + " of " + r.total;
@@ -171,10 +172,57 @@
       var bytes = new Uint8Array(rd.result), bin = "", i;
       for (i = 0; i < bytes.length; i += 32768) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
       api("POST", "/api/outreach/leads/import-file", { name: f.name, data: btoa(bin) }).then(function (r) {
-        toast("Imported " + r.added + " new leads (" + r.existing + " already there, " + r.invalid + " skipped)"); state.leadPage = 0; loadLeads(); refresh();
+        toast("Imported " + r.added + " new leads (" + r.existing + " already there, " + r.invalid + " invalid" + (r.cleaned ? ", " + r.cleaned + " bad addresses set aside" : "") + ")"); state.leadPage = 0; loadLeads(); refresh();
       }).catch(fail);
     };
     rd.readAsArrayBuffer(f);
+  });
+
+  // ---------------------------------------------------------------- list cleaner
+  var KIND = { syntax: "invalid address", junk: "scraped junk", disposable: "throwaway domain", typo: "typo", system: "system address", placeholder: "placeholder", "no-mail-server": "domain can't receive mail", role: "shared mailbox" };
+  var cleanTimer;
+  $("cleanBtn").addEventListener("click", function () {
+    $("cleanBox").hidden = false; $("cleanBody").innerHTML = '<p class="hint">Starting…</p>';
+    api("POST", "/api/outreach/leads/clean/start", {}).then(pollClean).catch(function (e) { if (/already/i.test(e.message)) pollClean(); else { fail(e); $("cleanBox").hidden = true; } });
+  });
+  function pollClean() {
+    clearTimeout(cleanTimer);
+    api("GET", "/api/outreach/leads/clean/status").then(function (s) {
+      if (s.running) { $("cleanBody").innerHTML = '<p class="hint">' + esc(s.phase) + (s.total ? " (" + s.done + " of " + s.total + ")" : "") + "…</p>"; cleanTimer = setTimeout(pollClean, 1000); return; }
+      if (s.error) { $("cleanBody").innerHTML = '<p class="bad">The scan failed: ' + esc(s.error) + "</p>"; return; }
+      if (s.result) showClean(s.result);
+    }).catch(fail);
+  }
+  function showClean(r) {
+    var already = state.status && state.status.byStatus ? state.status.byStatus["skipped-bad-address"] || 0 : 0;
+    var c = r.counts, kinds = Object.keys(c.byKind).map(function (k) { return c.byKind[k] + " " + (KIND[k] || k); }).join(", ");
+    if (!c.total) { $("cleanBody").innerHTML = '<p class="hint">No leads are waiting to be emailed, so there is nothing to clean. Import leads first.</p><button class="btn sm" id="cleanClose">Close</button>'; return; }
+    $("cleanBody").innerHTML = '<p><b>' + c.total + "</b> leads are waiting. <span class='ok'>" + c.ok + " look fine.</span></p>" +
+      (already ? '<p class="hint">' + already + " more were already set aside when you imported (filter the list by “skipped-bad-address” to see them).</p>" : "") +
+      "<p>" + (c.remove ? '<span class="bad">' + c.remove + " will be skipped</span> (" + esc(kinds) + ")" : "<span class='ok'>No bad addresses found.</span>") + "</p>" +
+      (c.role ? '<p><span class="warn">' + c.role + ' shared mailboxes</span> (info@, sales@ …) are kept unless you tick: <label class="check" style="display:inline-flex;margin-left:6px"><input type="checkbox" id="skipRoles"> skip these too</label></p>' : "") +
+      (r.items.length ? '<div class="scroll" style="max-height:260px;overflow:auto"><table><tr><th>Email</th><th>Store</th><th>Finding</th><th>Result</th></tr>' + r.items.slice(0, 150).map(function (i) {
+        return "<tr><td>" + esc(i.email) + "</td><td>" + esc(i.store) + "</td><td class='hint'>" + esc(i.reason) + "</td><td>" + (i.action === "remove" ? '<span class="bad">skip</span>' : '<span class="warn">keep (unless ticked)</span>') + "</td></tr>";
+      }).join("") + "</table></div>" + (r.items.length > 150 ? '<p class="hint">Showing 150 of ' + r.items.length + ".</p>" : "") : "") +
+      '<p class="hint" style="margin-top:10px">Nothing has changed yet. Skipped leads stay in the list and can be restored one by one. This catches typos, throwaway and junk addresses and dead domains; it cannot prove a particular inbox exists, so keep an eye on bounces.</p>' +
+      '<div class="toolbar" style="margin:10px 0 0"><button class="btn primary sm" id="cleanApply"' + (c.remove || c.role ? "" : " disabled") + '>Apply cleaning</button><button class="btn sm" id="cleanClose">Close</button></div>';
+  }
+  $("cleanBody").addEventListener("click", function (e) {
+    if (e.target.id === "cleanClose") $("cleanBox").hidden = true;
+    if (e.target.id === "cleanApply") {
+      e.target.disabled = true;
+      api("POST", "/api/outreach/leads/clean/apply", { skipRoles: Boolean($("skipRoles") && $("skipRoles").checked) }).then(function (r) {
+        toast("Done: " + (r.skipped + r.roleSkipped) + " leads skipped"); $("cleanBox").hidden = true; loadLeads(); refresh();
+      }).catch(fail);
+    }
+  });
+  $("leadTable").addEventListener("click", function (e) {
+    var em = e.target.getAttribute("data-restore"); if (!em) return;
+    api("POST", "/api/outreach/leads/action", { email: em, action: "restore" }).then(function () { toast("Restored"); loadLeads(); refresh(); }).catch(fail);
+  });
+  $("cautious").addEventListener("click", function () {
+    $("x_ramp").value = "5,10,15,20"; $("x_limit").value = 20; $("x_bounce").value = 3;
+    toast("Cautious settings filled in. Click Save settings to keep them.");
   });
 
   // ---------------------------------------------------------------- templates

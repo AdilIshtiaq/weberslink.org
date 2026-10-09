@@ -55,6 +55,7 @@ a{color:var(--accent)}
 
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:9px 16px;border-radius:99px;border:1px solid var(--line-2);background:transparent;font-size:14px;font-weight:500;transition:background .15s,border-color .15s}
 .btn:hover{border-color:var(--text)}
+a.btn{color:var(--text);text-decoration:none}
 .btn.primary{background:var(--text);color:#000;border-color:var(--text)}
 .btn.primary:hover{background:#dcdcdc}
 .btn.danger{color:var(--bad);border-color:rgba(248,113,113,.4)}
@@ -96,7 +97,7 @@ input[type=color]{width:44px;height:36px;padding:2px;background:var(--panel-2);b
 .toolbar input[type=search]{max-width:280px}
 .toolbar select{width:auto}
 .chip{display:inline-block;padding:2px 10px;border-radius:99px;font-size:12px;background:var(--panel-2);color:var(--dim);border:1px solid var(--line)}
-.chip.replied{color:var(--accent);border-color:rgba(139,108,255,.4)} .chip.active{color:var(--ok)} .chip.bounced,.chip.unsubscribed,.chip.do-not-contact{color:var(--bad)}
+.chip.skipped-bad-address{color:var(--warn)} .chip.replied{color:var(--accent);border-color:rgba(139,108,255,.4)} .chip.active{color:var(--ok)} .chip.bounced,.chip.unsubscribed,.chip.do-not-contact{color:var(--bad)}
 .chip.field-chip{cursor:pointer;font-family:var(--mono)} .chip.field-chip:hover{color:var(--text);border-color:var(--text)}
 
 .reply{display:grid;grid-template-columns:1fr auto;gap:8px 16px;padding:14px 0;border-top:1px solid var(--line)}
@@ -187,10 +188,13 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
         <input type="search" id="leadQ" placeholder="Search store, email or domain">
         <select id="leadStatus"><option value="">All statuses</option></select>
         <span style="flex:1"></span>
+        <button class="btn sm" id="cleanBtn">Clean list</button>
         <button class="btn sm" id="dncBtn">Never contact…</button>
         <a class="btn sm" href="/api/outreach/export?file=tracking" download>Export CSV</a>
+        <a class="btn sm" href="/api/outreach/export?file=sent" download>Sent log</a>
         <label class="btn primary sm" style="margin:0;cursor:pointer">Import leads<input type="file" id="importFile" accept=".xlsx,.xls,.csv" hidden></label>
       </div>
+      <div class="panel" id="cleanBox" hidden><h3>List cleaner <small>finds addresses that would bounce or hurt your sender reputation</small></h3><div id="cleanBody"></div></div>
       <div class="panel"><div class="scroll"><table id="leadTable"></table></div><div class="toolbar" style="margin:14px 0 0"><button class="btn sm" id="prevPg">Previous</button><span class="hint" id="pgInfo"></span><button class="btn sm" id="nextPg">Next</button></div></div>
       <p class="hint">Import accepts your spreadsheet (sheet “Leads”) or a CSV. People already contacted keep their history. Canada is skipped by default.</p>
     </section>
@@ -231,7 +235,8 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
           <p class="hint" style="margin-top:12px">Passwords are never entered here. On the server, set one environment variable per mailbox, named as shown under each mailbox (for example <code>OUTREACH_PASSWORD_1</code>). Mail servers other than Hostinger must be listed in <code>OUTREACH_ALLOWED_HOSTS</code>.</p>
         </div>
 
-        <div class="panel"><h3>Sending rules</h3>
+        <div class="panel"><h3>Sending rules <button type="button" class="btn sm" id="cautious" style="margin-left:auto">Use cautious settings</button></h3>
+          <p class="hint" style="margin:-4px 0 14px">Cautious = 5, 10, 15, 20 emails a day by week, at most 20 per mailbox, pause at 3% bounces. Best when you send from a single mailbox on your main domain.</p>
           <div class="row">
             <div class="field"><label>Notify me about replies at</label><input type="email" id="x_notify" placeholder="you@weberslink.org"></div>
             <div class="field"><label>Send days</label><input type="text" id="x_days" placeholder="Mon,Tue,Wed,Thu,Fri"></div>
