@@ -12,9 +12,11 @@ const DATA_DIR = path.resolve(process.env.OUTREACH_DATA_DIR || path.join(__dirna
 const P = (...a) => path.join(DATA_DIR, ...a);
 
 const TRACK_FIELDS = ["email", "first_name", "store", "domain", "country", "category", "niche", "step", "status", "mailbox", "variant",
-  "last_sent", "subject", "first_message_id", "last_message_id", "psi", "lcp", "mx", "note", "replied_at", "loom_sent", "sending"];
-// Fields the engine owns. The dashboard owns the rest (loom_sent), so a run never overwrites them.
-const ENGINE_FIELDS = TRACK_FIELDS.filter((f) => f !== "loom_sent");
+  "last_sent", "subject", "first_message_id", "last_message_id", "psi", "lcp", "mx", "note", "replied_at", "loom_sent", "sending",
+  "custom_line", "research_status", "research_source", "research_conf"];
+// Fields the dashboard owns (a run never overwrites them): the "video sent" tick and the personalised first line.
+const DASHBOARD_FIELDS = ["loom_sent", "custom_line", "research_status", "research_source", "research_conf"];
+const ENGINE_FIELDS = TRACK_FIELDS.filter((f) => !DASHBOARD_FIELDS.includes(f));
 const SENT_FIELDS = ["date", "mode", "mailbox", "email", "store", "step", "variant", "subject"];
 
 function ensureDir() {
@@ -160,5 +162,5 @@ function addSuppression(value) {
   fs.appendFileSync(P("do_not_contact.csv"), value.trim().toLowerCase() + "\n");
 }
 
-module.exports = { exportCsv, isEmail, sessionKey, DATA_DIR, P, ensureDir, TRACK_FIELDS, ENGINE_FIELDS, SENT_FIELDS, parseCsv, toCsv, readCsv, writeCsv, readJson, writeJson,
+module.exports = { DASHBOARD_FIELDS, exportCsv, isEmail, sessionKey, DATA_DIR, P, ensureDir, TRACK_FIELDS, ENGINE_FIELDS, SENT_FIELDS, parseCsv, toCsv, readCsv, writeCsv, readJson, writeJson,
   loadTracking, saveTracking, saveRow, updateLead, appendSentLog, appendLog, loadSuppression, addSuppression, atomicWrite };

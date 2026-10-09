@@ -178,6 +178,55 @@
     rd.readAsArrayBuffer(f);
   });
 
+  // ---------------------------------------------------------------- Gemini personalisation
+  var aiTimer;
+  $("aiBtn").addEventListener("click", function () { $("aiBox").hidden = !$("aiBox").hidden; if (!$("aiBox").hidden) loadAi(); else clearTimeout(aiTimer); });
+  function loadAi() {
+    clearTimeout(aiTimer);
+    Promise.all([api("GET", "/api/outreach/leads/research/status"), api("GET", "/api/outreach/leads/research/pending?limit=50")]).then(function (r) {
+      renderAi(r[0], r[1].rows);
+      if (r[0].job.running && !$("aiBox").hidden) aiTimer = setTimeout(loadAi, 2500);
+    }).catch(fail);
+  }
+  function renderAi(s, rows) {
+    var c = s.counts, j = s.job, html = "";
+    if (!s.configured) {
+      $("aiBody").innerHTML = '<p class="warn">Gemini is not set up yet.</p><p class="hint">Create a free key in Google AI Studio, then in Hostinger add an environment variable named <code>GEMINI_OUTREACH_KEY</code> with that key as its value, and restart the app. Never paste the key anywhere else.</p>';
+      return;
+    }
+    if (s.sharedKey) html += '<p class="warn">This is using your website chat key, so research shares its daily quota. Add a separate <code>GEMINI_OUTREACH_KEY</code> to protect the chat widget.</p>';
+    html += '<p class="hint">' + c.waiting + " waiting for research · " + c.pending + " to review · " + c.approved + " approved · " + c.rejected + " rejected · " + c.failed + " had no reliable detail · used today " + s.usedToday + " of " + s.dailyCap + "</p>";
+    if (j.running) {
+      html += '<p><b>Researching</b> “' + esc(j.current) + "” (" + j.done + " of " + j.total + ') <button class="btn sm danger" data-ai-stop="1">Stop</button></p>';
+    } else {
+      html += (j.message ? '<p class="hint">' + esc(j.message) + "</p>" : "") +
+        '<div class="toolbar"><select id="aiLimit"><option>10</option><option selected>25</option><option>50</option><option>100</option></select><button class="btn primary sm" id="aiStart"' + (c.waiting || c.failed ? "" : " disabled") + '>Research next leads</button>' +
+        '<label class="check" style="font-size:13px"><input type="checkbox" id="aiRetry"> also retry ones that failed</label></div>';
+    }
+    if (rows.length) {
+      html += '<div class="toolbar" style="margin-top:6px"><b>' + c.pending + ' suggestions to review</b><span style="flex:1"></span><button class="btn sm" data-ai-all="1">Approve all high-confidence</button></div>' +
+        '<div class="scroll" style="max-height:420px;overflow:auto"><table><tr><th>Store</th><th>Suggested line (you can edit it)</th><th>Source</th><th>Confidence</th><th></th></tr>' + rows.map(function (r) {
+          return "<tr><td>" + esc(r.store || r.domain) + '<div class="hint">' + esc(r.email) + "</div></td><td><textarea class='ai-line' rows='3' maxlength='240' data-line='" + esc(r.email) + "'>" + esc(r.line) + "</textarea></td><td>" +
+            (r.source ? '<a href="' + esc(r.source) + '" target="_blank" rel="noopener noreferrer">page</a>' : "–") + '</td><td><span class="chip ' + esc(r.conf) + '">' + esc(r.conf) + '</span></td><td style="white-space:nowrap"><button class="btn primary sm" data-ai="approve" data-email="' + esc(r.email) + '">Approve</button> <button class="btn sm" data-ai="reject" data-email="' + esc(r.email) + '">Reject</button></td></tr>';
+        }).join("") + "</table></div>";
+    }
+    html += '<p class="hint" style="margin-top:10px">Only approved lines go into emails (as <code>{custom_line_para}</code> in email 1; blank means the normal email). Check each against the store’s site: Gemini can be wrong. You can also add your own lines in a spreadsheet column named “first line”.</p>';
+    $("aiBody").innerHTML = html;
+  }
+  $("aiBody").addEventListener("click", function (e) {
+    var t = e.target;
+    if (t.id === "aiStart") {
+      api("POST", "/api/outreach/leads/research/start", { limit: Number($("aiLimit").value), retryFailed: Boolean($("aiRetry") && $("aiRetry").checked) }).then(function () { toast("Research started"); loadAi(); }).catch(fail);
+    } else if (t.getAttribute("data-ai-stop")) {
+      api("POST", "/api/outreach/leads/research/stop", {}).then(function () { toast("Stopping after the current store…"); loadAi(); }).catch(fail);
+    } else if (t.getAttribute("data-ai-all")) {
+      api("POST", "/api/outreach/leads/research/approve-high", {}).then(function (r) { toast("Approved " + r.approved + " high-confidence lines"); loadAi(); }).catch(fail);
+    } else if (t.getAttribute("data-ai")) {
+      var email = t.dataset.email, input = $("aiBody").querySelector("textarea[data-line='" + email.replace(/'/g, "\\'") + "']");
+      api("POST", "/api/outreach/leads/research/review", { email: email, action: t.dataset.ai, line: input ? input.value : undefined }).then(function () { toast(t.dataset.ai === "approve" ? "Approved" : "Rejected"); loadAi(); }).catch(fail);
+    }
+  });
+
   // ---------------------------------------------------------------- list cleaner
   var KIND = { syntax: "invalid address", junk: "scraped junk", disposable: "throwaway domain", typo: "typo", system: "system address", placeholder: "placeholder", "no-mail-server": "domain can't receive mail", role: "shared mailbox" };
   var cleanTimer;

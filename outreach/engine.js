@@ -10,6 +10,7 @@ const dns = require("dns").promises;
 const store = require("./store");
 const tpl = require("./templates");
 const cleaner = require("./cleaner");
+const research = require("./research");
 const { Mailbox, passwordFor } = require("./mail");
 const { stripOurFooter } = require("./inbound");
 
@@ -231,10 +232,14 @@ function importLeads(rows, cfg) {
       category: pick(r, "category").slice(0, 100), niche: pick(r, "niche").slice(0, 100),
       psi: num(pick(r, "psi", "mobile pagespeed (0-100)")), lcp: /^\d+(\.\d+)?$/.test(lcp) ? lcp : "",
     };
+    // A line you wrote yourself in the spreadsheet is trusted like an approved one (after the same safety checks).
+    const own = research.validateLine(pick(r, "custom_line", "custom line", "first_line", "first line", "personal line", "personalization", "personalisation"));
+    if (own.ok) { lead.custom_line = own.line; lead.research_status = "approved"; }
     const cur = have.get(key);
     if (cur) {
       res.existing++;
       for (const k of ["first_name", "store", "category", "niche", "psi", "lcp"]) if (!cur[k] && lead[k]) cur[k] = lead[k];
+      if (lead.custom_line && !cur.custom_line && !cur.research_status) { cur.custom_line = lead.custom_line; cur.research_status = "approved"; }
       continue;
     }
     const t = Object.fromEntries(store.TRACK_FIELDS.map((f) => [f, ""]));
@@ -501,6 +506,7 @@ async function runOnce(opts = {}, deps = {}) {
       if (why) { log(`  skipped ${t.email}: ${why}`); return "skipped"; }
       const mailboxHint = t.mailbox;
       for (const f of store.ENGINE_FIELDS) t[f] = current[f];
+      t.custom_line = current.custom_line; t.research_status = current.research_status; // read-only here: used to render the email
       t.mailbox = t.mailbox || mailboxHint;
 
       const variant = tpl.pickVariant(t, step);

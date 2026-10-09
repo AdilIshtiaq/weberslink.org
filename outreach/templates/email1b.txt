@@ -2,7 +2,7 @@ Subject: free video for {domain}
 
 {greeting}
 
-Shoppers on {domain} usually have a question about {questions} before they buy. At 2am nobody is there to answer, so they leave.
+{custom_line_para}Shoppers on {domain} usually have a question about {questions} before they buy. At 2am nobody is there to answer, so they leave.
 
 I'd like to record a free 3-minute video for {domain} showing where shoppers are likely getting stuck and what would fix it.{speed_note}
 

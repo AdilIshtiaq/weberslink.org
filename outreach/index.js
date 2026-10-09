@@ -15,6 +15,7 @@ const tpl = require("./templates");
 const eng = require("./engine");
 const xlsx = require("./xlsx");
 const cleaner = require("./cleaner");
+const research = require("./research");
 
 const PASSWORD = process.env.ADMIN_PASSWORD || "";
 const USERNAME = (process.env.ADMIN_USERNAME || "").trim().toLowerCase();
@@ -212,6 +213,20 @@ async function route(req, res, url, method) {
     if (rows.length > 20000) return send(res, 400, { ok: false, error: "Up to 20,000 rows at a time." });
     return send(res, 200, { ok: true, ...eng.importLeads(rows, eng.loadConfig()) });
   }
+  if (p === "/leads/research/status" && method === "GET") return send(res, 200, { ok: true, ...research.status() });
+  if (p === "/leads/research/start" && method === "POST") {
+    const body = await readJson(req);
+    const r = research.startJob({ limit: Math.max(1, Math.min(100, parseInt(body.limit, 10) || 25)), retryFailed: body.retryFailed === true });
+    return send(res, r.started ? 202 : r.reason && /already/.test(r.reason) ? 409 : 400, { ok: r.started, ...(r.started ? {} : { error: r.reason }) });
+  }
+  if (p === "/leads/research/stop" && method === "POST") { research.stopJob(); return send(res, 200, { ok: true }); }
+  if (p === "/leads/research/pending" && method === "GET") return send(res, 200, { ok: true, rows: research.pending(Math.min(200, Math.max(1, parseInt(url.searchParams.get("limit"), 10) || 50))) });
+  if (p === "/leads/research/review" && method === "POST") {
+    const body = await readJson(req);
+    const r = research.review(String(body.email || ""), String(body.action || ""), body.line);
+    return r.error ? send(res, 400, { ok: false, error: r.error }) : send(res, 200, { ok: true });
+  }
+  if (p === "/leads/research/approve-high" && method === "POST") return send(res, 200, { ok: true, approved: research.approveHigh() });
   if (p === "/leads/clean/start" && method === "POST") {
     const r = cleaner.startScan({ mx: eng.domainReceivesMail });
     return send(res, r.started ? 202 : 409, { ok: r.started, ...(r.started ? {} : { error: r.reason }) });
