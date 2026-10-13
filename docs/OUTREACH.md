@@ -37,15 +37,34 @@ Safety behaviour worth knowing:
 | `GEMINI_OUTREACH_DAILY_MAX` | optional | Most Gemini lookups per day (default 150). |
 | `GEMINI_OUTREACH_GAP_SECONDS` | optional | Pause between lookups (default 7), to stay inside free-tier rate limits. |
 | `GEMINI_OUTREACH_MODEL` | optional | Model name (default `gemini-flash-latest`). |
+| `OUTREACH_AUTO_RUN` | optional | Set to `window` to start runs automatically (every 10 minutes) whenever the sending window is open and Live sending is on. An alternative to the Hostinger cron job. |
 | `ADMIN_SESSION_SECRET` | optional | Login-cookie signing key. Default: a random key stored in the data folder. |
 
 Passwords are never stored in files or in the dashboard, and `outreach-data/` is git-ignored (this repo is public).
 Signing out ends the session immediately. Wrong passwords are throttled (per address, plus a global slow-down).
 
+## Sending window (for example overnight, 7pm to 7am)
+Settings -> Sending rules -> **Only send during a daily window**. Pick when it opens and closes in the time zone set above (the
+**Use 7pm-7am Pakistan time** button fills in Asia/Karachi and 19:00-07:00).
+- The day's emails are spread evenly across the window (a gap of roughly window length divided by emails left, with some
+  randomness, never faster than the minimum delay), so nothing goes out in a burst. The first goes out as soon as the window opens.
+- A window can cross midnight: 7pm to 7am is ONE campaign day (one daily budget, one "send day" decision: Friday evening
+  continues into Saturday's small hours; Saturday evening does not).
+- Outside the window a run still reads your inbox (replies, opt-outs, bounces) but sends nothing. Emails that don't fit
+  before the window closes wait for the next window; nothing is lost. Dry runs ignore the window.
+- The dashboard shows whether the window is open and when it opens or closes.
+- Keep it running with either a cron job every 30 minutes (below) or `OUTREACH_AUTO_RUN=window`. Extra triggers are harmless:
+  a trigger while a run is active is refused, and each run only sends what the budget and pacing allow.
+- Think about WHO is reading: 7pm-7am Pakistan time is 10am-10pm US Eastern (good for US leads) but 3pm-3am in the UK, so UK
+  emails arrive overnight. Business hours in the recipient's morning tend to do better.
+
 ## Daily run
 Hostinger can stop idle Node apps, so use a cron job as the reliable trigger (hPanel -> Advanced -> Cron Jobs), weekdays:
 
     curl -fsS -X POST -H "x-cron-token: YOUR_OUTREACH_CRON_TOKEN" https://weberslink.org/api/outreach/cron
+
+With a sending window, schedule it every 30 minutes instead (cron: `*/30 * * * *`) so a run is always active while the window is
+open and resumes after any restart; outside the window it only checks the inbox.
 
 It returns immediately (202) and the run continues in the background. A second trigger while one is running is refused.
 A crashed run's lock is taken over automatically. Runs use the Dry run / Live setting from Settings. Pick a time that
@@ -118,7 +137,7 @@ Every email carries the postal address and an opt-out line. A mailbox pauses its
 A/B versions share one body and differ only in subject; judge after about 100 leads each.
 
 ## Tests
-`npm test` (about 73 tests: engine, API, auth, regression tests for an independent code review; no network or real
+`npm test` (about 81 tests: engine, API, auth, regression tests for an independent code review; no network or real
 mailboxes needed).
 
 ## Not covered by tests

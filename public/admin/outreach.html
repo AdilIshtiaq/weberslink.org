@@ -171,6 +171,7 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
       <div class="panel problems" id="problems" hidden><h3>Fix these before live sending</h3><ul id="problemList"></ul></div>
       <div class="panel problems" id="dataWarn" hidden><h3>Protect your data</h3><ul id="dataWarnList"></ul></div>
       <div class="panel problems" id="heldBox" hidden><h3>Needs your check <small>a send was interrupted: look in your Sent folder, then choose</small></h3><div id="heldList"></div></div>
+      <div class="panel" id="windowBox" hidden><p id="windowInfo" style="margin:0"></p></div>
       <div class="cards" id="cards"></div>
       <div class="panel"><h3>Mailboxes <small>each one warms up automatically</small></h3><div class="scroll"><table id="mbTable"></table></div></div>
       <div class="grid2">
@@ -256,6 +257,12 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
             <div class="field"><label>Wait between emails (seconds, min)</label><input type="number" id="x_min" min="0"></div>
             <div class="field"><label>Wait between emails (seconds, max)</label><input type="number" id="x_max" min="0"></div>
           </div>
+          <div class="field"><label class="check"><input type="checkbox" id="x_win"> <b>Only send during a daily window</b> (uses the time zone above)</label></div>
+          <div class="row">
+            <div class="field"><label>Window opens</label><input type="time" id="x_wstart"></div>
+            <div class="field"><label>Window closes</label><input type="time" id="x_wend"></div>
+          </div>
+          <p class="hint" style="margin:-4px 0 14px">Emails are spread evenly across the window, one every so often, so a day's batch never goes out in a burst. A window can run past midnight (7pm to 7am counts as one day). Outside it the dashboard still reads your inbox but sends nothing. <button type="button" class="btn sm" id="overnightPk" style="margin-left:6px">Use 7pm–7am Pakistan time</button></p>
           <div class="field"><label class="check"><input type="checkbox" id="x_html"> Send designed HTML emails (with a plain-text copy)</label></div>
           <div class="field"><label class="check"><input type="checkbox" id="x_mx"> Check each store's email domain can receive mail first</label></div>
           <div class="field"><label class="check" style="color:var(--warn)"><input type="checkbox" id="x_live"> <b>Live sending</b> — off means every run is a safe dry run that sends nothing</label></div>
