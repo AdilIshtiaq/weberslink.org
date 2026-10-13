@@ -130,3 +130,11 @@ test("repeated wrong passwords are throttled", async () => {
   // even the right password is refused while throttled
   assert.strictEqual((await api("POST", "/api/outreach/login", { password: process.env.ADMIN_PASSWORD }, { auth: false })).status, 429);
 });
+
+test("email signature shows the logo from the website, and can be switched off", () => {
+  const t = require("../outreach/templates");
+  const sig = { name: "Hassan Ali", title: "Founder", company: "WebersLink", website: "weberslink.org", postal_address: "1 Example St", accent_color: "#222222" };
+  const on = t.renderHtml("Hello\n\nHassan", { signature: sig });
+  assert.ok(on.includes('src="https://weberslink.org/assets/email-logo.png"'), "logo is loaded from the sender's own site");
+  assert.ok(!t.renderHtml("Hello\n\nHassan", { signature: { ...sig, logo: false } }).includes("<img"), "off means no image");
+});

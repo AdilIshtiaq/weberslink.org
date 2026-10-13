@@ -131,13 +131,16 @@ function renderHtml(main, cfg) {
   });
   const site = String(sig.website || "").trim();
   const href = /^https?:/i.test(site) ? site : "https://" + site;
+  let logoUrl = "";
+  if (sig.logo !== false) { try { logoUrl = new URL(href).origin + "/assets/email-logo.png"; } catch (e) { /* no valid website: no logo */ } }
+  const logoRow = logoUrl ? `<tr><td style="padding:0 0 10px 0;"><a href="${esc(href)}"><img src="${esc(logoUrl)}" width="168" height="37" alt="${esc(sig.company)}" style="display:block;border:0;height:auto;"></a></td></tr>\n` : "";
   const role = sig.title ? `${esc(sig.title)}, ${esc(sig.company)}` : esc(sig.company);
   return `<!DOCTYPE html>
 <html><body style="margin:0;padding:0;background:#ffffff;">
 <div style="max-width:580px;padding:8px 4px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#222222;">
 ${blocks.join("")}
 <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:8px;border-collapse:collapse;">
-<tr><td style="border-left:3px solid ${accent};padding:2px 0 2px 12px;font-family:Arial,Helvetica,sans-serif;">
+${logoRow}<tr><td style="border-left:3px solid ${accent};padding:2px 0 2px 12px;font-family:Arial,Helvetica,sans-serif;">
 <div style="font-size:15px;font-weight:bold;color:#111111;">${esc(sig.name)}</div>
 <div style="font-size:13px;color:#555555;">${role}</div>
 <div style="font-size:13px;"><a href="${esc(href)}" style="color:${accent};text-decoration:none;">${esc(site)}</a></div>

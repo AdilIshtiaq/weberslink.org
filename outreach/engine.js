@@ -34,7 +34,7 @@ const COUNTRY_ALIAS = { "UNITED STATES": "US", USA: "US", "UNITED KINGDOM": "UK"
 // so it is not written here: set OUTREACH_NOTIFY_EMAIL in Hostinger and it becomes the default (see loadConfig).
 const DEFAULT_CONFIG = {
   signature: { name: "Hassan Ali", title: "Founder", company: "WebersLink", website: "weberslink.org",
-    postal_address: "2315 Chestnut Street, Montgomery, Alabama 36107, United States", accent_color: "#5b2ee5" },
+    postal_address: "2315 Chestnut Street, Montgomery, Alabama 36107, United States", accent_color: "#5b2ee5", logo: true },
   sending: {
     dry_run: true, countries: ["US", "UK"], send_days: ["Mon", "Tue", "Wed", "Thu", "Fri"], timezone: "America/New_York",
     daily_limit: 20, ramp: [5, 10, 15, 20], followup_gaps_days: [3, 4, 7], min_delay_seconds: 600, max_delay_seconds: 1200,
@@ -70,6 +70,7 @@ function sanitizeConfig(input) {
     signature: {
       name: str(g.name, 100), title: str(g.title, 100), company: str(g.company, 100), website: str(g.website, 200),
       postal_address: str(g.postal_address, 300), accent_color: /^#[0-9a-f]{6}$/i.test(str(g.accent_color)) ? str(g.accent_color) : d.signature.accent_color,
+      logo: g.logo === undefined ? d.signature.logo : !(g.logo === false || g.logo === "false"),
     },
     sending: {
       dry_run: s.dry_run !== false,
