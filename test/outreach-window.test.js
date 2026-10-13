@@ -10,7 +10,7 @@ const store = require("../outreach/store");
 const eng = require("../outreach/engine");
 
 const base = { signature: { name: "Hassan Ali", company: "WebersLink", website: "weberslink.org", postal_address: "1 Example St" }, mailboxes: [{ email: "box1@lookalike1.com" }] };
-const mk = (sending) => eng.sanitizeConfig({ ...base, sending: { dry_run: false, timezone: "Asia/Karachi", send_days: ["Mon", "Tue", "Wed", "Thu", "Fri"], min_delay_seconds: 60, max_delay_seconds: 60, ramp: "40", daily_limit: 40, window_enabled: true, window_start: "19:00", window_end: "07:00", ...sending } });
+const mk = (sending) => eng.sanitizeConfig({ ...base, sending: { dry_run: false, timezone: "Asia/Karachi", send_days: ["Mon", "Tue", "Wed", "Thu", "Fri"], min_delay_seconds: 600, max_delay_seconds: 1200, ramp: "40", daily_limit: 40, window_enabled: true, window_start: "19:00", window_end: "07:00", ...sending } });
 const CFG = mk({});
 const z = (iso) => new Date(iso);
 const reset = () => { for (const f of fs.readdirSync(DIR)) fs.rmSync(path.join(DIR, f), { recursive: true, force: true }); };
@@ -79,7 +79,7 @@ test("outside the window a live run reads the inbox but sends nothing; a dry run
   assert.ok(d.sent > 0, "rehearsals are allowed any time");
 });
 
-test("inside the window the day's emails are spread over the whole window and all fit", async () => {
+test("inside the window the gaps are random between the minimum and maximum and all emails fit", async () => {
   reset(); eng.importLeads(leads(6), CFG);
   const h = harness("2026-03-02T14:00:00Z"); // 19:00 PKT: window just opened
   const open = h.t, close = Date.parse("2026-03-03T02:00:00Z"); // 07:00 PKT
@@ -88,9 +88,7 @@ test("inside the window the day's emails are spread over the whole window and al
   assert.strictEqual(h.times[0], open, "the first goes out as soon as the window opens");
   assert.ok(h.times.every((t) => t >= open && t < close), "every email goes out inside the window");
   const gaps = h.times.slice(1).map((t, i) => (t - h.times[i]) / 1000);
-  assert.ok(gaps.every((g) => g >= 60), "never faster than the minimum delay");
-  assert.ok(gaps[0] >= 0.6 * (43200 / 5) - 1 && gaps[0] <= 0.95 * (43200 / 5) + 1, `the first gap is a share of the window (${gaps[0]}s), not a burst`);
-  assert.ok(h.times[5] - open > 6 * 3600 * 1000, "the emails really are spread out over many hours");
+  assert.ok(gaps.every((g) => g >= 600 && g <= 1200), `every gap is 10-20 minutes (${gaps.join(",")})`);
 });
 
 test("when the window closes with emails left, they wait for the next window and nothing is lost", async () => {
