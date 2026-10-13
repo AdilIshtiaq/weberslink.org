@@ -344,6 +344,19 @@ function startScheduler() {
     const d = store.info();
     console.log(`Outreach data folder: ${d.dir} (${d.explicit ? "set by OUTREACH_DATA_DIR" : "default; set OUTREACH_DATA_DIR to choose it"})${d.insideApp ? " WARNING: inside the app folder, a redeploy can erase it" : ""}${d.writable ? "" : " WARNING: not writable"}`);
   }
+  // OUTREACH_AUTO_RUN=window: while the sending window is open (and Live sending is on) start a run every 10 minutes if none is
+  // running. Each run only sends what the day's budget and the window's pacing allow, so extra triggers are harmless.
+  if (enabled && process.env.OUTREACH_AUTO_RUN === "window") {
+    setInterval(() => {
+      try {
+        const cfg = eng.loadConfig();
+        if (cfg.sending.dry_run) return;
+        const w = eng.windowState(cfg);
+        if (w.enabled && w.open) eng.startRun({ source: "auto" });
+      } catch (e) { console.error("outreach scheduler:", e.message); }
+    }, 10 * 60 * 1000).unref();
+    console.log("Outreach auto-run on: whenever the sending window is open.");
+  }
   const raw = process.env.OUTREACH_AUTO_RUN_HOUR;
   if (!enabled || raw === undefined || raw === "") return;
   const hour = Number(raw);

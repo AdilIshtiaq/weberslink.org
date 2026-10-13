@@ -79,6 +79,9 @@
       ["Bounced", c.bounced || 0], ["Days to finish", s.daysLeft || "–"]
     ].map(function (x) { return '<div class="card"><div class="n">' + esc(x[1]) + '</div><div class="l">' + esc(x[0]) + "</div></div>"; }).join("");
 
+    var w = s.window || {}, fmt = function (m) { return Math.floor(m / 60) + "h " + (m % 60) + "m"; };
+    $("windowBox").hidden = !w.enabled;
+    if (w.enabled) $("windowInfo").innerHTML = "Sending window " + esc(w.start) + "–" + esc(w.end) + " (" + esc(w.timezone) + "): " + (w.open ? '<b class="ok">OPEN now</b>, closes in ' + fmt(w.minutesToClose) : '<b class="warn">closed</b>, opens in ' + fmt(w.minutesToOpen)) + (s.dryRun ? ' <span class="hint">(Live sending is off, so nothing will be sent.)</span>' : "");
     var d = s.data || {}, warns = [];
     if (d.insideApp) warns.push("Your data folder (" + d.dir + ") is inside the app's folder, so a redeploy can erase it. Set OUTREACH_DATA_DIR in Hostinger to a folder outside the app, restart, then restore a backup.");
     if (d.dir && !d.writable) warns.push("The data folder (" + d.dir + ") can't be written to, so nothing you save will stick. Set OUTREACH_DATA_DIR to a folder you can write to.");
@@ -289,6 +292,10 @@
     var em = e.target.getAttribute("data-restore"); if (!em) return;
     api("POST", "/api/outreach/leads/action", { email: em, action: "restore" }).then(function () { toast("Restored"); loadLeads(); refresh(); }).catch(fail);
   });
+  $("overnightPk").addEventListener("click", function () {
+    $("x_tz").value = "Asia/Karachi"; $("x_win").checked = true; $("x_wstart").value = "19:00"; $("x_wend").value = "07:00";
+    toast("Set to 7pm–7am Pakistan time. Click Save settings to keep it.");
+  });
   $("cautious").addEventListener("click", function () {
     $("x_ramp").value = "5,10,15,20"; $("x_limit").value = 20; $("x_bounce").value = 3;
     toast("Cautious settings filled in. Click Save settings to keep them.");
@@ -359,7 +366,7 @@
       $("s_name").value = g.name; $("s_title").value = g.title; $("s_company").value = g.company; $("s_website").value = g.website; $("s_postal").value = g.postal_address; $("s_accent").value = g.accent_color;
       $("x_notify").value = s.notify_email; $("x_days").value = s.send_days.join(","); $("x_tz").value = s.timezone; $("x_countries").value = s.countries.join(",");
       $("x_ramp").value = s.ramp.join(","); $("x_limit").value = s.daily_limit; $("x_gaps").value = s.followup_gaps_days.join(","); $("x_bounce").value = s.bounce_pause_percent;
-      $("x_min").value = s.min_delay_seconds; $("x_max").value = s.max_delay_seconds; $("x_html").checked = s.html_emails; $("x_mx").checked = s.check_mx; $("x_live").checked = !s.dry_run;
+      $("x_win").checked = s.window_enabled; $("x_wstart").value = s.window_start; $("x_wend").value = s.window_end; $("x_min").value = s.min_delay_seconds; $("x_max").value = s.max_delay_seconds; $("x_html").checked = s.html_emails; $("x_mx").checked = s.check_mx; $("x_live").checked = !s.dry_run;
       $("mbList").innerHTML = c.mailboxes.map(mbBlock).join("");
     }).catch(fail);
   }
@@ -376,7 +383,7 @@
       signature: { name: $("s_name").value, title: $("s_title").value, company: $("s_company").value, website: $("s_website").value, postal_address: $("s_postal").value, accent_color: $("s_accent").value },
       sending: { notify_email: $("x_notify").value, send_days: $("x_days").value, timezone: $("x_tz").value, countries: $("x_countries").value, ramp: $("x_ramp").value, daily_limit: $("x_limit").value,
         followup_gaps_days: $("x_gaps").value, bounce_pause_percent: $("x_bounce").value, min_delay_seconds: $("x_min").value, max_delay_seconds: $("x_max").value,
-        html_emails: $("x_html").checked, check_mx: $("x_mx").checked, dry_run: !live, check_inbox_in_dry_run: state.config ? state.config.sending.check_inbox_in_dry_run : false },
+        window_enabled: $("x_win").checked, window_start: $("x_wstart").value, window_end: $("x_wend").value, html_emails: $("x_html").checked, check_mx: $("x_mx").checked, dry_run: !live, check_inbox_in_dry_run: state.config ? state.config.sending.check_inbox_in_dry_run : false },
       mailboxes: boxes
     };
     api("PUT", "/api/outreach/config", body).then(function (r) { state.config = r.config; toast("Settings saved"); loadSettings(); refresh(); }).catch(fail);

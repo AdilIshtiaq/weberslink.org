@@ -35,6 +35,7 @@ const DEFAULT_CONFIG = {
     dry_run: true, countries: ["US", "UK"], send_days: ["Mon", "Tue", "Wed", "Thu", "Fri"], timezone: "America/New_York",
     daily_limit: 40, ramp: [10, 20, 30, 40], followup_gaps_days: [3, 4, 7], min_delay_seconds: 90, max_delay_seconds: 240,
     notify_email: "", html_emails: true, check_mx: true, bounce_pause_percent: 3, check_inbox_in_dry_run: false,
+    window_enabled: false, window_start: "19:00", window_end: "07:00",
   },
   mailboxes: [],
 };
@@ -75,12 +76,14 @@ function sanitizeConfig(input) {
       max_delay_seconds: Math.max(minD, intIn(s.max_delay_seconds, 0, 7200, d.sending.max_delay_seconds)),
       notify_email: str(s.notify_email, 200), html_emails: s.html_emails !== false, check_mx: s.check_mx !== false,
       bounce_pause_percent: intIn(s.bounce_pause_percent, 1, 50, 3), check_inbox_in_dry_run: Boolean(s.check_inbox_in_dry_run),
+      window_enabled: s.window_enabled === true, window_start: hhmm(s.window_start, d.sending.window_start), window_end: hhmm(s.window_end, d.sending.window_end),
     },
     mailboxes: sanitizeMailboxes(input.mailboxes),
   };
   if (out.sending.notify_email && !store.isEmail(out.sending.notify_email)) throw new Error("Notification email is not a valid address");
   for (const m of out.mailboxes) if (m.email && !store.isEmail(m.email)) throw new Error(`Mailbox "${m.email}" is not a valid address`);
   if (!out.sending.send_days.length) throw new Error("Choose at least one send day");
+  if (out.sending.window_enabled && out.sending.window_start === out.sending.window_end) throw new Error("The sending window's start and end times must be different");
   return out;
 }
 // Mail servers the dashboard may send passwords to. Without this, a hijacked admin session could point a mailbox at
@@ -116,6 +119,12 @@ function sanitizeMailboxes(list) {
   });
 }
 
+/** "7:05" -> "07:05". Anything that isn't a 24-hour time falls back to the default. */
+function hhmm(v, d) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(v == null ? "" : v).trim());
+  return m && Number(m[1]) < 24 && Number(m[2]) < 60 ? `${m[1].padStart(2, "0")}:${m[2]}` : d;
+}
+
 function intList0(v, d) { const a = (Array.isArray(v) ? v : String(v == null ? "" : v).split(",")).map((x) => String(x).trim()).filter(Boolean); return a.length ? a : d; }
 
 function saveConfig(cfg) {
@@ -124,16 +133,56 @@ function saveConfig(cfg) {
 
 // ---------------------------------------------------------------- dates (in the sending time zone)
 function tzParts(date, tz) {
-  const f = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", weekday: "short", hour: "2-digit", hourCycle: "h23" }).formatToParts(date);
+  const f = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(date);
   const g = (t) => f.find((p) => p.type === t).value;
-  return { date: `${g("year")}-${g("month")}-${g("day")}`, weekday: g("weekday").slice(0, 3).toLowerCase(), hour: parseInt(g("hour"), 10) };
+  return { date: `${g("year")}-${g("month")}-${g("day")}`, weekday: g("weekday").slice(0, 3).toLowerCase(), hour: parseInt(g("hour"), 10), minute: parseInt(g("minute"), 10) };
 }
-const today = (cfg, now = new Date()) => tzParts(now, cfg.sending.timezone).date;
+
+// ---- optional daily sending window (e.g. 19:00 to 07:00, which crosses midnight) in the sending time zone
+const toMin = (hm) => { const m = /^(\d{2}):(\d{2})$/.exec(hm || ""); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+function windowOf(cfg) {
+  const s = cfg.sending;
+  if (!s.window_enabled) return null;
+  const a = toMin(s.window_start), b = toMin(s.window_end);
+  return a == null || b == null || a === b ? null : { start: a, end: b, crosses: a > b };
+}
+const minuteOfDay = (cfg, now) => { const p = tzParts(now, cfg.sending.timezone); return p.hour * 60 + p.minute; };
+function inWindow(cfg, now = new Date()) {
+  const w = windowOf(cfg);
+  if (!w) return true;
+  const m = minuteOfDay(cfg, now);
+  return w.crosses ? m >= w.start || m < w.end : m >= w.start && m < w.end;
+}
+/** Minutes until the window opens (0 if open now). */
+function minutesToOpen(cfg, now = new Date()) {
+  const w = windowOf(cfg);
+  return !w || inWindow(cfg, now) ? 0 : (w.start - minuteOfDay(cfg, now) + 1440) % 1440;
+}
+/** Minutes until the window closes (only meaningful while it is open). */
+function minutesToClose(cfg, now = new Date()) {
+  const w = windowOf(cfg);
+  return w ? (w.end - minuteOfDay(cfg, now) + 1440) % 1440 || 1440 : 1440;
+}
+/**
+ * The "campaign day" of a moment: the calendar date, except that the small hours after midnight still belong to the
+ * evening window that started the day before (Mon 19:00 to Tue 07:00 is ONE Monday campaign day: one budget, one send day).
+ */
+function campaignDate(cfg, d) {
+  const p = tzParts(d, cfg.sending.timezone), w = windowOf(cfg);
+  return w && w.crosses && p.hour * 60 + p.minute < w.end ? new Date(Date.parse(p.date + "T12:00:00Z") - 864e5).toISOString().slice(0, 10) : p.date;
+}
+const today = (cfg, now = new Date()) => campaignDate(cfg, now);
+function windowState(cfg, now = new Date()) {
+  const w = windowOf(cfg);
+  if (!w) return { enabled: false };
+  const open = inWindow(cfg, now);
+  return { enabled: true, start: cfg.sending.window_start, end: cfg.sending.window_end, timezone: cfg.sending.timezone, open, minutesToOpen: minutesToOpen(cfg, now), minutesToClose: open ? minutesToClose(cfg, now) : 0 };
+}
 function daysBetween(a, b) { return Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 864e5); }
 function daysSince(iso, cfg, now = new Date()) {
   const d = new Date(iso);
   if (!iso || Number.isNaN(d.getTime())) return 0;
-  return daysBetween(tzParts(d, cfg.sending.timezone).date, today(cfg, now));
+  return daysBetween(campaignDate(cfg, d), today(cfg, now));
 }
 const addDays = (dateStr, n) => new Date(Date.parse(dateStr + "T12:00:00Z") + n * 864e5).toISOString().slice(0, 10);
 
@@ -147,14 +196,15 @@ function nextEmail(t, cfg, now = new Date()) {
   if (t.status === "finished") return "Sequence complete";
   if (t.status === cleaner.SKIPPED) return t.note ? `Skipped: ${t.note}` : "Skipped by the list cleaner";
   if (t.status !== "active" || step < 1 || step > 3) return "";
-  const lastDay = tzParts(new Date(t.last_sent), cfg.sending.timezone).date;
+  const lastDay = campaignDate(cfg, new Date(t.last_sent));
   const gap = cfg.sending.followup_gaps_days[step - 1] || cfg.sending.followup_gaps_days[cfg.sending.followup_gaps_days.length - 1];
   const due = nextSendDay(addDays(lastDay, gap));
   return daysBetween(today(cfg, now), due) <= 0 ? `Email ${step + 1} due on the next run` : `Email ${step + 1} on ${due}`;
 }
 
 function isSendDay(cfg, now = new Date()) {
-  return cfg.sending.send_days.map((d) => d.toLowerCase().slice(0, 3)).includes(tzParts(now, cfg.sending.timezone).weekday);
+  const day = campaignDate(cfg, now); // which campaign day it is (a window crossing midnight counts as the day it started)
+  return cfg.sending.send_days.map((d) => d.toLowerCase().slice(0, 3)).includes(tzParts(new Date(day + "T12:00:00Z"), "UTC").weekday);
 }
 
 // ---------------------------------------------------------------- run state + logging
@@ -400,7 +450,9 @@ async function runOnce(opts = {}, deps = {}) {
     return summary;
   }
   const sendDay = isSendDay(cfg, now);
-  log(`=== Run start v${VERSION} (${dry ? "DRY RUN" : "LIVE"}) - ${boxes.length} mailbox(es)${sendDay ? "" : " - not a send day, checking inboxes only"}`);
+  const windowOn = !dry && Boolean(windowOf(cfg)); // a dry run is a rehearsal and ignores the window
+  const closed = windowOn && !inWindow(cfg, now);
+  log(`=== Run start v${VERSION} (${dry ? "DRY RUN" : "LIVE"}) - ${boxes.length} mailbox(es)${sendDay ? "" : " - not a send day, checking inboxes only"}${windowOn ? ` - sending window ${cfg.sending.window_start}-${cfg.sending.window_end} ${cfg.sending.timezone}${closed ? " (closed now)" : " (open)"}` : ""}`);
 
   const state = store.readJson("mailboxes.json", { mailboxes: {} });
   state.mailboxes = state.mailboxes || {};
@@ -442,6 +494,10 @@ async function runOnce(opts = {}, deps = {}) {
     }
     track = loadState(cfg);
     if (!sendDay) { log("=== Run end - today is not in send_days"); return summary; }
+    if (closed) {
+      log(`=== Run end - outside the sending window; it opens in ${Math.floor(minutesToOpen(cfg, now) / 60)}h ${minutesToOpen(cfg, now) % 60}m. Inboxes were checked, nothing was sent.`);
+      return summary;
+    }
 
     // 2. budgets
     const doneToday = dry ? {} : sentTodayByBox(cfg, now);
@@ -571,13 +627,21 @@ async function runOnce(opts = {}, deps = {}) {
     const worker = async (box) => {
       const key = box.addr.toLowerCase();
       let sentOne = false;
-      for (const item of plan.get(key)) {
+      const items = plan.get(key);
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
         if (run.stop) break;
+        const windowClosed = () => { if (windowOn && !inWindow(cfg, clock())) { log(`  ${box.addr}: sending window closed; ${items.length - i} email(s) wait for the next window`); return true; } return false; };
+        if (windowClosed()) break;
         if (!dry && sentOne) { // each mailbox paces itself; mailboxes run side by side
-          const wait = cfg.sending.min_delay_seconds + Math.floor(Math.random() * (cfg.sending.max_delay_seconds - cfg.sending.min_delay_seconds + 1));
-          log(`  ${box.addr}: waiting ${wait}s ...`);
+          let wait;
+          if (windowOn) { // spread what is left evenly over what is left of the window (with some randomness), never faster than the minimum delay
+            const base = (minutesToClose(cfg, clock()) * 60) / (items.length - i);
+            wait = Math.max(Math.round(base * (0.6 + Math.random() * 0.35)), cfg.sending.min_delay_seconds); // never longer than an even share, so the rest always fits
+          } else wait = cfg.sending.min_delay_seconds + Math.floor(Math.random() * (cfg.sending.max_delay_seconds - cfg.sending.min_delay_seconds + 1));
+          log(`  ${box.addr}: waiting ${wait >= 3600 ? `${Math.floor(wait / 3600)}h ${Math.round((wait % 3600) / 60)}m` : wait >= 120 ? `${Math.round(wait / 60)} min` : `${wait}s`} ...`);
           await sleep(wait * 1000);
-          if (run.stop) break;
+          if (run.stop || windowClosed()) break;
         }
         const r = await deliver(item.t, item.step, box);
         if (r === "stop") break;
@@ -596,7 +660,7 @@ async function runOnce(opts = {}, deps = {}) {
 function sentTodayByBox(cfg, now) {
   const t0 = today(cfg, now), c = {};
   for (const r of store.readCsv("sent_log.csv")) {
-    if (r.mode === "live" && tzParts(new Date(r.date), cfg.sending.timezone).date === t0) c[(r.mailbox || "").toLowerCase()] = (c[(r.mailbox || "").toLowerCase()] || 0) + 1;
+    if (r.mode === "live" && campaignDate(cfg, new Date(r.date)) === t0) c[(r.mailbox || "").toLowerCase()] = (c[(r.mailbox || "").toLowerCase()] || 0) + 1;
   }
   return c;
 }
@@ -682,7 +746,7 @@ function status(cfg = loadConfig(), now = new Date()) {
   const daily = mailboxes.filter((m) => m.enabled && !m.paused).reduce((a, m) => a + m.todayLimit, 0);
   const remaining = track.filter((t) => t.status === "new").length;
   return {
-    version: VERSION, dryRun: cfg.sending.dry_run, sendDay: isSendDay(cfg, now), today: today(cfg, now),
+    version: VERSION, dryRun: cfg.sending.dry_run, sendDay: isSendDay(cfg, now), today: today(cfg, now), window: windowState(cfg, now),
     total: track.length, byStatus: count(track, (t) => t.status), byMailbox: group((t) => t.mailbox || "?"), byVariant: group((t) => t.variant || "a"),
     furthestStep: count(started.filter((t) => Number(t.step)), (t) => `email ${t.step}`), mailboxes, remaining,
     daysLeft: remaining && daily ? Math.ceil(remaining / daily) : 0,
@@ -753,5 +817,5 @@ function resolveHeld(email, action) {
   return null;
 }
 
-module.exports = { domainReceivesMail, nextEmail, sendTest, dnsHealth, resolveHeld, VERSION, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dailyLimitFor, bounceCheck, dueFollowups, runOnce,
+module.exports = { windowState, inWindow, campaignDate, domainReceivesMail, nextEmail, sendTest, dnsHealth, resolveHeld, VERSION, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dailyLimitFor, bounceCheck, dueFollowups, runOnce,
   startRun, requestStop, previewNext, status, readiness, applyRules, loadState, tzParts, isSendDay, today, daysSince, run, log };
