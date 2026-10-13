@@ -29,24 +29,31 @@ const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 const COUNTRY_ALIAS = { "UNITED STATES": "US", USA: "US", "UNITED KINGDOM": "UK", GB: "UK", CANADA: "CA" };
 
 // ---------------------------------------------------------------- config
+// What a fresh install (or a wiped data folder) starts with: the owner's own settings, taken from their backup of 2026-10-13.
+// Anything saved in the dashboard wins over these. Live sending stays OFF by default. The notification address is private,
+// so it is not written here: set OUTREACH_NOTIFY_EMAIL in Hostinger and it becomes the default (see loadConfig).
 const DEFAULT_CONFIG = {
-  signature: { name: "", title: "", company: "WebersLink", website: "weberslink.org", postal_address: "", accent_color: "#5B2EE5" },
+  signature: { name: "Hassan Ali", title: "Founder", company: "WebersLink", website: "weberslink.org",
+    postal_address: "2315 Chestnut Street, Montgomery, Alabama 36107, United States", accent_color: "#5b2ee5" },
   sending: {
     dry_run: true, countries: ["US", "UK"], send_days: ["Mon", "Tue", "Wed", "Thu", "Fri"], timezone: "America/New_York",
-    daily_limit: 40, ramp: [10, 20, 30, 40], followup_gaps_days: [3, 4, 7], min_delay_seconds: 90, max_delay_seconds: 240,
+    daily_limit: 20, ramp: [5, 10, 15, 20], followup_gaps_days: [3, 4, 7], min_delay_seconds: 90, max_delay_seconds: 240,
     notify_email: "", html_emails: true, check_mx: true, bounce_pause_percent: 3, check_inbox_in_dry_run: false,
-    window_enabled: false, window_start: "19:00", window_end: "07:00",
+    window_enabled: true, window_start: "19:00", window_end: "07:00",
   },
-  mailboxes: [],
+  mailboxes: [{ id: 1, email: "hassan@weberslink.org", from_name: "Hassan Ali", enabled: true, smtp_host: "smtp.hostinger.com", smtp_port: 465, imap_host: "imap.hostinger.com", imap_port: 993 }],
 };
 
 function loadConfig() {
   const saved = store.readJson("config.json", {});
-  return {
+  const cfg = {
     signature: { ...DEFAULT_CONFIG.signature, ...(saved.signature || {}) },
     sending: { ...DEFAULT_CONFIG.sending, ...(saved.sending || {}) },
-    mailboxes: Array.isArray(saved.mailboxes) ? saved.mailboxes : [],
+    // Defaults only apply when nothing was ever saved; a saved empty list means "no mailboxes" on purpose.
+    mailboxes: Array.isArray(saved.mailboxes) ? saved.mailboxes : DEFAULT_CONFIG.mailboxes.map((m) => ({ ...m })),
   };
+  if (!cfg.sending.notify_email) cfg.sending.notify_email = String(process.env.OUTREACH_NOTIFY_EMAIL || "").trim();
+  return cfg;
 }
 
 const str = (v, n = 300) => String(v == null ? "" : v).trim().slice(0, n);
@@ -216,6 +223,28 @@ function log(msg) {
   store.appendLog(line);
   return line;
 }
+// ---- what happened last time, in plain words, kept on disk so it survives restarts
+const writeLastRun = (o) => { try { store.writeJson("last_run.json", o); } catch (e) { /* diagnostics must never break a run */ } };
+const readLastRun = () => store.readJson("last_run.json", null);
+/** The last lines of the run log file: the history is still there after a restart even though memory is empty. */
+function logTail(n = 200) {
+  try {
+    const f = store.P("run_log.txt"), size = fs.statSync(f).size, len = Math.min(size, 96 * 1024);
+    const fd = fs.openSync(f, "r"), buf = Buffer.alloc(len);
+    try { fs.readSync(fd, buf, 0, len, size - len); } finally { fs.closeSync(fd); }
+    return buf.toString("utf8").split("\n").filter(Boolean).slice(-n);
+  } catch (e) { return []; }
+}
+/** A run left "running" by a previous process was cut off (typically the host stopped an idle app). Say so. */
+function markInterrupted() {
+  const last = readLastRun();
+  if (last && last.status === "running" && !run.running) {
+    writeLastRun({ ...last, status: "interrupted", at: new Date().toISOString(),
+      reason: `The server was restarted or stopped while this run was in progress (hosts like Hostinger can stop an idle app). Nothing is lost: leads that were not emailed are still waiting. Run again, or let the 30-minute cron job continue it.` });
+  }
+}
+markInterrupted();
+
 function sleepAbortable(ms) {
   return new Promise((resolve) => {
     const done = () => { clearTimeout(t); run.wakes.delete(done); resolve(); };
@@ -447,6 +476,7 @@ async function runOnce(opts = {}, deps = {}) {
     log("NOT SENDING - fix these first:");
     problems.forEach((p) => log("  - " + p));
     summary.problems = problems;
+    summary.reason = `Not ready, nothing sent: ${problems[0]}${problems.length > 1 ? ` (and ${problems.length - 1} more problem${problems.length > 2 ? "s" : ""})` : ""}`;
     return summary;
   }
   const sendDay = isSendDay(cfg, now);
@@ -473,6 +503,7 @@ async function runOnce(opts = {}, deps = {}) {
           if (sendKeys.has(key)) {
             log(`  Inbox check failed for ${box.addr} (${e.message}). No sending this run, to be safe.`);
             summary.note = "inbox check failed";
+            summary.reason = `Stopped for safety: could not read the inbox of ${box.addr} (${String(e.message).slice(0, 100)}). Check its password (OUTREACH_PASSWORD_${box.id}) and mail server settings.`;
             return summary;
           }
           log(`  (could not read the inbox of switched-off mailbox ${box.addr}: ${e.message})`);
@@ -493,9 +524,10 @@ async function runOnce(opts = {}, deps = {}) {
       if (all.length) await notify(cfg, boxes, all, dry);
     }
     track = loadState(cfg);
-    if (!sendDay) { log("=== Run end - today is not in send_days"); return summary; }
+    if (!sendDay) { log("=== Run end - today is not in send_days"); summary.reason = "Nothing sent: today isn't one of your send days (Settings > Send days)."; return summary; }
     if (closed) {
       log(`=== Run end - outside the sending window; it opens in ${Math.floor(minutesToOpen(cfg, now) / 60)}h ${minutesToOpen(cfg, now) % 60}m. Inboxes were checked, nothing was sent.`);
+      summary.reason = `Nothing sent: outside the sending window (${cfg.sending.window_start}-${cfg.sending.window_end} ${cfg.sending.timezone}); it opens in ${Math.floor(minutesToOpen(cfg, now) / 60)}h ${minutesToOpen(cfg, now) % 60}m. The inbox was checked.`;
       return summary;
     }
 
@@ -604,6 +636,7 @@ async function runOnce(opts = {}, deps = {}) {
         if (unsure) log(`  UNSURE whether ${t.email} was sent (${e.code}). Held for a manual check in the dashboard - it will not be retried automatically.`);
         else { t.sending = ""; store.saveRow(t); }
         log(`  Could not send from ${box.addr} (${e.code || e.responseCode || "error"}: ${String(e.message).slice(0, 120)}). Stopping this mailbox for today.`);
+        (summary.errors ||= []).push(`${box.addr} stopped: ${e.code || e.responseCode || "error"} ${String(e.message).slice(0, 100)}`);
         return "stop";
       }
       // The mail is out. Record it in the order that matters most; one failure must not abort the run.
@@ -631,7 +664,7 @@ async function runOnce(opts = {}, deps = {}) {
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         if (run.stop) break;
-        const windowClosed = () => { if (windowOn && !inWindow(cfg, clock())) { log(`  ${box.addr}: sending window closed; ${items.length - i} email(s) wait for the next window`); return true; } return false; };
+        const windowClosed = () => { if (windowOn && !inWindow(cfg, clock())) { log(`  ${box.addr}: sending window closed; ${items.length - i} email(s) wait for the next window`); summary.leftover = (summary.leftover || 0) + (items.length - i); return true; } return false; };
         if (windowClosed()) break;
         if (!dry && sentOne) { // each mailbox paces itself; mailboxes run side by side
           let wait;
@@ -648,13 +681,30 @@ async function runOnce(opts = {}, deps = {}) {
         if (r === "sent") sentOne = true;
       }
     };
+    summary.planned = [...plan.values()].reduce((n, l) => n + l.length, 0);
+    summary.noBudget = boxes.every((b) => (budget[b.addr.toLowerCase()] || 0) <= 0);
     const outcomes = await Promise.allSettled(boxes.map(worker));
     outcomes.forEach((o, i) => { if (o.status === "rejected") log(`  ERROR in ${boxes[i].addr}: ${o.reason && o.reason.message}`); });
   } finally {
     for (const b of new Set([...boxes, ...scanBoxes])) b.close && b.close();
   }
   log(`=== Run end - emails ${dry ? "planned" : "sent"} this run: ${summary.sent}${run.stop ? " (stopped early)" : ""}`);
+  summary.reason = finalReason(summary, dry, summary.noBudget, summary.planned);
   return summary;
+}
+
+/** One plain-English sentence saying why a run ended the way it did. */
+function finalReason(sm, dry, noBudget, planned) {
+  const what = dry ? "Dry run: planned" : "Sent";
+  const errs = sm.errors && sm.errors.length ? ` Problem: ${sm.errors.join("; ")}.` : "";
+  if (run.stop) return `Stopped by you. ${what} ${sm.sent} first.${errs}`;
+  if (sm.sent === 0) {
+    if (sm.errors && sm.errors.length) return `Nothing sent.${errs}`;
+    if (noBudget) return `Nothing sent: every mailbox has used its limit for today, or is paused (see Mailboxes on the dashboard).`;
+    if (!planned) return `Nothing to send: no leads are waiting (import leads, or everyone has been emailed or is waiting for their follow-up day).`;
+    return `Nothing was sent.${errs}`;
+  }
+  return `${what} ${sm.sent} email${sm.sent === 1 ? "" : "s"}.${sm.leftover ? ` The window closed with ${sm.leftover} still to go; they wait for the next window.` : ""}${errs}`;
 }
 
 function sentTodayByBox(cfg, now) {
@@ -704,8 +754,13 @@ function startRun(opts = {}, deps = {}) {
   const beat = setInterval(() => { try { const t = new Date(); fs.utimesSync(LOCK(), t, t); } catch (e) { /* lock gone */ } }, 60 * 1000);
   beat.unref();
   log(`Run requested (${opts.source || "dashboard"})`);
-  const done = runOnce(opts, deps).then((s) => { run.last = { ...s, at: new Date().toISOString(), source: opts.source || "dashboard" }; })
-    .catch((e) => { log(`Run failed: ${e.stack || e.message}`); run.last = { error: e.message, at: new Date().toISOString(), source: opts.source || "dashboard" }; })
+  const meta = { startedAt: run.startedAt, source: opts.source || "dashboard", mode: run.mode };
+  writeLastRun({ ...meta, status: "running", at: run.startedAt, reason: "Running now." });
+  const done = runOnce(opts, deps).then((s) => {
+    run.last = { ...s, at: new Date().toISOString(), source: meta.source };
+    writeLastRun({ ...meta, status: "done", at: run.last.at, sent: s.sent, replies: s.replies, optOuts: s.optOuts, bounces: s.bounces, reason: s.reason || "Finished." });
+  })
+    .catch((e) => { log(`Run failed: ${e.stack || e.message}`); run.last = { error: e.message, at: new Date().toISOString(), source: meta.source }; writeLastRun({ ...meta, status: "failed", at: run.last.at, reason: `The run crashed: ${String(e.message).slice(0, 160)}. See the log for details.` }); })
     .finally(() => { clearInterval(beat); run.running = false; run.stop = false; releaseLock(); });
   return { started: true, done };
 }
@@ -754,7 +809,7 @@ function status(cfg = loadConfig(), now = new Date()) {
       email: t.email, store: t.store, mailbox: t.mailbox, note: t.note, repliedAt: t.replied_at, loomSent: t.loom_sent === "1", domain: t.domain })),
     held: track.filter((t) => t.sending).map((t) => ({ email: t.email, store: t.store, step: t.sending, mailbox: t.mailbox })),
     problems: readiness(cfg, cfg.mailboxes.filter((m) => m.enabled && m.email).map((m) => new Mailbox(m)), { live: !cfg.sending.dry_run }),
-    running: run.running, startedAt: run.startedAt, runMode: run.mode, last: run.last, log: run.lines.slice(-200),
+    running: run.running, startedAt: run.startedAt, runMode: run.mode, last: run.last, lastRun: readLastRun(), log: run.lines.length ? run.lines.slice(-200) : logTail(200),
   };
 }
 
@@ -817,5 +872,5 @@ function resolveHeld(email, action) {
   return null;
 }
 
-module.exports = { windowState, inWindow, campaignDate, domainReceivesMail, nextEmail, sendTest, dnsHealth, resolveHeld, VERSION, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dailyLimitFor, bounceCheck, dueFollowups, runOnce,
+module.exports = { logTail, markInterrupted, readLastRun, windowState, inWindow, campaignDate, domainReceivesMail, nextEmail, sendTest, dnsHealth, resolveHeld, VERSION, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dailyLimitFor, bounceCheck, dueFollowups, runOnce,
   startRun, requestStop, previewNext, status, readiness, applyRules, loadState, tzParts, isSendDay, today, daysSince, run, log };

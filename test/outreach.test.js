@@ -13,7 +13,7 @@ const eng = require("../outreach/engine");
 
 const CONFIG = eng.sanitizeConfig({
   signature: { name: "Hassan Ali", title: "Founder", company: "WebersLink", website: "weberslink.org", postal_address: "1 Example St, Lahore" },
-  sending: { dry_run: false, send_days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], min_delay_seconds: 0, max_delay_seconds: 0, countries: ["US", "UK"], timezone: "UTC", notify_email: "me@example.com" },
+  sending: { dry_run: false, send_days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], min_delay_seconds: 0, max_delay_seconds: 0, countries: ["US", "UK"], timezone: "UTC", notify_email: "me@example.com", ramp: "10,20,30,40", daily_limit: 40 },
   mailboxes: [{ email: "a@getweberslink.com", from_name: "Hassan" }, { email: "b@weberslinkhq.com" }],
 });
 

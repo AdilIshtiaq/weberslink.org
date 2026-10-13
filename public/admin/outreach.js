@@ -110,7 +110,13 @@
     var fs = Object.keys(s.furthestStep || {}).sort();
     $("funnel").innerHTML = fs.length ? "<table>" + fs.map(function (k) { return "<tr><td>Reached " + esc(k) + "</td><td>" + s.furthestStep[k] + "</td></tr>"; }).join("") + "</table>" : '<p class="empty">Nothing sent yet.</p>';
 
-    var l = s.last; $("lastRun").textContent = l ? (l.error ? "last run failed " : "last run " + (l.sent || 0) + (l.mode === "dry" ? " planned " : " sent ")) + ago(l.at) : "";
+    var lr = s.lastRun; $("lastRun").textContent = lr ? "last run " + ago(lr.at) : "";
+    $("lastRunBox").hidden = !lr;
+    if (lr) {
+      var tone = lr.status === "failed" ? "bad" : lr.status === "interrupted" ? "warn" : lr.status === "running" ? "hint" : (lr.sent > 0 ? "ok" : "warn");
+      var label = { done: "Last run", failed: "Last run FAILED", interrupted: "Last run was cut off", running: "Running now" }[lr.status] || "Last run";
+      $("lastRunText").innerHTML = '<b class="' + tone + '">' + label + " (" + esc(lr.mode === "dry" ? "dry run" : lr.mode === "live" ? "live" : "") + (lr.source ? ", " + esc(lr.source) : "") + ", " + esc(ago(lr.at)) + ")</b><br>" + esc(lr.reason || "");
+    }
     var lg = $("log"), atEnd = lg.scrollTop + lg.clientHeight >= lg.scrollHeight - 30;
     lg.innerHTML = s.log.length ? s.log.map(function (line) {
       var cls = /SENT|Notified/.test(line) ? "sent" : /REPLIED|OPT-OUT/.test(line) ? "rep" : /failed|REFUSED|Could not|NOT SENDING/i.test(line) ? "err" : /PAUSED|waiting/.test(line) ? "wrn" : "";

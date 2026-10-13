@@ -37,6 +37,7 @@ Safety behaviour worth knowing:
 | `GEMINI_OUTREACH_DAILY_MAX` | optional | Most Gemini lookups per day (default 150). |
 | `GEMINI_OUTREACH_GAP_SECONDS` | optional | Pause between lookups (default 7), to stay inside free-tier rate limits. |
 | `GEMINI_OUTREACH_MODEL` | optional | Model name (default `gemini-flash-latest`). |
+| `OUTREACH_NOTIFY_EMAIL` | optional | Default address for reply notifications (so a private address never has to be written in the code). A value saved in Settings wins. |
 | `OUTREACH_AUTO_RUN` | optional | Set to `window` to start runs automatically (every 10 minutes) whenever the sending window is open and Live sending is on. An alternative to the Hostinger cron job. |
 | `ADMIN_SESSION_SECRET` | optional | Login-cookie signing key. Default: a random key stored in the data folder. |
 
@@ -69,6 +70,23 @@ open and resumes after any restart; outside the window it only checks the inbox.
 It returns immediately (202) and the run continues in the background. A second trigger while one is running is refused.
 A crashed run's lock is taken over automatically. Runs use the Dry run / Live setting from Settings. Pick a time that
 is morning in the time zone of your leads.
+
+## Defaults, and "why did my run stop?"
+**Defaults.** A fresh install (or a wiped data folder) starts with the owner's settings (name, title, postal address, the
+`hassan@weberslink.org` mailbox, a 7pm-7am window, cautious 5/10/15/20 warm-up, 3% bounce pause). They live in `DEFAULT_CONFIG`
+in `outreach/engine.js`; anything saved in Settings wins. Live sending is always OFF by default, and nothing can send until the
+mailbox password variable (`OUTREACH_PASSWORD_1`) is set. The notification address is deliberately not in the code (this
+repository is public): set `OUTREACH_NOTIFY_EMAIL` in Hostinger.
+
+**Why a run ended.** The dashboard's "Last run" panel says in plain words what happened and what to do, for example
+"Nothing sent: outside the sending window (19:00-07:00 America/New_York); it opens in 8h 16m", "Nothing sent: every mailbox
+has used its limit for today", "Stopped for safety: could not read the inbox of ... check OUTREACH_PASSWORD_1", or "The
+server was restarted or stopped while this run was in progress". The record is saved on disk, and the run log shows history
+after a restart (it is read from `run_log.txt` in the data folder).
+
+**A run that "stops after 30 seconds"** almost always means one of: the sending window is closed (check the time zone
+setting: 19:00 in New York is 04:00 in Pakistan), today isn't a send day, the daily limit is used up, no leads are waiting, or
+the mailbox password/inbox login failed. The Last-run panel names which.
 
 ## Where your data lives, and backups
 Everything you save (settings, leads and their progress, sent history, do-not-contact list, edited emails, the login key) is
@@ -137,7 +155,7 @@ Every email carries the postal address and an opt-out line. A mailbox pauses its
 A/B versions share one body and differ only in subject; judge after about 100 leads each.
 
 ## Tests
-`npm test` (about 81 tests: engine, API, auth, regression tests for an independent code review; no network or real
+`npm test` (about 92 tests: engine, API, auth, regression tests for an independent code review; no network or real
 mailboxes needed).
 
 ## Not covered by tests
