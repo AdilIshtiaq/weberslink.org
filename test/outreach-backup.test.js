@@ -14,7 +14,7 @@ const tpl = require("../outreach/templates");
 const backup = require("../outreach/backup");
 
 const CONFIG = eng.sanitizeConfig({
-  signature: { name: "Hassan Ali", company: "WebersLink", website: "weberslink.org", postal_address: "1 Example St", title: "Founder" },
+  signature: { name: "Test Person", company: "WebersLink", website: "weberslink.org", postal_address: "1 Example St", title: "Founder" },
   sending: { dry_run: true, notify_email: "me@example.com", timezone: "UTC" },
   mailboxes: [{ email: "a@getweberslink.com", from_name: "Hassan" }],
 });
@@ -41,11 +41,12 @@ test("a redeploy that wipes the data folder is fully recoverable from a backup",
   assert.ok(!Object.keys(b.files).some((n) => /session\.key|lock|backups/.test(n)), "no login key, lock or old backups inside");
   assert.ok(!JSON.stringify(b).includes("password"), "no passwords in the file (config has none)");
   wipe();                                                        // "redeploy"
-  assert.strictEqual(eng.loadConfig().signature.name, "", "everything is gone, as the user experienced");
+  assert.notStrictEqual(eng.loadConfig().signature.name, "Test Person", "their saved settings are gone (only the built-in defaults remain)");
+  assert.strictEqual(store.loadTracking().length, 0);
   const r = backup.restore(JSON.parse(JSON.stringify(b)));
   assert.ok(r.restored.includes("config.json") && r.restored.includes("templates/email2.txt"));
   assert.deepStrictEqual(snapshot(), before, "every file is back byte for byte");
-  assert.strictEqual(eng.loadConfig().signature.name, "Hassan Ali");
+  assert.strictEqual(eng.loadConfig().signature.name, "Test Person");
   assert.strictEqual(eng.loadConfig().mailboxes[0].email, "a@getweberslink.com");
   assert.strictEqual(store.loadTracking().length, 2);
   assert.strictEqual(store.loadTracking().find((t) => t.email === "bob@fitco.com").research_status, "approved", "approved personal lines survive");
@@ -114,10 +115,10 @@ test("API: download and restore behind login; status reports the data folder and
     assert.ok(st.lastBackup, "downloading a backup is remembered");
     const keep = fs.readFileSync(store.P("session.key"), "utf8");
     for (const f of fs.readdirSync(DIR)) if (f !== "session.key") fs.rmSync(path.join(DIR, f), { recursive: true, force: true }); // redeploy wipes data (login key kept here so the same cookie stays valid)
-    assert.strictEqual(eng.loadConfig().signature.name, "");
+    assert.notStrictEqual(eng.loadConfig().signature.name, "Test Person");
     const rs = await call("POST", "/api/outreach/backup/restore", { backup: bundle }, cookie);
     assert.strictEqual(rs.status, 200);
-    assert.strictEqual(eng.loadConfig().signature.name, "Hassan Ali");
+    assert.strictEqual(eng.loadConfig().signature.name, "Test Person");
     const bad = await call("POST", "/api/outreach/backup/restore", { backup: { format: "nope" } }, cookie);
     assert.strictEqual(bad.status, 400);
     assert.match((await bad.json()).error, /isn't an outreach backup/);

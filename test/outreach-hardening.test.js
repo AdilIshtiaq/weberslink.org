@@ -167,6 +167,7 @@ const api = (method, url, body, c = cookie) => fetch(base + url, { method, heade
 
 test("API: logout really ends the session (a stolen cookie stops working); imports accept csv/xlsx only", async () => {
   reset();
+  eng.saveConfig(eng.sanitizeConfig({ mailboxes: [] })); // an install with no mailbox set up (the built-in default mailbox would otherwise apply)
   const login = await api("POST", "/api/outreach/login", { password: process.env.ADMIN_PASSWORD }, "");
   cookie = login.headers.get("set-cookie").split(";")[0];
   assert.strictEqual((await api("GET", "/api/outreach/status")).status, 200);
