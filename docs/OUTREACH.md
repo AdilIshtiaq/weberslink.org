@@ -47,8 +47,8 @@ Signing out ends the session immediately. Wrong passwords are throttled (per add
 ## Sending window (for example overnight, 7pm to 7am)
 Settings -> Sending rules -> **Only send during a daily window**. Pick when it opens and closes in the time zone set above (the
 **Use 7pm-7am Pakistan time** button fills in Asia/Karachi and 19:00-07:00).
-- The day's emails are spread evenly across the window (a gap of roughly window length divided by emails left, with some
-  randomness, never faster than the minimum delay), so nothing goes out in a burst. The first goes out as soon as the window opens.
+- Between emails the app waits a random time between the minimum and maximum delay in Settings (default 10 to 20 minutes),
+  but never longer than an even share of what is left of the window, so the day's emails always fit. The first goes out as soon as the window opens.
 - A window can cross midnight: 7pm to 7am is ONE campaign day (one daily budget, one "send day" decision: Friday evening
   continues into Saturday's small hours; Saturday evening does not).
 - Outside the window a run still reads your inbox (replies, opt-outs, bounces) but sends nothing. Emails that don't fit

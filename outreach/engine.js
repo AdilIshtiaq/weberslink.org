@@ -37,7 +37,7 @@ const DEFAULT_CONFIG = {
     postal_address: "2315 Chestnut Street, Montgomery, Alabama 36107, United States", accent_color: "#5b2ee5" },
   sending: {
     dry_run: true, countries: ["US", "UK"], send_days: ["Mon", "Tue", "Wed", "Thu", "Fri"], timezone: "America/New_York",
-    daily_limit: 20, ramp: [5, 10, 15, 20], followup_gaps_days: [3, 4, 7], min_delay_seconds: 90, max_delay_seconds: 240,
+    daily_limit: 20, ramp: [5, 10, 15, 20], followup_gaps_days: [3, 4, 7], min_delay_seconds: 600, max_delay_seconds: 1200,
     notify_email: "", html_emails: true, check_mx: true, bounce_pause_percent: 3, check_inbox_in_dry_run: false,
     window_enabled: true, window_start: "19:00", window_end: "07:00",
   },
@@ -668,10 +668,12 @@ async function runOnce(opts = {}, deps = {}) {
         if (windowClosed()) break;
         if (!dry && sentOne) { // each mailbox paces itself; mailboxes run side by side
           let wait;
-          if (windowOn) { // spread what is left evenly over what is left of the window (with some randomness), never faster than the minimum delay
-            const base = (minutesToClose(cfg, clock()) * 60) / (items.length - i);
-            wait = Math.max(Math.round(base * (0.6 + Math.random() * 0.35)), cfg.sending.min_delay_seconds); // never longer than an even share, so the rest always fits
-          } else wait = cfg.sending.min_delay_seconds + Math.floor(Math.random() * (cfg.sending.max_delay_seconds - cfg.sending.min_delay_seconds + 1));
+          const lo = cfg.sending.min_delay_seconds, hi = cfg.sending.max_delay_seconds;
+          wait = lo + Math.floor(Math.random() * (hi - lo + 1)); // random gap between the minimum and maximum you set
+          if (windowOn) { // ...but never more than an even share of what is left of the window, so the rest always fits
+            const share = Math.round((minutesToClose(cfg, clock()) * 60) / (items.length - i));
+            wait = Math.min(wait, Math.max(share, lo));
+          }
           log(`  ${box.addr}: waiting ${wait >= 3600 ? `${Math.floor(wait / 3600)}h ${Math.round((wait % 3600) / 60)}m` : wait >= 120 ? `${Math.round(wait / 60)} min` : `${wait}s`} ...`);
           await sleep(wait * 1000);
           if (run.stop || windowClosed()) break;
