@@ -4,7 +4,7 @@ Tags: form builder, contact form, multi step form, payment form, conditional log
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.0.1
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -16,6 +16,7 @@ Drag-and-drop form builder with conditional logic, multi-step forms, calculation
 
 **Builder**
 * Drag & drop editor, 35+ field types, 9 ready-made templates, duplicate/reorder fields, 5 width options per row
+* New in 1.1: toggle switch, image choice (picture options), ranking, date range, emoji rating, terms box (scroll-to-agree), US state, dynamic dropdown (posts / pages / custom post types / taxonomy terms), image and video/oEmbed blocks
 * Text, paragraph, email, number, phone, URL, password, date/time/date-time, colour, hidden, dropdown, multi-select, radio, checkboxes (with "Other"), consent, name, address, country
 * File & image upload, star rating, net-promoter score, range slider, Likert matrix, signature pad, repeater rows, calculation, section, HTML, divider, shortcode, CAPTCHA
 * Multi-step forms with progress bar or step tabs
@@ -73,6 +74,16 @@ Add a Webhook integration pointing at a Google Apps Script web app, Zapier, Make
 Yes: Form → Settings → Appearance, CSS variables (`.wlfp-wrap{--wlfp-primary:#e11d48}`) or the per-form custom CSS box.
 
 == Changelog ==
+
+= 1.1.0 =
+* New fields: toggle, image choice, ranking, date range, emoji rating, terms (scroll-to-agree), US state, dynamic dropdown from posts/terms, image block, video/oEmbed embed.
+* New field options: duplicate (unique) check, read-only, confirm email / password, max words.
+* Quiz scoring: per-option scores with {score}, {score_max}, {score_percent}, {quiz_result} tags and pass mark.
+* Conditional confirmations (different message or redirect depending on answers).
+* Create post / page / custom post type feed.
+* Entries: reply to the submitter by email from the entry screen, re-run integrations on an entry.
+* Shortcodes: [weberslink_my_entries] (a logged-in user's own submissions) and [weberslink_entry_count] (live counter, e.g. "12 of 50 seats taken").
+* New templates: scored quiz, hotel/rental booking request, priorities survey.
 
 = 1.0.1 =
 * Fix: Edit/Form builder page was blocked for administrators.

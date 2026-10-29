@@ -2,8 +2,8 @@
 /**
  * Plugin Name:       Weberslink Forms Pro
  * Plugin URI:        https://weberslink.org/
- * Description:       A complete drag-and-drop form builder: 35+ field types, multi-step forms, conditional logic, calculations, file uploads, spam protection, entries manager, email notifications, payments and integrations. Styled to blend into any theme.
- * Version:           1.0.1
+ * Description:       A complete drag-and-drop form builder: 45+ field types, multi-step forms, conditional logic, calculations, file uploads, spam protection, entries manager, email notifications, payments and integrations. Styled to blend into any theme.
+ * Version:           1.1.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            WebersLink
@@ -16,7 +16,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'WLFP_VERSION', '1.0.1' );
+define( 'WLFP_VERSION', '1.1.0' );
 define( 'WLFP_FILE', __FILE__ );
 define( 'WLFP_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WLFP_URL', plugin_dir_url( __FILE__ ) );
@@ -41,6 +41,7 @@ require_once WLFP_DIR . 'includes/class-wlfp-templates.php';
 require_once WLFP_DIR . 'includes/class-wlfp-export.php';
 require_once WLFP_DIR . 'includes/class-wlfp-privacy.php';
 require_once WLFP_DIR . 'includes/class-wlfp-blocks.php';
+require_once WLFP_DIR . 'includes/class-wlfp-shortcodes.php';
 require_once WLFP_DIR . 'includes/class-wlfp-admin.php';
 
 register_activation_hook( __FILE__, array( 'WLFP_Install', 'activate' ) );
@@ -60,6 +61,7 @@ final class WLFP_Plugin {
 		WLFP_Export::init();
 		WLFP_Privacy::init();
 		WLFP_Blocks::init();
+		WLFP_Shortcodes::init();
 		WLFP_Install::init_cron();
 
 		if ( is_admin() ) {

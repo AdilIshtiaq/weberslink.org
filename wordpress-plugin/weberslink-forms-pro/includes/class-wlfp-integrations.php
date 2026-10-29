@@ -18,6 +18,7 @@ class WLFP_Integrations {
 			'telegram'          => __( 'Telegram', 'weberslink-forms-pro' ),
 			'mailchimp'         => __( 'Mailchimp', 'weberslink-forms-pro' ),
 			'user_registration' => __( 'Create WordPress user', 'weberslink-forms-pro' ),
+			'create_post'       => __( 'Create a post / page / custom post', 'weberslink-forms-pro' ),
 		) );
 	}
 
@@ -49,6 +50,9 @@ class WLFP_Integrations {
 						break;
 					case 'user_registration':
 						$res = self::register_user( $feed, $form, $entry );
+						break;
+					case 'create_post':
+						$res = self::create_post( $feed, $form, $entry );
 						break;
 					default:
 						do_action( 'wlfp_feed_' . $feed['type'], $feed, $form, $entry );
@@ -195,6 +199,37 @@ class WLFP_Integrations {
 		}
 		$hash = md5( strtolower( $email ) );
 		return self::http_result( wp_remote_request( "https://{$dc}.api.mailchimp.com/3.0/lists/{$list}/members/{$hash}", array( 'method' => 'PUT', 'timeout' => 15, 'headers' => array( 'Authorization' => 'Basic ' . base64_encode( 'anystring:' . $key ), 'Content-Type' => 'application/json' ), 'body' => wp_json_encode( $body ) ) ) );
+	}
+
+	private static function create_post( $feed, $form, $entry ) {
+		$pt  = sanitize_key( isset( $feed['post_type'] ) ? $feed['post_type'] : 'post' );
+		$obj = post_type_exists( $pt ) ? get_post_type_object( $pt ) : null;
+		if ( ! $obj || ! $obj->public ) {
+			$pt = 'post';
+		}
+		$status = isset( $feed['status'] ) && in_array( $feed['status'], array( 'draft', 'pending', 'private', 'publish' ), true ) ? $feed['status'] : 'draft';
+		$title  = wp_strip_all_tags( self::m( ! empty( $feed['title'] ) ? $feed['title'] : '{form_title}', $form, $entry ) );
+		$body   = wp_kses_post( self::m( ! empty( $feed['content'] ) ? $feed['content'] : '{all_data}', $form, $entry, true ) );
+		$author = isset( $feed['author'] ) ? (int) $feed['author'] : 0;
+		if ( ! $author || ! get_userdata( $author ) ) {
+			$admins = get_users( array( 'role' => 'administrator', 'number' => 1, 'fields' => 'ID' ) );
+			$author = $admins ? (int) $admins[0] : 0;
+		}
+		$id = wp_insert_post( array( 'post_type' => $pt, 'post_status' => $status, 'post_title' => '' !== $title ? $title : __( 'Untitled', 'weberslink-forms-pro' ), 'post_content' => $body, 'post_author' => $author ), true );
+		if ( is_wp_error( $id ) ) {
+			return $id;
+		}
+		foreach ( preg_split( '/\r?\n/', (string) ( isset( $feed['meta'] ) ? $feed['meta'] : '' ) ) as $line ) {
+			$kv = explode( '=', $line, 2 );
+			$k  = 2 === count( $kv ) ? sanitize_key( trim( $kv[0] ) ) : '';
+			if ( '' !== $k && '_' !== $k[0] ) { // Never write protected (underscore) meta.
+				update_post_meta( $id, $k, sanitize_text_field( self::m( trim( $kv[1] ), $form, $entry ) ) );
+			}
+		}
+		if ( 'post' === $pt && ! empty( $feed['category'] ) && term_exists( (int) $feed['category'], 'category' ) ) {
+			wp_set_object_terms( $id, array( (int) $feed['category'] ), 'category' );
+		}
+		return $pt . ' #' . $id;
 	}
 
 	private static function register_user( $feed, $form, $entry ) {

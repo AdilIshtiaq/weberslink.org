@@ -122,16 +122,28 @@
 		var name = w.getAttribute( 'data-name' );
 		var els = $$( '[name="' + name + '"],[name="' + name + '[]"],[name^="' + name + '["]', w ).filter( function ( e ) { return ! e.disabled; } );
 		if ( ! els.length ) { return ''; }
+		if ( type === 'toggle' ) { return els[ 0 ].checked ? 'yes' : 'no'; }
+		if ( type === 'terms' ) { return els[ 0 ].checked ? 'yes' : ''; }
+		if ( type === 'ranking' ) { return els.map( function ( e ) { return e.value; } ); }
+		if ( type === 'image_choice' ) {
+			var chosen = els.filter( function ( e ) { return e.checked; } ).map( function ( e ) { return e.value; } );
+			return $( '.wlfp-imgchoices', w ).getAttribute( 'data-multiple' ) === '1' ? chosen : ( chosen[ 0 ] || '' );
+		}
+		if ( type === 'post_select' ) {
+			var psel = $( 'select', w );
+			if ( psel && psel.multiple ) { return $$( 'option', psel ).filter( function ( o ) { return o.selected; } ).map( function ( o ) { return o.value; } ); }
+			return psel ? psel.value : '';
+		}
 		if ( type === 'checkbox' || type === 'multiselect' || ( type === 'payment_item' && w.querySelector( 'input[type=checkbox]' ) ) ) {
 			if ( type === 'multiselect' ) { var s = $( 'select', w ); return s ? $$( 'option', s ).filter( function ( o ) { return o.selected; } ).map( function ( o ) { return o.value; } ) : []; }
 			return els.filter( function ( e ) { return e.checked; } ).map( function ( e ) { return e.value; } );
 		}
-		if ( type === 'radio' || type === 'rating' || type === 'nps' || ( type === 'payment_item' && w.querySelector( 'input[type=radio]' ) ) ) {
+		if ( type === 'radio' || type === 'rating' || type === 'nps' || type === 'emoji_rating' || ( type === 'payment_item' && w.querySelector( 'input[type=radio]' ) ) ) {
 			var c = els.filter( function ( e ) { return e.checked; } )[ 0 ];
 			return c ? c.value : '';
 		}
 		if ( type === 'consent' ) { return els[ 0 ].checked ? 'yes' : ''; }
-		if ( type === 'name' || type === 'address' ) {
+		if ( type === 'name' || type === 'address' || type === 'date_range' ) {
 			var o = {};
 			els.forEach( function ( e ) { var m = e.name.match( /\[(\w+)\]$/ ); if ( m ) { o[ m[ 1 ] ] = e.value; } } );
 			return Object.keys( o ).map( function ( k ) { return o[ k ]; } ).join( ' ' ).trim();
@@ -153,6 +165,8 @@
 		this.bindRepeaters();
 		this.bindSignatures();
 		this.bindCoupon();
+		this.bindRanking();
+		this.bindTerms();
 		this.initCaptcha();
 		this.restoreDraft();
 		this.evaluate();
@@ -350,6 +364,7 @@
 		if ( ! name ) { return ''; }
 		var req = w.hasAttribute( 'data-required' );
 		var v = this.valueOf( w );
+		if ( type === 'toggle' ) { return req && v !== 'yes' ? ( w.getAttribute( 'data-req-msg' ) || T.required || 'Required' ) : ''; }
 		var empty = Array.isArray( v ) ? v.length === 0 : String( v ).trim() === '';
 		if ( type === 'name' && req ) { var parts = $$( 'input', w ); if ( parts.some( function ( p ) { return p.name.match( /\[(first|last)\]/ ) && ! p.value.trim(); } ) ) { empty = true; } }
 		if ( type === 'address' && req ) { if ( $$( 'input,select', w ).some( function ( p ) { return p.name.match( /\[(line1|city|zip|country)\]/ ) && ! p.value.trim(); } ) ) { empty = true; } }
@@ -358,6 +373,16 @@
 		if ( empty ) { return ''; }
 		var el = $( 'input:not([type=hidden]):not([type=checkbox]):not([type=radio]),select,textarea', w );
 		if ( el && el.type !== 'file' && el.checkValidity && ! el.checkValidity() ) { return el.validationMessage; }
+		var cf = $( '.wlfp-confirm', w );
+		if ( cf && el && el !== cf ) {
+			var a = type === 'email' ? el.value.trim().toLowerCase() : el.value;
+			var b = type === 'email' ? cf.value.trim().toLowerCase() : cf.value;
+			if ( a !== b ) { return T.mismatch || 'The two values do not match.'; }
+		}
+		if ( type === 'date_range' ) {
+			var ds = $$( 'input[type=date]', w );
+			if ( ds.length === 2 && ds[ 0 ].value && ds[ 1 ].value && ds[ 1 ].value < ds[ 0 ].value ) { return T.rangeBad || 'The end date must be on or after the start date.'; }
+		}
 		return '';
 	};
 	Form.prototype.validateAll = function () {
@@ -477,6 +502,34 @@
 			cv.addEventListener( 'pointerup', end ); cv.addEventListener( 'pointercancel', end );
 			$( '.wlfp-sig-clear', box ).addEventListener( 'click', function () { ctx.clearRect( 0, 0, cv.width, cv.height ); out.value = ''; dirty = false; out.dispatchEvent( new Event( 'change', { bubbles: true } ) ); } );
 			window.addEventListener( 'resize', function () { if ( ! dirty ) { resize(); } } );
+		} );
+	};
+	Form.prototype.bindRanking = function () {
+		$$( '.wlfp-rank', this.f ).forEach( function ( ol ) {
+			ol.addEventListener( 'click', function ( e ) {
+				var b = e.target.closest( 'button' );
+				if ( ! b ) { return; }
+				var li = b.closest( 'li' );
+				if ( b.classList.contains( 'wlfp-rank-up' ) && li.previousElementSibling ) { ol.insertBefore( li, li.previousElementSibling ); }
+				else if ( b.classList.contains( 'wlfp-rank-down' ) && li.nextElementSibling ) { ol.insertBefore( li.nextElementSibling, li ); }
+				else { return; }
+				b.focus();
+				ol.dispatchEvent( new Event( 'change', { bubbles: true } ) );
+			} );
+		} );
+	};
+	Form.prototype.bindTerms = function () {
+		$$( '.wlfp-terms-box[data-must-scroll]', this.f ).forEach( function ( box ) {
+			var cb = box.parentNode.querySelector( 'input[type=checkbox]' );
+			if ( ! cb ) { return; }
+			var done = false;
+			var check = function () {
+				if ( done ) { return; }
+				if ( box.scrollHeight - box.scrollTop - box.clientHeight < 6 ) { done = true; cb.disabled = false; box.classList.add( 'is-read' ); }
+			};
+			cb.disabled = true;
+			box.addEventListener( 'scroll', check );
+			setTimeout( check, 50 );
 		} );
 	};
 	Form.prototype.bindCoupon = function () {

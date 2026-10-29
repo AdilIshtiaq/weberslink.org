@@ -64,6 +64,15 @@ class WLFP_Submit {
 				continue; // Recomputed below.
 			}
 			$err = WLFP_Fields::validate( $f, $v, $form );
+			if ( ! $err && in_array( $f['type'], array( 'email', 'password' ), true ) && ! empty( $f['confirm'] ) && ! WLFP_Fields::is_empty( $v ) ) {
+				$cv = isset( $slashed[ $f['name'] . '__confirm' ] ) && is_scalar( $slashed[ $f['name'] . '__confirm' ] ) ? wp_unslash( (string) $slashed[ $f['name'] . '__confirm' ] ) : '';
+				if ( 'email' === $f['type'] ? 0 !== strcasecmp( $v, sanitize_email( $cv ) ) : $v !== $cv ) {
+					$err = __( 'The two values do not match.', 'weberslink-forms-pro' );
+				}
+			}
+			if ( ! $err && ! $preview && ! empty( $f['unique'] ) && ! WLFP_Fields::is_empty( $v ) && WLFP_Entries::value_exists( $form['id'], $f['name'], $v ) ) {
+				$err = __( 'This value has already been submitted.', 'weberslink-forms-pro' );
+			}
 			if ( $err ) {
 				$errors[ $f['name'] ] = $err;
 			}
@@ -139,6 +148,11 @@ class WLFP_Submit {
 			self::respond_ok( $form, $data, array( 'id' => 0, 'serial' => 0, 'ip' => '', 'source_url' => $source, 'payment_total' => 0, 'currency' => '', 'payment_status' => '', 'transaction_id' => '', 'user_id' => 0 ), $ajax, true );
 		}
 
+		/* 3b. Quiz scoring. */
+		if ( ! empty( $form['settings']['quiz']['enabled'] ) ) {
+			$data['_quiz'] = self::quiz( $form, $data, $visible );
+		}
+
 		/* 4. Payment. */
 		$provider = $form['settings']['payment']['provider'];
 		$calc     = WLFP_Payments::has_items( $form ) ? WLFP_Payments::compute( $form, $data, $visible ) : null;
@@ -185,6 +199,35 @@ class WLFP_Submit {
 		self::respond_ok( $form, $data, $entry, $ajax );
 	}
 
+	/** Totals option scores of choice fields. */
+	public static function quiz( $form, $data, $visible ) {
+		$score = 0.0;
+		$max   = 0.0;
+		foreach ( $form['fields'] as $f ) {
+			if ( empty( $visible[ $f['id'] ] ) || empty( $f['name'] ) || empty( $f['options'] ) || ! in_array( $f['type'], array( 'radio', 'select', 'checkbox', 'multiselect', 'image_choice' ), true ) ) {
+				continue;
+			}
+			$multi  = in_array( $f['type'], array( 'checkbox', 'multiselect' ), true ) || ( 'image_choice' === $f['type'] && ! empty( $f['multiple'] ) );
+			$scores = array();
+			foreach ( $f['options'] as $o ) {
+				$scores[ (string) $o['value'] ] = (float) ( $o['score'] ?? 0 );
+			}
+			if ( ! array_filter( $scores ) ) {
+				continue;
+			}
+			foreach ( (array) ( isset( $data[ $f['name'] ] ) ? $data[ $f['name'] ] : array() ) as $v ) {
+				if ( isset( $scores[ (string) $v ] ) ) {
+					$score += $scores[ (string) $v ];
+				}
+			}
+			$max += $multi ? array_sum( array_filter( $scores, function ( $x ) {
+				return $x > 0;
+			} ) ) : max( $scores );
+		}
+		$pct = $max > 0 ? round( $score / $max * 100, 1 ) : 0;
+		return array( 'score' => $score, 'max' => $max, 'percent' => $pct, 'passed' => $pct >= (float) $form['settings']['quiz']['pass_percent'] );
+	}
+
 	/** Data as stored in DB: no raw passwords or internal-only values. */
 	public static function storable( $form, $data ) {
 		foreach ( $form['fields'] as $f ) {
@@ -212,7 +255,13 @@ class WLFP_Submit {
 	}
 
 	public static function respond_ok( $form, $data, $entry, $ajax, $quiet = false ) {
-		$c   = $form['settings']['confirmation'];
+		$c = $form['settings']['confirmation'];
+		foreach ( (array) ( isset( $c['rules'] ) ? $c['rules'] : array() ) as $rule ) {
+			if ( is_array( $rule ) && WLFP_Logic::passes( isset( $rule['conditional'] ) ? $rule['conditional'] : array(), $data ) ) {
+				$c = array_merge( $c, array_intersect_key( $rule, array_flip( array( 'type', 'message', 'url', 'page_id' ) ) ) );
+				break;
+			}
+		}
 		$out = array( 'type' => 'message', 'message' => '', 'entry_id' => $entry['id'] );
 		if ( 'redirect' === $c['type'] && ! empty( $c['url'] ) ) {
 			$out['type']     = 'redirect';

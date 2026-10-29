@@ -8,6 +8,14 @@ class WLFP_Templates {
 		return array_merge( WLFP_Fields::defaults( $type ), array( 'name' => $name, 'label' => $label ), $o );
 	}
 
+	private static function scored( $map ) {
+		$o = array();
+		foreach ( $map as $label => $score ) {
+			$o[] = array( 'label' => (string) $label, 'value' => sanitize_title( (string) $label ), 'price' => '', 'score' => $score );
+		}
+		return $o;
+	}
+
 	private static function opts( $list ) {
 		$o = array();
 		foreach ( $list as $l ) {
@@ -274,12 +282,13 @@ class WLFP_Templates {
 			self::f( 'email', 'email', 'Email me this estimate', array( 'required' => 1 ) ),
 		), 'settings' => array( 'notifications' => array( self::notify( '{field:email}' ) ) ) );
 
-		$T['quiz'] = array( 'title' => __( 'Quick quiz / assessment', 'weberslink-forms-pro' ), 'desc' => __( 'Multiple-choice questions to collect answers.', 'weberslink-forms-pro' ), 'fields' => array(
+		$T['quiz'] = array( 'title' => __( 'Scored quiz (pass / fail)', 'weberslink-forms-pro' ), 'desc' => __( 'Multiple-choice quiz with automatic score and pass mark.', 'weberslink-forms-pro' ), 'fields' => array(
 			self::f( 'name', 'name', 'Your name', array( 'required' => 1 ) ),
-			self::f( 'radio', 'q1', '1. Which of these is a primary colour?', array( 'options' => self::opts( array( 'Green', 'Red', 'Orange', 'Purple' ) ), 'required' => 1 ) ),
-			self::f( 'radio', 'q2', '2. How many days are in a leap year?', array( 'options' => self::opts( array( '364', '365', '366', '367' ) ), 'required' => 1 ) ),
-			self::f( 'checkbox', 'q3', '3. Select all even numbers', array( 'options' => self::opts( array( '2', '3', '4', '7' ) ) ) ),
-		), 'settings' => array() );
+			self::f( 'email', 'email', 'Email', array( 'required' => 1 ) ),
+			self::f( 'radio', 'q1', '1. Which of these is a primary colour?', array( 'options' => self::scored( array( 'Green' => 0, 'Red' => 1, 'Orange' => 0, 'Purple' => 0 ) ), 'required' => 1 ) ),
+			self::f( 'radio', 'q2', '2. How many days are in a leap year?', array( 'options' => self::scored( array( '364' => 0, '365' => 0, '366' => 1, '367' => 0 ) ), 'required' => 1 ) ),
+			self::f( 'checkbox', 'q3', '3. Select all even numbers', array( 'options' => self::scored( array( '2' => 1, '3' => 0, '4' => 1, '7' => 0 ) ) ) ),
+		), 'settings' => array( 'quiz' => array( 'enabled' => 1, 'pass_percent' => 60 ), 'confirmation' => array( 'message' => '<h3>{quiz_result}</h3><p>You scored {score} out of {score_max} ({score_percent}%).</p>' ), 'notifications' => array( self::notify( '{field:email}' ) ) ) );
 
 		$T['gdpr'] = array( 'title' => __( 'GDPR data request', 'weberslink-forms-pro' ), 'desc' => __( 'Access / delete / correct my data.', 'weberslink-forms-pro' ), 'fields' => array(
 			self::f( 'name', 'name', 'Full name', array( 'required' => 1 ) ),
@@ -288,6 +297,24 @@ class WLFP_Templates {
 			self::f( 'textarea', 'details', 'Details' ),
 			self::f( 'consent', 'verify', '', array( 'terms' => 'I confirm I am the person these details relate to.', 'required' => 1 ) ),
 		), 'settings' => array( 'notifications' => array( self::notify( '{field:email}' ), self::autoreply( 'We received your data request' ) ) ) );
+
+		$T['stay'] = array( 'title' => __( 'Hotel / rental booking request', 'weberslink-forms-pro' ), 'desc' => __( 'Date range, guests, state and add-ons (toggle).', 'weberslink-forms-pro' ), 'fields' => array(
+			self::f( 'name', 'name', 'Name', array( 'required' => 1 ) ),
+			self::f( 'email', 'email', 'Email', array( 'required' => 1, 'confirm' => 1 ) ),
+			self::f( 'date_range', 'stay', 'Check-in / check-out', array( 'required' => 1 ) ),
+			self::f( 'number', 'guests', 'Guests', array( 'min' => 1, 'max' => 12, 'default' => 2, 'width' => 'half' ) ),
+			self::f( 'us_state', 'state', 'Home state', array( 'width' => 'half' ) ),
+			self::f( 'toggle', 'breakfast', 'Add breakfast', array( 'toggle_text' => 'Yes, include breakfast' ) ),
+			self::f( 'toggle', 'parking', 'Need parking', array( 'toggle_text' => 'Yes, I will bring a car' ) ),
+			self::f( 'textarea', 'notes', 'Special requests' ),
+		), 'settings' => array( 'notifications' => array( self::notify( '{field:email}' ), self::autoreply( 'Your booking request' ) ) ) );
+
+		$T['priorities'] = array( 'title' => __( 'Priorities survey (ranking)', 'weberslink-forms-pro' ), 'desc' => __( 'Rank options, emoji satisfaction and picture choice.', 'weberslink-forms-pro' ), 'fields' => array(
+			self::f( 'emoji_rating', 'mood', 'How was your experience?', array( 'required' => 1 ) ),
+			self::f( 'ranking', 'priorities', 'Rank these from most to least important', array( 'options' => self::opts( array( 'Price', 'Quality', 'Speed', 'Support' ) ) ) ),
+			self::f( 'image_choice', 'style', 'Pick the style you like', array( 'columns' => 3 ) ),
+			self::f( 'email', 'email', 'Email (optional)' ),
+		), 'settings' => array() );
 
 		$T['simple'] = array( 'title' => __( 'Simple contact (3 fields)', 'weberslink-forms-pro' ), 'desc' => __( 'Name, email, message. Nothing else.', 'weberslink-forms-pro' ), 'fields' => array(
 			self::f( 'text', 'name', 'Name', array( 'required' => 1 ) ),
@@ -323,7 +350,7 @@ class WLFP_Templates {
 			'appointment' => 'booking', 'tour' => 'booking', 'rsvp' => 'booking', 'reservation' => 'booking', 'tickets' => 'payment',
 			'order' => 'payment', 'donation' => 'payment', 'service_order' => 'payment',
 			'feedback' => 'survey', 'survey' => 'survey', 'nps' => 'survey', 'testimonial' => 'survey', 'quiz' => 'survey',
-			'registration' => 'signup', 'job' => 'signup', 'course' => 'signup', 'membership' => 'signup', 'volunteer' => 'signup', 'contest' => 'signup',
+			'stay' => 'booking', 'priorities' => 'survey', 'registration' => 'signup', 'job' => 'signup', 'course' => 'signup', 'membership' => 'signup', 'volunteer' => 'signup', 'contest' => 'signup',
 			'support' => 'support', 'bug' => 'support', 'refund' => 'support', 'gdpr' => 'support',
 		);
 	}

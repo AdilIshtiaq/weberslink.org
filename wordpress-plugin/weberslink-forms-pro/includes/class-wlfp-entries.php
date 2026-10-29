@@ -60,7 +60,7 @@ class WLFP_Entries {
 
 	public static function query( $args ) {
 		global $wpdb;
-		$a = wp_parse_args( $args, array( 'form_id' => 0, 'status' => '', 'search' => '', 'from' => '', 'to' => '', 'starred' => 0, 'payment' => '', 'per_page' => 20, 'page' => 1, 'orderby' => 'id', 'order' => 'DESC', 'ids' => array() ) );
+		$a = wp_parse_args( $args, array( 'form_id' => 0, 'status' => '', 'search' => '', 'from' => '', 'to' => '', 'starred' => 0, 'payment' => '', 'per_page' => 20, 'page' => 1, 'orderby' => 'id', 'order' => 'DESC', 'ids' => array(), 'user_id' => 0 ) );
 		$where = array( '1=1' );
 		$vals  = array();
 		if ( $a['form_id'] ) {
@@ -72,6 +72,10 @@ class WLFP_Entries {
 			$vals[]  = $a['status'];
 		} elseif ( 'all' === $a['status'] || '' === $a['status'] ) {
 			$where[] = "status NOT IN ('trashed','spam')";
+		}
+		if ( $a['user_id'] ) {
+			$where[] = 'user_id=%d';
+			$vals[]  = (int) $a['user_id'];
 		}
 		if ( $a['starred'] ) {
 			$where[] = 'starred=1';
@@ -110,6 +114,13 @@ class WLFP_Entries {
 		}
 		$rows = $wpdb->get_results( $pv ? $wpdb->prepare( $sql, $pv ) : $sql, ARRAY_A ); // phpcs:ignore
 		return array( 'total' => $total, 'rows' => array_map( array( __CLASS__, 'hydrate' ), (array) $rows ) );
+	}
+
+	/** True when another live entry already holds this exact value for the field (used by "unique" fields). */
+	public static function value_exists( $form_id, $name, $value ) {
+		global $wpdb;
+		$like = '%' . $wpdb->esc_like( '"' . $name . '":' . wp_json_encode( $value ) ) . '%';
+		return (bool) $wpdb->get_var( $wpdb->prepare( 'SELECT id FROM ' . self::table() . " WHERE form_id=%d AND status NOT IN ('spam','trashed') AND data LIKE %s LIMIT 1", (int) $form_id, $like ) ); // phpcs:ignore
 	}
 
 	public static function counts( $form_id = 0 ) {

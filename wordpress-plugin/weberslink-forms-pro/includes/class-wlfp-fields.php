@@ -8,7 +8,7 @@ class WLFP_Fields {
 
 	/** Types that do not store a value. */
 	public static function layout_types() {
-		return array( 'section', 'html', 'divider', 'page_break', 'captcha', 'payment_summary', 'shortcode' );
+		return array( 'section', 'html', 'divider', 'page_break', 'captcha', 'payment_summary', 'shortcode', 'image_block', 'embed' );
 	}
 
 	public static function stores_value( $type ) {
@@ -50,6 +50,16 @@ class WLFP_Fields {
 			'quantity'        => array( 'label' => __( 'Quantity', 'weberslink-forms-pro' ), 'group' => 'payment', 'icon' => '×' ),
 			'payment_summary' => array( 'label' => __( 'Order summary', 'weberslink-forms-pro' ), 'group' => 'payment', 'icon' => '∑$' ),
 			'coupon'          => array( 'label' => __( 'Coupon code', 'weberslink-forms-pro' ), 'group' => 'payment', 'icon' => '%' ),
+			'toggle'      => array( 'label' => __( 'Toggle switch (yes / no)', 'weberslink-forms-pro' ), 'group' => 'advanced', 'icon' => '⏽' ),
+			'image_choice' => array( 'label' => __( 'Image choice', 'weberslink-forms-pro' ), 'group' => 'advanced', 'icon' => '▣' ),
+			'ranking'     => array( 'label' => __( 'Ranking (order the options)', 'weberslink-forms-pro' ), 'group' => 'advanced', 'icon' => '⇅' ),
+			'date_range'  => array( 'label' => __( 'Date range', 'weberslink-forms-pro' ), 'group' => 'advanced', 'icon' => '↔📅' ),
+			'emoji_rating' => array( 'label' => __( 'Emoji rating', 'weberslink-forms-pro' ), 'group' => 'advanced', 'icon' => '🙂' ),
+			'terms'       => array( 'label' => __( 'Terms & conditions (scroll box)', 'weberslink-forms-pro' ), 'group' => 'advanced', 'icon' => '§' ),
+			'us_state'    => array( 'label' => __( 'US state', 'weberslink-forms-pro' ), 'group' => 'advanced', 'icon' => 'ST' ),
+			'post_select' => array( 'label' => __( 'Dynamic dropdown (posts / terms)', 'weberslink-forms-pro' ), 'group' => 'advanced', 'icon' => '⛁' ),
+			'image_block' => array( 'label' => __( 'Image', 'weberslink-forms-pro' ), 'group' => 'layout', 'icon' => '🖼' ),
+			'embed'       => array( 'label' => __( 'Embed (video / oEmbed)', 'weberslink-forms-pro' ), 'group' => 'layout', 'icon' => '▶' ),
 			'section'     => array( 'label' => __( 'Section heading', 'weberslink-forms-pro' ), 'group' => 'layout', 'icon' => 'H' ),
 			'html'        => array( 'label' => __( 'Custom HTML / text', 'weberslink-forms-pro' ), 'group' => 'layout', 'icon' => '<>' ),
 			'divider'     => array( 'label' => __( 'Divider', 'weberslink-forms-pro' ), 'group' => 'layout', 'icon' => '—' ),
@@ -154,6 +164,47 @@ class WLFP_Fields {
 				$base['default'] = 1;
 				$base['item'] = '';
 				break;
+			case 'toggle':
+				$base['toggle_text'] = 'Yes';
+				break;
+			case 'image_choice':
+				$base['options']  = array( array( 'label' => 'Option 1', 'value' => 'option_1', 'image' => '', 'price' => '' ), array( 'label' => 'Option 2', 'value' => 'option_2', 'image' => '', 'price' => '' ), array( 'label' => 'Option 3', 'value' => 'option_3', 'image' => '', 'price' => '' ) );
+				$base['multiple'] = 0;
+				$base['columns']  = 3;
+				break;
+			case 'ranking':
+				$base['options'] = $opts;
+				break;
+			case 'date_range':
+				$base['min'] = '';
+				$base['max'] = '';
+				break;
+			case 'terms':
+				$base['label']      = 'Terms & conditions';
+				$base['terms_text'] = '<p>Write your terms here…</p>';
+				$base['agree_label'] = 'I have read and agree to the terms';
+				$base['must_scroll'] = 0;
+				$base['required']   = 1;
+				break;
+			case 'post_select':
+				$base['source_kind'] = 'posts';
+				$base['source']      = 'page';
+				$base['limit']       = 200;
+				$base['multiple']    = 0;
+				$base['placeholder'] = '— Select —';
+				break;
+			case 'image_block':
+				$base['url']       = '';
+				$base['alt']       = '';
+				$base['link']      = '';
+				$base['max_width'] = 100;
+				$base['align']     = 'left';
+				$base['label']     = 'Image';
+				break;
+			case 'embed':
+				$base['url']   = '';
+				$base['label'] = 'Embed';
+				break;
 			case 'section':
 				$base['label'] = 'Section title';
 				$base['help']  = '';
@@ -188,7 +239,7 @@ class WLFP_Fields {
 		$req  = ! empty( $f['required'] );
 		$val  = null === $value ? ( isset( $f['default'] ) ? $f['default'] : '' ) : $value;
 		$desc = ! empty( $f['help'] ) ? $fid . '-help' : null;
-		$base = array( 'id' => $fid, 'name' => $name, 'class' => 'wlfp-input', 'aria-describedby' => $desc, 'aria-required' => $req ? 'true' : null, 'data-wlfp-field' => $name );
+		$base = array( 'id' => $fid, 'name' => $name, 'class' => 'wlfp-input', 'aria-describedby' => $desc, 'aria-required' => $req ? 'true' : null, 'data-wlfp-field' => $name, 'readonly' => ! empty( $f['readonly'] ) ? true : null );
 		if ( ! empty( $f['placeholder'] ) && in_array( $f['type'], array( 'text', 'textarea', 'email', 'number', 'phone', 'url', 'password' ), true ) ) {
 			$base['placeholder'] = $f['placeholder'];
 		}
@@ -218,6 +269,9 @@ class WLFP_Fields {
 					$attr['data-mask'] = $f['mask'];
 				}
 				$o = '<input' . WLFP_Helpers::esc_attrs( $attr ) . ' />';
+				if ( ! empty( $f['confirm'] ) && in_array( $f['type'], array( 'email', 'password' ), true ) ) {
+					$o .= '<input type="' . ( 'email' === $f['type'] ? 'email' : 'password' ) . '" class="wlfp-input wlfp-confirm" id="' . esc_attr( $fid ) . '-confirm" name="' . esc_attr( $name ) . '__confirm" autocomplete="off" placeholder="' . esc_attr( 'email' === $f['type'] ? __( 'Confirm email', 'weberslink-forms-pro' ) : __( 'Confirm password', 'weberslink-forms-pro' ) ) . '" aria-label="' . esc_attr( 'email' === $f['type'] ? __( 'Confirm email', 'weberslink-forms-pro' ) : __( 'Confirm password', 'weberslink-forms-pro' ) ) . '" data-confirm-for="' . esc_attr( $name ) . '" />';
+				}
 				break;
 			case 'hidden':
 				$o = '<input type="hidden" id="' . esc_attr( $fid ) . '" name="' . esc_attr( $name ) . '" value="' . esc_attr( $val ) . '" data-wlfp-field="' . esc_attr( $name ) . '" />';
@@ -406,10 +460,119 @@ class WLFP_Fields {
 			case 'coupon':
 				$o = '<div class="wlfp-coupon"><input type="text" class="wlfp-input" id="' . esc_attr( $fid ) . '" name="' . esc_attr( $name ) . '" data-wlfp-field="' . esc_attr( $name ) . '" /><button type="button" class="wlfp-coupon-apply">' . esc_html__( 'Apply', 'weberslink-forms-pro' ) . '</button><span class="wlfp-coupon-msg" aria-live="polite"></span></div>';
 				break;
+			case 'toggle':
+				$on = in_array( (string) $val, array( 'yes', '1', 'on', 'true' ), true );
+				$o  = '<label class="wlfp-toggle" for="' . esc_attr( $fid ) . '"><input type="checkbox" role="switch" id="' . esc_attr( $fid ) . '" name="' . esc_attr( $name ) . '" value="yes" data-wlfp-field="' . esc_attr( $name ) . '"' . checked( $on, true, false ) . ( $req ? ' aria-required="true"' : '' ) . ' /><span class="wlfp-switch" aria-hidden="true"></span><span class="wlfp-toggle-text">' . esc_html( $f['toggle_text'] ?? '' ) . '</span></label>';
+				break;
+			case 'image_choice':
+				$multi = ! empty( $f['multiple'] );
+				$type  = $multi ? 'checkbox' : 'radio';
+				$cols  = max( 1, min( 6, (int) ( $f['columns'] ?? 3 ) ) );
+				$sel   = array_map( 'strval', (array) $val );
+				$o     = '<div class="wlfp-imgchoices" style="--wlfp-cols:' . $cols . '" role="' . ( $multi ? 'group' : 'radiogroup' ) . '" aria-labelledby="' . esc_attr( $fid ) . '-label" data-wlfp-field="' . esc_attr( $name ) . '" data-multiple="' . ( $multi ? 1 : 0 ) . '">';
+				$n     = 0;
+				foreach ( (array) ( $f['options'] ?? array() ) as $opt ) {
+					$cid = $fid . '-' . $n++;
+					$o  .= '<label class="wlfp-imgchoice" for="' . esc_attr( $cid ) . '"><input type="' . $type . '" id="' . esc_attr( $cid ) . '" name="' . esc_attr( $name ) . ( $multi ? '[]' : '' ) . '" value="' . esc_attr( $opt['value'] ) . '"' . checked( in_array( (string) $opt['value'], $sel, true ), true, false ) . ' data-wlfp-field="' . esc_attr( $name ) . '" /><span class="wlfp-imgchoice-box">' . ( ! empty( $opt['image'] ) ? '<img src="' . esc_url( $opt['image'] ) . '" alt="" loading="lazy" />' : '' ) . '<span class="wlfp-imgchoice-cap">' . esc_html( $opt['label'] ) . '</span></span></label>';
+				}
+				$o .= '</div>';
+				break;
+			case 'ranking':
+				$o = '<ol class="wlfp-rank" id="' . esc_attr( $fid ) . '" data-wlfp-field="' . esc_attr( $name ) . '">';
+				foreach ( (array) ( $f['options'] ?? array() ) as $opt ) {
+					$o .= '<li class="wlfp-rank-item"><input type="hidden" name="' . esc_attr( $name ) . '[]" value="' . esc_attr( $opt['value'] ) . '" data-wlfp-field="' . esc_attr( $name ) . '" /><span class="wlfp-rank-label">' . esc_html( $opt['label'] ) . '</span><span class="wlfp-rank-btns"><button type="button" class="wlfp-rank-up" aria-label="' . esc_attr__( 'Move up', 'weberslink-forms-pro' ) . '">↑</button><button type="button" class="wlfp-rank-down" aria-label="' . esc_attr__( 'Move down', 'weberslink-forms-pro' ) . '">↓</button></span></li>';
+				}
+				$o .= '</ol>';
+				break;
+			case 'date_range':
+				$o = '<div class="wlfp-composite">';
+				foreach ( array( 'start' => __( 'Start date', 'weberslink-forms-pro' ), 'end' => __( 'End date', 'weberslink-forms-pro' ) ) as $p => $l ) {
+					$pid = $fid . '-' . $p;
+					$o  .= '<div class="wlfp-sub"><input type="date" class="wlfp-input" id="' . esc_attr( $pid ) . '" name="' . esc_attr( $name ) . '[' . $p . ']" data-wlfp-field="' . esc_attr( $name ) . '" value="' . esc_attr( is_array( $val ) && isset( $val[ $p ] ) ? $val[ $p ] : '' ) . '"' . ( ! empty( $f['min'] ) ? ' min="' . esc_attr( $f['min'] ) . '"' : '' ) . ( ! empty( $f['max'] ) ? ' max="' . esc_attr( $f['max'] ) . '"' : '' ) . ' /><label class="wlfp-sublabel" for="' . esc_attr( $pid ) . '">' . esc_html( $l ) . '</label></div>';
+				}
+				$o .= '</div>';
+				break;
+			case 'emoji_rating':
+				$o = '<div class="wlfp-emoji" role="radiogroup" aria-labelledby="' . esc_attr( $fid ) . '-label" data-wlfp-field="' . esc_attr( $name ) . '">';
+				foreach ( self::emoji() as $i => $e ) {
+					$o .= '<label class="wlfp-emoji-item"><input type="radio" name="' . esc_attr( $name ) . '" value="' . (int) $i . '"' . checked( (string) $val, (string) $i, false ) . ' data-wlfp-field="' . esc_attr( $name ) . '" /><span aria-hidden="true">' . $e . '</span><span class="wlfp-sr">' . esc_html( $i . ' / 5' ) . '</span></label>';
+				}
+				$o .= '</div>';
+				break;
+			case 'terms':
+				$o = '<div class="wlfp-terms-box" tabindex="0" role="region" aria-label="' . esc_attr__( 'Terms and conditions', 'weberslink-forms-pro' ) . '"' . ( ! empty( $f['must_scroll'] ) ? ' data-must-scroll="1"' : '' ) . '>' . wp_kses( $f['terms_text'] ?? '', WLFP_Helpers::allowed_html() ) . '</div><label class="wlfp-choice wlfp-consent" for="' . esc_attr( $fid ) . '"><input type="checkbox" id="' . esc_attr( $fid ) . '" name="' . esc_attr( $name ) . '" value="yes" data-wlfp-field="' . esc_attr( $name ) . '"' . ( $req ? ' aria-required="true"' : '' ) . ' /><span>' . esc_html( $f['agree_label'] ?? '' ) . '</span></label>';
+				break;
+			case 'us_state':
+				$o = '<select' . WLFP_Helpers::esc_attrs( $base ) . '><option value="">' . esc_html( ! empty( $f['placeholder'] ) ? $f['placeholder'] : __( '— Select state —', 'weberslink-forms-pro' ) ) . '</option>';
+				foreach ( WLFP_Helpers::us_states() as $code => $label ) {
+					$o .= '<option value="' . esc_attr( $code ) . '"' . selected( (string) $val, $code, false ) . '>' . esc_html( $label ) . '</option>';
+				}
+				$o .= '</select>';
+				break;
+			case 'post_select':
+				$multi = ! empty( $f['multiple'] );
+				$attr  = $base;
+				if ( $multi ) {
+					$attr['multiple'] = true;
+					$attr['name']     = $name . '[]';
+					$attr['size']     = 6;
+				}
+				$o   = '<select' . WLFP_Helpers::esc_attrs( $attr ) . '>' . ( $multi ? '' : '<option value="">' . esc_html( ! empty( $f['placeholder'] ) ? $f['placeholder'] : __( '— Select —', 'weberslink-forms-pro' ) ) . '</option>' );
+				$sel = array_map( 'strval', (array) $val );
+				foreach ( self::post_options( $f ) as $v => $label ) {
+					$o .= '<option value="' . esc_attr( $v ) . '"' . selected( in_array( (string) $v, $sel, true ), true, false ) . '>' . esc_html( $label ) . '</option>';
+				}
+				$o .= '</select>';
+				break;
 			default:
 				$o = apply_filters( 'wlfp_render_field_' . $f['type'], '', $f, $form, $val );
 		}
 		return $o;
+	}
+
+	public static function emoji() {
+		return array( 1 => '😡', 2 => '🙁', 3 => '😐', 4 => '🙂', 5 => '😍' );
+	}
+
+	/** image_choice behaves like radio / checkbox everywhere except rendering. */
+	public static function alias( $f ) {
+		if ( isset( $f['type'] ) && 'image_choice' === $f['type'] ) {
+			$f['type'] = ! empty( $f['multiple'] ) ? 'checkbox' : 'radio';
+		}
+		return $f;
+	}
+
+	/** value => label for a dynamic dropdown (published posts of a public type, or taxonomy terms). */
+	public static function post_options( $f ) {
+		static $cache = array();
+		$kind  = ( $f['source_kind'] ?? 'posts' ) === 'terms' ? 'terms' : 'posts';
+		$slug  = sanitize_key( $f['source'] ?? ( 'terms' === $kind ? 'category' : 'page' ) );
+		$limit = max( 1, min( 500, (int) ( $f['limit'] ?? 200 ) ) );
+		$key   = $kind . '|' . $slug . '|' . $limit;
+		if ( isset( $cache[ $key ] ) ) {
+			return $cache[ $key ];
+		}
+		$out = array();
+		if ( 'terms' === $kind ) {
+			if ( taxonomy_exists( $slug ) ) {
+				$terms = get_terms( array( 'taxonomy' => $slug, 'hide_empty' => false, 'number' => $limit ) );
+				if ( ! is_wp_error( $terms ) ) {
+					foreach ( $terms as $t ) {
+						$out[ (string) $t->term_id ] = $t->name;
+					}
+				}
+			}
+		} else {
+			$obj = post_type_exists( $slug ) ? get_post_type_object( $slug ) : null;
+			if ( $obj && $obj->public ) {
+				foreach ( get_posts( array( 'post_type' => $slug, 'post_status' => 'publish', 'numberposts' => $limit, 'orderby' => 'title', 'order' => 'ASC', 'has_password' => false ) ) as $p ) {
+					$t                       = get_the_title( $p );
+					$out[ (string) $p->ID ] = '' !== $t ? $t : '#' . $p->ID;
+				}
+			}
+		}
+		$cache[ $key ] = $out;
+		return $out;
 	}
 
 	public static function repeater_row( $f, $i ) {
@@ -428,6 +591,7 @@ class WLFP_Fields {
 	 * Read the raw posted value for a field, sanitised. Files are handled separately.
 	 */
 	public static function collect( $f, $post ) {
+		$f    = self::alias( $f );
 		$name = $f['name'];
 		$raw  = isset( $post[ $name ] ) ? wp_unslash( $post[ $name ] ) : null;
 		if ( 'payment_item' === $f['type'] ) {
@@ -470,6 +634,7 @@ class WLFP_Fields {
 				return $v;
 			case 'name':
 			case 'address':
+			case 'date_range':
 				$out = array();
 				foreach ( (array) $raw as $k => $v ) {
 					if ( is_scalar( $v ) ) {
@@ -505,7 +670,17 @@ class WLFP_Fields {
 				$v = null === $raw || is_array( $raw ) ? '' : (string) $raw;
 				return 0 === strpos( $v, 'data:image/png;base64,' ) && strlen( $v ) < 400000 && preg_match( '#^data:image/png;base64,[A-Za-z0-9+/=]+$#', $v ) ? $v : '';
 			case 'consent':
+			case 'terms':
 				return $raw ? 'yes' : '';
+			case 'toggle':
+				return $raw ? 'yes' : 'no';
+			case 'ranking':
+				return array_values( array_unique( array_filter( array_map( 'sanitize_text_field', array_map( 'strval', array_filter( (array) $raw, 'is_scalar' ) ) ), 'strlen' ) ) );
+			case 'post_select':
+				if ( ! empty( $f['multiple'] ) ) {
+					return array_values( array_filter( array_map( 'sanitize_text_field', array_map( 'strval', array_filter( (array) $raw, 'is_scalar' ) ) ), 'strlen' ) );
+				}
+				return null === $raw || is_array( $raw ) ? '' : sanitize_text_field( $raw );
 			default:
 				return null === $raw || is_array( $raw ) ? '' : sanitize_text_field( $raw );
 		}
@@ -522,7 +697,11 @@ class WLFP_Fields {
 
 	/** Returns an error string or ''. */
 	public static function validate( $f, $v, $form ) {
+		$f     = self::alias( $f );
 		$label = ! empty( $f['label'] ) ? $f['label'] : $f['name'];
+		if ( 'toggle' === $f['type'] ) {
+			return ( ! empty( $f['required'] ) && 'yes' !== $v ) ? ( ! empty( $f['req_msg'] ) ? $f['req_msg'] : sprintf( /* translators: %s: field label */ __( '%s is required.', 'weberslink-forms-pro' ), $label ) ) : '';
+		}
 		if ( ! empty( $f['required'] ) && 'hidden' !== $f['type'] && self::is_empty( $v ) ) {
 			return ! empty( $f['req_msg'] ) ? $f['req_msg'] : sprintf( /* translators: %s: field label */ __( '%s is required.', 'weberslink-forms-pro' ), $label );
 		}
@@ -550,6 +729,7 @@ class WLFP_Fields {
 			case 'quantity':
 			case 'rating':
 			case 'nps':
+			case 'emoji_rating':
 				if ( ! is_numeric( $v ) ) {
 					return __( 'Please enter a number.', 'weberslink-forms-pro' );
 				}
@@ -579,6 +759,42 @@ class WLFP_Fields {
 			case 'datetime':
 				if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/', $v ) ) {
 					return __( 'Please enter a valid date and time.', 'weberslink-forms-pro' );
+				}
+				break;
+			case 'ranking':
+				$allowed = array_map( 'strval', wp_list_pluck( (array) ( $f['options'] ?? array() ), 'value' ) );
+				foreach ( (array) $v as $x ) {
+					if ( ! in_array( (string) $x, $allowed, true ) ) {
+						return __( 'Invalid ranking.', 'weberslink-forms-pro' );
+					}
+				}
+				break;
+			case 'date_range':
+				$a = isset( $v['start'] ) ? $v['start'] : '';
+				$b = isset( $v['end'] ) ? $v['end'] : '';
+				if ( ( '' === $a || '' === $b ) && ! empty( $f['required'] ) ) {
+					return __( 'Please choose both a start and an end date.', 'weberslink-forms-pro' );
+				}
+				foreach ( array( $a, $b ) as $d ) {
+					if ( '' !== $d && ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $d ) || ! strtotime( $d ) ) ) {
+						return __( 'Please enter valid dates.', 'weberslink-forms-pro' );
+					}
+				}
+				if ( '' !== $a && '' !== $b && $b < $a ) {
+					return __( 'The end date must be on or after the start date.', 'weberslink-forms-pro' );
+				}
+				break;
+			case 'us_state':
+				if ( ! isset( WLFP_Helpers::us_states()[ $v ] ) ) {
+					return __( 'Please choose a valid state.', 'weberslink-forms-pro' );
+				}
+				break;
+			case 'post_select':
+				$allowed = array_map( 'strval', array_keys( self::post_options( $f ) ) );
+				foreach ( (array) $v as $x ) {
+					if ( ! in_array( (string) $x, $allowed, true ) ) {
+						return __( 'Please choose a valid option.', 'weberslink-forms-pro' );
+					}
 				}
 				break;
 			case 'color':
@@ -651,6 +867,9 @@ class WLFP_Fields {
 				}
 				break;
 		}
+		if ( in_array( $f['type'], array( 'text', 'textarea' ), true ) && ! empty( $f['max_words'] ) && str_word_count( wp_strip_all_tags( (string) $v ) ) > (int) $f['max_words'] ) {
+			return sprintf( /* translators: %d: words */ __( 'Please use at most %d words.', 'weberslink-forms-pro' ), (int) $f['max_words'] );
+		}
 		if ( in_array( $f['type'], array( 'text', 'textarea' ), true ) && ! empty( $f['maxlength'] ) && mb_strlen( (string) $v ) > (int) $f['maxlength'] ) {
 			return sprintf( /* translators: %d: characters */ __( 'Please use at most %d characters.', 'weberslink-forms-pro' ), (int) $f['maxlength'] );
 		}
@@ -660,8 +879,38 @@ class WLFP_Fields {
 	/* ---------------- Display of stored values ---------------- */
 
 	public static function format_value( $f, $v, $html = false ) {
+		$f   = self::alias( $f );
 		$out = '';
 		switch ( $f['type'] ) {
+			case 'toggle':
+				$out = 'yes' === $v ? __( 'Yes', 'weberslink-forms-pro' ) : __( 'No', 'weberslink-forms-pro' );
+				break;
+			case 'terms':
+				$out = $v ? __( 'Agreed', 'weberslink-forms-pro' ) : '';
+				break;
+			case 'ranking':
+				$lines = array();
+				foreach ( array_values( (array) $v ) as $i => $x ) {
+					$lines[] = ( $i + 1 ) . '. ' . self::option_label( $f, $x );
+				}
+				return $html ? implode( '<br>', array_map( 'esc_html', $lines ) ) : implode( "\n", $lines );
+			case 'date_range':
+				$out = ( $v['start'] ?? '' ) . ' → ' . ( $v['end'] ?? '' );
+				break;
+			case 'emoji_rating':
+				$e   = self::emoji();
+				$out = ( isset( $e[ (int) $v ] ) ? $e[ (int) $v ] . ' ' : '' ) . $v . ' / 5';
+				break;
+			case 'us_state':
+				$st  = WLFP_Helpers::us_states();
+				$out = isset( $st[ $v ] ) ? $st[ $v ] : (string) $v;
+				break;
+			case 'post_select':
+				$opts = self::post_options( $f );
+				$out  = implode( ', ', array_map( function ( $x ) use ( $opts ) {
+					return isset( $opts[ (string) $x ] ) ? $opts[ (string) $x ] : (string) $x;
+				}, (array) $v ) );
+				break;
 			case 'name':
 				$out = trim( implode( ' ', array_filter( array( $v['prefix'] ?? '', $v['first'] ?? '', $v['middle'] ?? '', $v['last'] ?? '' ) ) ) );
 				break;

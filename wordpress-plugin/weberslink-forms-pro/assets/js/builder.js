@@ -8,6 +8,20 @@
 	var F = C.form;
 	F.fields = F.fields || [];
 	var S = { sel: null, tab: 'build', sub: 'confirmation', dirty: false, last: null, q: '' };
+	var LAYOUT = [ 'section', 'html', 'divider', 'page_break', 'captcha', 'payment_summary', 'shortcode', 'image_block', 'embed' ];
+	function quizOn() { return !! ( F.settings.quiz && Number( F.settings.quiz.enabled ) ); }
+	function mediaPick( cb ) {
+		if ( ! window.wp || ! window.wp.media ) { toast( 'The media library is not available here.', true ); return; }
+		var fr = window.wp.media( { title: 'Choose an image', multiple: false, library: { type: 'image' } } );
+		fr.on( 'select', function () { var a = fr.state().get( 'selection' ).first().toJSON(); cb( a.url ); } );
+		fr.open();
+	}
+	function urlField( obj, key, label, on ) {
+		var e = track( h( 'input', { type: 'text', value: obj[ key ] || '', placeholder: 'https://…' } ) );
+		e.addEventListener( 'input', function () { obj[ key ] = e.value; touch(); if ( on ) { on(); } } );
+		var b = h( 'button', { type: 'button', class: 'button', text: 'Choose', onclick: function () { mediaPick( function ( u ) { obj[ key ] = u; e.value = u; touch(); if ( on ) { on(); } } ); } } );
+		return row( label, h( 'div', { style: 'display:flex;gap:6px' }, e, b ) );
+	}
 
 	/* ---------- tiny DOM helper ---------- */
 	function h( tag, props ) {
@@ -83,7 +97,7 @@
 	}
 
 	/* ---------- field helpers ---------- */
-	function valueFields() { return F.fields.filter( function ( f ) { return f.name && [ 'section', 'html', 'divider', 'page_break', 'captcha', 'payment_summary', 'shortcode' ].indexOf( f.type ) === -1; } ); }
+	function valueFields() { return F.fields.filter( function ( f ) { return f.name && LAYOUT.indexOf( f.type ) === -1; } ); }
 	function byId( id ) { for ( var i = 0; i < F.fields.length; i++ ) { if ( F.fields[ i ].id === id ) { return F.fields[ i ]; } } return null; }
 	function indexOf( id ) { for ( var i = 0; i < F.fields.length; i++ ) { if ( F.fields[ i ].id === id ) { return i; } } return -1; }
 	function uniqueName( base, selfId ) {
@@ -96,7 +110,7 @@
 	function newField( type ) {
 		var f = clone( C.defaults[ type ] );
 		f.id = uid();
-		if ( [ 'section', 'html', 'divider', 'page_break', 'captcha', 'payment_summary', 'shortcode' ].indexOf( type ) === -1 ) {
+		if ( LAYOUT.indexOf( type ) === -1 ) {
 			f.name = uniqueName( f.label || type, f.id );
 		} else { f.name = ''; }
 		if ( type === 'payment_item' ) { f.label = 'Product'; }
@@ -297,6 +311,16 @@
 			case 'page_break': add( m, h( 'div', { text: '⇥ Step break' + ( f.step_title ? ': ' + f.step_title : '' ), style: 'text-align:center;border:1px dashed #8c8f94;padding:6px;border-radius:4px' } ) ); break;
 			case 'captcha': add( m, box( '🛡 CAPTCHA' ) ); break;
 			case 'shortcode': add( m, box( f.shortcode || '[shortcode]' ) ); break;
+			case 'toggle': add( m, h( 'div', { class: 'c' }, h( 'b', { style: 'width:28px;border-radius:99px' } ), f.toggle_text || '' ) ); break;
+			case 'image_choice': add( m, h( 'div', { class: 'g' }, ( f.options || [] ).slice( 0, 4 ).map( function ( o ) { return box( '▣ ' + o.label ); } ) ) ); break;
+			case 'ranking': add( m, ( f.options || [] ).slice( 0, 4 ).map( function ( o, i ) { return box( ( i + 1 ) + '. ' + o.label ); } ) ); break;
+			case 'date_range': add( m, h( 'div', { class: 'g' }, box( 'Start date' ), box( 'End date' ) ) ); break;
+			case 'emoji_rating': add( m, h( 'div', { class: 'st', text: '😡 🙁 😐 🙂 😍' } ) ); break;
+			case 'terms': add( m, box( ( f.terms_text || '' ).replace( /<[^>]+>/g, ' ' ).slice( 0, 90 ), 'tall' ) ); break;
+			case 'us_state': add( m, h( 'div', { class: 'm' }, h( 'span', { text: 'Select state' } ), '▾' ) ); break;
+			case 'post_select': add( m, h( 'div', { class: 'm' }, h( 'span', { text: 'Dynamic: ' + ( f.source || '' ) } ), '▾' ) ); break;
+			case 'image_block': add( m, box( '🖼 ' + ( f.url || '(choose an image)' ) ) ); break;
+			case 'embed': add( m, box( '▶ ' + ( f.url || '(paste a video URL)' ) ) ); break;
 			case 'hidden': add( m, box( 'Hidden: ' + ( f.default || '' ) ) ); break;
 			case 'color': add( m, box( '🎨 #000000' ) ); break;
 			default: add( m, box( f.placeholder ) );
@@ -316,7 +340,7 @@
 		var t = C.types[ f.type ] || { label: f.type };
 		var refresh = function () { var c = canvasEl.querySelector( '.wlfpb-card[data-id="' + f.id + '"]' ); if ( c ) { var n = card( f, indexOf( f.id ) ); c.replaceWith( n ); } };
 		sideEl.appendChild( h( 'h3', { text: t.label } ) );
-		var isLayout = [ 'section', 'html', 'divider', 'page_break', 'captcha', 'payment_summary', 'shortcode' ].indexOf( f.type ) !== -1;
+		var isLayout = LAYOUT.indexOf( f.type ) !== -1;
 		var gen = h( 'details', { open: true }, h( 'summary', { text: 'General' } ) );
 		if ( f.type !== 'divider' && f.type !== 'html' && f.type !== 'captcha' && f.type !== 'payment_summary' && f.type !== 'shortcode' ) {
 			gen.appendChild( text( f, 'label', { label: f.type === 'page_break' ? 'Button label / step title' : 'Label', on: function ( v ) { refresh(); if ( f.type === 'page_break' && ! f.step_title ) { /* keep */ } } } ) );
@@ -331,7 +355,7 @@
 		if ( f.type === 'page_break' ) { gen.appendChild( text( f, 'step_title', { label: 'Title of the step that ends here', help: 'Shown in the progress bar. The first step is named in Settings → Steps.' } ) ); }
 		if ( f.type === 'shortcode' ) { gen.appendChild( text( f, 'shortcode', { label: 'Shortcode', ph: '[my_shortcode]', on: refresh } ) ); }
 		if ( ! isLayout && f.type !== 'hidden' && f.type !== 'consent' ) { gen.appendChild( text( f, 'help', { label: 'Help text' } ) ); }
-		if ( ! isLayout && [ 'file', 'image', 'signature', 'repeater', 'calculation', 'rating', 'nps', 'likert', 'payment_item', 'quantity', 'coupon' ].indexOf( f.type ) === -1 ) {
+		if ( ! isLayout && [ 'file', 'image', 'signature', 'repeater', 'calculation', 'rating', 'nps', 'likert', 'payment_item', 'quantity', 'coupon', 'ranking', 'image_choice', 'date_range', 'emoji_rating', 'terms', 'post_select', 'us_state' ].indexOf( f.type ) === -1 ) {
 			var dv = text( f, 'default', { label: 'Default value', help: 'Merge tags work: {user_email}, {get:param}…' } );
 			gen.appendChild( dv );
 		}
@@ -366,8 +390,15 @@
 				var manual = op.value !== slug( op.label );
 				lab.addEventListener( 'input', function () { op.label = lab.value; if ( ! manual ) { op.value = slug( lab.value ); val.value = op.value; } touch(); if ( o.on ) { o.on(); } } );
 				val.addEventListener( 'input', function () { manual = true; op.value = val.value; touch(); } );
-				var r = h( 'div', { class: 'wlfpb-opt' + ( o.price ? ' price' : '' ) }, lab, val );
+				var cols = '1fr 1fr' + ( o.image ? ' 1.5fr' : '' ) + ( o.price ? ' 70px' : '' ) + ( o.score ? ' 60px' : '' ) + ' auto auto';
+				var r = h( 'div', { class: 'wlfpb-opt', style: 'grid-template-columns:' + cols }, lab, val );
+				if ( o.image ) {
+					var im = h( 'input', { type: 'text', value: op.image || '', placeholder: 'Image URL', 'aria-label': 'Option image URL' } );
+					im.addEventListener( 'input', function () { op.image = im.value; touch(); if ( o.on ) { o.on(); } } );
+					r.appendChild( h( 'div', { style: 'display:flex;gap:2px;min-width:0' }, im, h( 'button', { type: 'button', class: 'button button-small', text: '…', title: 'Choose from media library', onclick: function () { mediaPick( function ( u ) { op.image = u; im.value = u; touch(); if ( o.on ) { o.on(); } } ); } } ) ) );
+				}
 				if ( o.price ) { var pr = h( 'input', { type: 'text', value: op.price || '', placeholder: 'Price', 'aria-label': 'Option price' } ); pr.addEventListener( 'input', function () { op.price = pr.value; touch(); } ); r.appendChild( pr ); }
+				if ( o.score ) { var sc = h( 'input', { type: 'number', step: 'any', value: op.score === undefined ? '' : op.score, placeholder: 'Score', 'aria-label': 'Option score' } ); sc.addEventListener( 'input', function () { op.score = sc.value; touch(); } ); r.appendChild( sc ); }
 				r.appendChild( h( 'button', { type: 'button', class: 'wlfpb-ib', title: 'Move up', text: '↑', onclick: function () { if ( i ) { f.options.splice( i - 1, 0, f.options.splice( i, 1 )[ 0 ] ); touch(); draw(); if ( o.on ) { o.on(); } } } } ) );
 				r.appendChild( h( 'button', { type: 'button', class: 'wlfpb-ib del', title: 'Remove', text: '✕', onclick: function () { f.options.splice( i, 1 ); touch(); draw(); if ( o.on ) { o.on(); } } } ) );
 				wrap.appendChild( r );
@@ -378,7 +409,7 @@
 					var cur = f.options.map( function ( x ) { return x.label + ( o.price && x.price ? ' | ' + x.price : '' ); } ).join( '\n' );
 					var v = window.prompt( 'One option per line' + ( o.price ? ' (use "Label | price")' : '' ), cur );
 					if ( v === null ) { return; }
-					f.options = v.split( /\r?\n/ ).map( function ( l ) { return l.trim(); } ).filter( Boolean ).map( function ( l ) { var p = l.split( '|' ); return { label: p[ 0 ].trim(), value: slug( p[ 0 ] ), price: o.price && p[ 1 ] ? p[ 1 ].trim() : '' }; } );
+					var oldOpts = f.options; f.options = v.split( /\r?\n/ ).map( function ( l ) { return l.trim(); } ).filter( Boolean ).map( function ( l ) { var p = l.split( '|' ); var lb = p[ 0 ].trim(); var old = oldOpts.filter( function ( x ) { return x.label === lb; } )[ 0 ] || {}; return Object.assign( {}, old, { label: lb, value: old.value || slug( lb ), price: o.price && p[ 1 ] ? p[ 1 ].trim() : ( old.price || '' ) } ); } );
 					touch(); draw(); if ( o.on ) { o.on(); }
 				} } ) ) );
 		};
@@ -408,7 +439,7 @@
 		var any = true;
 		switch ( f.type ) {
 			case 'select': case 'multiselect': case 'radio': case 'checkbox':
-				w.appendChild( optionsEditor( f, { on: refresh } ) );
+				w.appendChild( optionsEditor( f, { on: refresh, score: quizOn() } ) );
 				if ( f.type === 'radio' || f.type === 'checkbox' ) {
 					w.appendChild( sel( f, 'layout', [ [ 'vertical', 'Vertical list' ], [ 'horizontal', 'Inline' ] ], { label: 'Layout' } ) );
 					w.appendChild( check( f, 'other', 'Add an "Other" option with text box' ) );
@@ -464,8 +495,38 @@
 				w.appendChild( text( f, 'min', { label: 'Min', type: 'number' } ) ); w.appendChild( text( f, 'max', { label: 'Max', type: 'number' } ) ); break;
 			}
 			case 'coupon': w.appendChild( h( 'p', { class: 'description', text: 'Create coupon codes under Payments.' } ) ); break;
+			case 'toggle': w.appendChild( text( f, 'toggle_text', { label: 'Text next to the switch' } ) ); break;
+			case 'image_choice':
+				w.appendChild( optionsEditor( f, { image: true, score: quizOn(), on: refresh } ) );
+				w.appendChild( check( f, 'multiple', 'Allow multiple selections' ) );
+				w.appendChild( text( f, 'columns', { label: 'Columns (1-6)', type: 'number', min: 1, max: 6 } ) ); break;
+			case 'ranking': w.appendChild( optionsEditor( f, { on: refresh } ) ); break;
+			case 'date_range': w.appendChild( text( f, 'min', { label: 'Earliest date', type: 'date' } ) ); w.appendChild( text( f, 'max', { label: 'Latest date', type: 'date' } ) ); break;
+			case 'terms':
+				w.appendChild( area( f, 'terms_text', { label: 'Terms text (HTML allowed)', rows: 8, on: refresh } ) );
+				w.appendChild( text( f, 'agree_label', { label: 'Checkbox label' } ) );
+				w.appendChild( check( f, 'must_scroll', 'Visitor must scroll to the bottom before the checkbox unlocks' ) ); break;
+			case 'post_select':
+				w.appendChild( sel( f, 'source_kind', [ [ 'posts', 'Posts / pages / custom post type' ], [ 'terms', 'Taxonomy terms (categories, tags…)' ] ], { label: 'Fill options from', on: function () { f.source = f.source_kind === 'terms' ? 'category' : 'page'; renderSide(); } } ) );
+				var srcs = f.source_kind === 'terms' ? C.taxonomies : C.postTypes;
+				w.appendChild( sel( f, 'source', Object.keys( srcs ).map( function ( k ) { return [ k, srcs[ k ] ]; } ), { label: f.source_kind === 'terms' ? 'Taxonomy' : 'Post type' } ) );
+				w.appendChild( text( f, 'limit', { label: 'Max items', type: 'number' } ) );
+				w.appendChild( check( f, 'multiple', 'Allow multiple selections' ) );
+				w.appendChild( text( f, 'placeholder', { label: 'Placeholder' } ) ); break;
+			case 'us_state': w.appendChild( text( f, 'placeholder', { label: 'Placeholder' } ) ); break;
+			case 'image_block':
+				w.appendChild( urlField( f, 'url', 'Image', refresh ) );
+				w.appendChild( text( f, 'alt', { label: 'Alt text (accessibility)' } ) );
+				w.appendChild( text( f, 'link', { label: 'Link URL (optional)' } ) );
+				w.appendChild( text( f, 'max_width', { label: 'Max width (%)', type: 'number', min: 1, max: 100 } ) );
+				w.appendChild( sel( f, 'align', [ [ 'left', 'Left' ], [ 'center', 'Center' ], [ 'right', 'Right' ] ], { label: 'Alignment' } ) ); break;
+			case 'embed': w.appendChild( text( f, 'url', { label: 'Video / embed URL', ph: 'https://www.youtube.com/watch?v=…', on: refresh, help: 'Any WordPress oEmbed provider: YouTube, Vimeo, Spotify, SoundCloud, X…' } ) ); break;
 			default: any = false;
 		}
+		if ( [ 'text', 'email', 'phone', 'url', 'number' ].indexOf( f.type ) !== -1 ) { w.appendChild( check( f, 'unique', 'Reject duplicates (value must be unique across entries)' ) ); any = true; }
+		if ( [ 'text', 'textarea', 'email', 'phone', 'url', 'number', 'date' ].indexOf( f.type ) !== -1 ) { w.appendChild( check( f, 'readonly', 'Read-only (use with a default value / merge tag)' ) ); any = true; }
+		if ( f.type === 'email' || f.type === 'password' ) { w.appendChild( check( f, 'confirm', 'Ask the visitor to type it twice' ) ); any = true; }
+		if ( f.type === 'text' || f.type === 'textarea' ) { w.appendChild( text( f, 'max_words', { label: 'Max words', type: 'number' } ) ); any = true; }
 		return any ? w : null;
 	}
 
@@ -523,7 +584,7 @@
 	/* ---------- SETTINGS tab ---------- */
 	function settingsTab( body ) {
 		var S2 = F.settings;
-		var secs = [ [ 'confirmation', 'Confirmation' ], [ 'button', 'Button & steps' ], [ 'style', 'Appearance' ], [ 'restrictions', 'Restrictions' ], [ 'spam', 'Spam protection' ], [ 'entries', 'Entries & behaviour' ] ];
+		var secs = [ [ 'confirmation', 'Confirmation' ], [ 'button', 'Button & steps' ], [ 'style', 'Appearance' ], [ 'restrictions', 'Restrictions' ], [ 'spam', 'Spam protection' ], [ 'quiz', 'Quiz scoring' ], [ 'entries', 'Entries & behaviour' ] ];
 		var nav = h( 'div', { class: 'wlfpb-panel wlfpb-nav' }, secs.map( function ( s ) { return h( 'button', { type: 'button', class: S.sub === s[ 0 ] ? 'on' : '', text: s[ 1 ], onclick: function () { S.sub = s[ 0 ]; renderTab(); } } ); } ) );
 		var main = h( 'div', { class: 'wlfpb-panel wlfpb-wide' } );
 		var c;
@@ -532,8 +593,33 @@
 				c = S2.confirmation;
 				main.appendChild( sel( c, 'type', [ [ 'message', 'Show a message' ], [ 'redirect', 'Redirect to a URL' ], [ 'page', 'Redirect to a page' ] ], { label: 'After submission', on: renderTab } ) );
 				if ( c.type === 'message' ) { main.appendChild( area( c, 'message', { label: 'Message (HTML + merge tags)', rows: 6 } ) ); main.appendChild( check( c, 'hide_form', 'Hide the form after submitting' ) ); main.appendChild( check( c, 'scroll', 'Scroll to the message' ) ); main.appendChild( tagChips() ); }
+				c.rules = c.rules || [];
+				main.appendChild( h( 'h3', { text: 'Conditional confirmations', style: 'margin-top:20px' } ) );
+				main.appendChild( h( 'p', { class: 'description', text: 'The first rule whose condition matches replaces the confirmation above (e.g. redirect high scorers to a different page).' } ) );
+				c.rules.forEach( function ( r, i ) {
+					r.conditional = r.conditional || { enabled: 1, match: 'all', rules: [] };
+					r.type = r.type || 'message';
+					var it = h( 'div', { class: 'wlfpb-list-item' } );
+					it.appendChild( h( 'header', null, h( 'span', { text: 'Rule ' + ( i + 1 ) } ), h( 'button', { type: 'button', class: 'button button-small', text: 'Delete', onclick: function () { c.rules.splice( i, 1 ); touch(); renderTab(); } } ) ) );
+					var d = h( 'div' );
+					d.appendChild( condEditor( r.conditional, null ) );
+					d.appendChild( sel( r, 'type', [ [ 'message', 'Show a message' ], [ 'redirect', 'Redirect to a URL' ], [ 'page', 'Redirect to a page' ] ], { label: 'Then', on: renderTab } ) );
+					if ( r.type === 'message' ) { d.appendChild( area( r, 'message', { label: 'Message', rows: 4 } ) ); }
+					if ( r.type === 'redirect' ) { d.appendChild( text( r, 'url', { label: 'URL' } ) ); }
+					if ( r.type === 'page' ) { d.appendChild( sel( r, 'page_id', [ [ 0, '— choose —' ] ].concat( Object.keys( C.pages ).map( function ( k ) { return [ k, C.pages[ k ] ]; } ) ), { label: 'Page' } ) ); }
+					it.appendChild( d ); main.appendChild( it );
+				} );
+				main.appendChild( h( 'button', { type: 'button', class: 'button', text: '+ Add conditional confirmation', onclick: function () { c.rules.push( { type: 'message', message: '<p>Thanks!</p>', conditional: { enabled: 1, match: 'all', rules: [] } } ); touch(); renderTab(); } } ) );
 				if ( c.type === 'redirect' ) { main.appendChild( text( c, 'url', { label: 'Redirect URL', ph: 'https://…/thank-you?name={field:name:first}', help: 'Merge tags allowed.' } ) ); }
 				if ( c.type === 'page' ) { main.appendChild( sel( c, 'page_id', [ [ 0, '— choose —' ] ].concat( Object.keys( C.pages ).map( function ( k ) { return [ k, C.pages[ k ] ]; } ) ), { label: 'Page' } ) ); }
+				break;
+			case 'quiz':
+				c = S2.quiz = S2.quiz || { enabled: 0, pass_percent: 60 };
+				main.appendChild( check( c, 'enabled', 'Turn this form into a scored quiz', { on: renderTab } ) );
+				if ( Number( c.enabled ) ) {
+					main.appendChild( text( c, 'pass_percent', { label: 'Pass mark (%)', type: 'number', min: 0, max: 100 } ) );
+					main.appendChild( h( 'p', { class: 'description', text: 'Give each answer option a Score in the Build tab (dropdown, radio, checkbox, image choice). Then use {score}, {score_max}, {score_percent} and {quiz_result} in the confirmation message, emails and conditional confirmations.' } ) );
+				}
 				break;
 			case 'button':
 				c = S2.button;
@@ -642,13 +728,22 @@
 					d.appendChild( text( fd, 'email', { label: 'Email', ph: '{field:email}' } ) ); d.appendChild( text( fd, 'username', { label: 'Username', ph: '{field:username}' } ) ); d.appendChild( text( fd, 'password', { label: 'Password (empty = generate)', ph: '{field:password}' } ) );
 					d.appendChild( text( fd, 'first_name', { label: 'First name', ph: '{field:name:first}' } ) ); d.appendChild( text( fd, 'last_name', { label: 'Last name', ph: '{field:name:last}' } ) );
 					d.appendChild( sel( fd, 'role', Object.keys( C.roles ).map( function ( k ) { return [ k, C.roles[ k ] ]; } ), { label: 'Role' } ) ); d.appendChild( check( fd, 'notify', 'Send the WordPress new-user email' ) ); break;
+				case 'create_post':
+					d.appendChild( h( 'div', { class: 'wlfpb-warn', text: 'Creates content from submissions. Keep the status on Draft or Pending unless you fully trust the form (HTML is sanitised either way).' } ) );
+					d.appendChild( sel( fd, 'post_type', Object.keys( C.postTypes ).map( function ( k ) { return [ k, C.postTypes[ k ] ]; } ), { label: 'Post type' } ) );
+					d.appendChild( sel( fd, 'status', [ [ 'draft', 'Draft' ], [ 'pending', 'Pending review' ], [ 'private', 'Private' ], [ 'publish', 'Published' ] ], { label: 'Status' } ) );
+					d.appendChild( text( fd, 'title', { label: 'Title', ph: '{field:name}: {field:subject}' } ) );
+					d.appendChild( area( fd, 'content', { label: 'Content', rows: 5, ph: '{all_data}' } ) );
+					d.appendChild( area( fd, 'meta', { label: 'Custom fields (one key=value per line)', rows: 3, ph: 'client_email={field:email}', help: 'Keys starting with _ are ignored for safety.' } ) );
+					d.appendChild( text( fd, 'category', { label: 'Category ID (posts only, optional)', type: 'number' } ) );
+					d.appendChild( text( fd, 'author', { label: 'Author user ID (empty = first administrator)', type: 'number' } ) ); break;
 				default: d.appendChild( h( 'p', { class: 'description', text: 'Custom feed type: handled by the wlfp_feed_' + fd.type + ' action.' } ) );
 			}
 			d.appendChild( h( 'details', { open: !! Number( fd.conditional.enabled ) }, h( 'summary', { text: 'Run only if…' } ), condEditor( fd.conditional, null ) ) );
 			item.appendChild( d ); wrap.appendChild( item );
 		} );
 		var types = h( 'select', null, Object.keys( C.feeds ).map( function ( k ) { return h( 'option', { value: k, text: C.feeds[ k ] } ); } ) );
-		wrap.appendChild( h( 'div', { style: 'display:flex;gap:8px' }, types, h( 'button', { type: 'button', class: 'button', text: '+ Add integration', onclick: function () { list.push( { type: types.value, name: C.feeds[ types.value ], enabled: 1, method: 'POST', format: 'json', role: 'subscriber', conditional: { enabled: 0, match: 'all', rules: [] } } ); touch(); renderTab(); } } ) ) );
+		wrap.appendChild( h( 'div', { style: 'display:flex;gap:8px' }, types, h( 'button', { type: 'button', class: 'button', text: '+ Add integration', onclick: function () { list.push( { type: types.value, name: C.feeds[ types.value ], enabled: 1, method: 'POST', format: 'json', role: 'subscriber', status: 'draft', post_type: 'post', conditional: { enabled: 0, match: 'all', rules: [] } } ); touch(); renderTab(); } } ) ) );
 		body.appendChild( wrap );
 	}
 

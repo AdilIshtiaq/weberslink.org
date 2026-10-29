@@ -44,6 +44,8 @@ class WLFP_Renderer {
 				'couponOk'  => __( 'Coupon applied.', 'weberslink-forms-pro' ),
 				'couponBad' => __( 'Invalid or expired coupon.', 'weberslink-forms-pro' ),
 				'draft'     => __( 'We restored your saved progress.', 'weberslink-forms-pro' ),
+				'mismatch'  => __( 'The two values do not match.', 'weberslink-forms-pro' ),
+				'rangeBad'  => __( 'The end date must be on or after the start date.', 'weberslink-forms-pro' ),
 			),
 		) );
 	}
@@ -337,6 +339,24 @@ class WLFP_Renderer {
 					return '<div' . $attrs . '><div class="wlfp-captcha wlfp-captcha-v3" data-provider="recaptcha" data-site="' . esc_attr( $c['site'] ) . '" data-v3="1"></div></div>';
 				}
 				return '<div' . $attrs . '><div class="wlfp-captcha" data-provider="' . esc_attr( $c['provider'] ) . '" data-site="' . esc_attr( $c['site'] ) . '"></div><div class="wlfp-error" role="alert"></div></div>';
+			case 'image_block':
+				$u = ! empty( $f['url'] ) ? esc_url( $f['url'] ) : '';
+				if ( ! $u ) {
+					return '';
+				}
+				$mw  = max( 1, min( 100, (int) ( $f['max_width'] ?? 100 ) ) );
+				$img = '<img src="' . $u . '" alt="' . esc_attr( $f['alt'] ?? '' ) . '" loading="lazy" style="max-width:' . $mw . '%;height:auto" />';
+				if ( ! empty( $f['link'] ) ) {
+					$img = '<a href="' . esc_url( $f['link'] ) . '" rel="noopener">' . $img . '</a>';
+				}
+				return '<div' . $attrs . '><div class="wlfp-image-block wlfp-ta-' . esc_attr( in_array( $f['align'] ?? 'left', array( 'left', 'center', 'right' ), true ) ? $f['align'] : 'left' ) . '">' . $img . '</div></div>';
+			case 'embed':
+				$u    = ! empty( $f['url'] ) ? esc_url_raw( $f['url'] ) : '';
+				$html = $u ? wp_oembed_get( $u ) : false;
+				if ( ! $html ) {
+					$html = $u ? '<a href="' . esc_url( $u ) . '" target="_blank" rel="noopener">' . esc_html( $u ) . '</a>' : '';
+				}
+				return $html ? '<div' . $attrs . '><div class="wlfp-embed">' . $html . '</div></div>' : '';
 			case 'payment_summary':
 				return '<div' . $attrs . '><div class="wlfp-summary" data-currency="' . esc_attr( WLFP_Payments::currency( $form ) ) . '"></div></div>';
 		}
@@ -347,7 +367,7 @@ class WLFP_Renderer {
 
 		$input   = WLFP_Fields::render_input( $f, $form, $prefill );
 		$label   = isset( $f['label'] ) ? $f['label'] : '';
-		$grouped = in_array( $type, array( 'radio', 'checkbox', 'rating', 'nps', 'name', 'address', 'likert', 'consent', 'signature', 'repeater' ), true ) || ( 'payment_item' === $type && 'select' !== ( $f['kind'] ?? '' ) && 'custom' !== ( $f['kind'] ?? '' ) );
+		$grouped = in_array( $type, array( 'radio', 'checkbox', 'rating', 'nps', 'name', 'address', 'likert', 'consent', 'signature', 'repeater', 'image_choice', 'ranking', 'emoji_rating', 'date_range', 'toggle', 'terms' ), true ) || ( 'payment_item' === $type && 'select' !== ( $f['kind'] ?? '' ) && 'custom' !== ( $f['kind'] ?? '' ) );
 		$star    = '';
 		$ast     = isset( $form['settings']['style']['asterisk'] ) ? $form['settings']['style']['asterisk'] : 'end';
 		if ( ! empty( $f['required'] ) && 'none' !== $ast ) {

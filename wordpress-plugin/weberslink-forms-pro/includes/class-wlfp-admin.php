@@ -13,6 +13,8 @@ class WLFP_Admin {
 		add_action( 'admin_post_wlfp_entry_save', array( __CLASS__, 'entry_save' ) );
 		add_action( 'admin_post_wlfp_entry_note', array( __CLASS__, 'entry_note' ) );
 		add_action( 'admin_post_wlfp_entry_resend', array( __CLASS__, 'entry_resend' ) );
+		add_action( 'admin_post_wlfp_entry_feeds', array( __CLASS__, 'entry_feeds' ) );
+		add_action( 'admin_post_wlfp_entry_email', array( __CLASS__, 'entry_email' ) );
 		add_action( 'admin_post_wlfp_test_email', array( __CLASS__, 'test_email' ) );
 		add_action( 'admin_post_wlfp_clear_logs', array( __CLASS__, 'clear_logs' ) );
 		add_action( 'wp_ajax_wlfp_save_form', array( __CLASS__, 'ajax_save_form' ) );
@@ -56,6 +58,7 @@ class WLFP_Admin {
 		}
 		wp_enqueue_style( 'wlfp-admin', WLFP_URL . 'assets/css/admin.css', array(), WLFP_VERSION );
 		if ( 'wlfp-builder' === $page ) {
+			wp_enqueue_media();
 			wp_enqueue_script( 'wlfp-builder', WLFP_URL . 'assets/js/builder.js', array(), WLFP_VERSION, true );
 			$id   = isset( $_GET['form'] ) ? (int) $_GET['form'] : 0; // phpcs:ignore
 			$form = $id ? WLFP_Forms::get( $id ) : null;
@@ -75,6 +78,16 @@ class WLFP_Admin {
 			$pages = array();
 			foreach ( get_pages( array( 'number' => 200, 'sort_column' => 'post_title' ) ) as $p ) {
 				$pages[ $p->ID ] = $p->post_title;
+			}
+			$ptypes = array();
+			foreach ( get_post_types( array( 'public' => true ), 'objects' ) as $slug => $o ) {
+				if ( 'attachment' !== $slug ) {
+					$ptypes[ $slug ] = $o->labels->singular_name . ' (' . $slug . ')';
+				}
+			}
+			$taxes = array();
+			foreach ( get_taxonomies( array( 'public' => true ), 'objects' ) as $slug => $o ) {
+				$taxes[ $slug ] = $o->labels->singular_name . ' (' . $slug . ')';
 			}
 			$g = WLFP_Helpers::settings();
 			wp_localize_script( 'wlfp-builder', 'WLFPB', array(
@@ -98,6 +111,8 @@ class WLFP_Admin {
 				'hasCaptcha' => array( 'recaptcha' => (bool) $g['recaptcha_secret'], 'hcaptcha' => (bool) $g['hcaptcha_secret'], 'turnstile' => (bool) $g['turnstile_secret'] ),
 				'settingsUrl' => admin_url( 'admin.php?page=wlfp-settings' ),
 				'akismet'   => class_exists( 'Akismet' ),
+				'postTypes' => $ptypes,
+				'taxonomies' => $taxes,
 				'countries' => WLFP_Helpers::countries(),
 				'i18n'      => array(
 					'saved'  => __( 'Form saved', 'weberslink-forms-pro' ),
@@ -450,6 +465,22 @@ class WLFP_Admin {
 			}
 			echo '<tr><th>' . esc_html__( 'Total', 'weberslink-forms-pro' ) . '</th><th style="text-align:end">' . esc_html( WLFP_Helpers::money( $p['total'], $e['currency'] ) ) . '</th></tr></tbody></table>';
 		}
+		if ( ! empty( $e['data']['_quiz'] ) ) {
+			$q = $e['data']['_quiz'];
+			echo '<h3>' . esc_html__( 'Quiz result', 'weberslink-forms-pro' ) . '</h3><p><strong>' . esc_html( $q['score'] . ' / ' . $q['max'] . ' (' . $q['percent'] . '%)' ) . '</strong> — <span class="wlfp-pill wlfp-pill-' . ( ! empty( $q['passed'] ) ? 'paid' : 'failed' ) . '">' . esc_html( ! empty( $q['passed'] ) ? __( 'Passed', 'weberslink-forms-pro' ) : __( 'Not passed', 'weberslink-forms-pro' ) ) . '</span></p>';
+		}
+		$to_guess = '';
+		foreach ( WLFP_Forms::value_fields( $form ) as $ef ) {
+			if ( 'email' === $ef['type'] && ! empty( $e['data'][ $ef['name'] ] ) ) {
+				$to_guess = $e['data'][ $ef['name'] ];
+				break;
+			}
+		}
+		if ( $to_guess ) {
+			echo '<h3>' . esc_html__( 'Reply by email', 'weberslink-forms-pro' ) . '</h3><form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+			wp_nonce_field( 'wlfp_entry_email_' . $id );
+			echo '<input type="hidden" name="action" value="wlfp_entry_email" /><input type="hidden" name="entry" value="' . (int) $id . '" /><p><input type="email" name="to" class="large-text" value="' . esc_attr( $to_guess ) . '" required /></p><p><input type="text" name="subject" class="large-text" placeholder="' . esc_attr__( 'Subject', 'weberslink-forms-pro' ) . '" value="' . esc_attr( 'Re: ' . $form['title'] ) . '" required /></p><p><textarea name="message" rows="5" class="large-text" required></textarea></p><p><button class="button">' . esc_html__( 'Send email', 'weberslink-forms-pro' ) . '</button></p></form>';
+		}
 		echo '<h3>' . esc_html__( 'Notes', 'weberslink-forms-pro' ) . '</h3><form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
 		wp_nonce_field( 'wlfp_entry_note_' . $id );
 		echo '<input type="hidden" name="action" value="wlfp_entry_note" /><input type="hidden" name="entry" value="' . (int) $id . '" /><textarea name="note" rows="3" class="large-text" required></textarea><p><button class="button">' . esc_html__( 'Add note', 'weberslink-forms-pro' ) . '</button></p></form>';
@@ -482,6 +513,7 @@ class WLFP_Admin {
 		echo '<a class="button" href="' . esc_url( self::url( 'wlfp-entries', array( 'entry' => $id, 'edit' => 1 ) ) ) . '">' . esc_html__( 'Edit', 'weberslink-forms-pro' ) . '</a> ';
 		echo '<a class="button" target="_blank" href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=wlfp_print_entry&entry=' . $id ), 'wlfp_print' ) ) . '">' . esc_html__( 'Print / PDF', 'weberslink-forms-pro' ) . '</a> ';
 		echo '<a class="button" href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=wlfp_entry_resend&entry=' . $id ), 'wlfp_resend_' . $id ) ) . '">' . esc_html__( 'Resend emails', 'weberslink-forms-pro' ) . '</a> ';
+		echo '<a class="button" href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=wlfp_entry_feeds&entry=' . $id ), 'wlfp_feeds_' . $id ) ) . '">' . esc_html__( 'Run integrations again', 'weberslink-forms-pro' ) . '</a> ';
 		echo ( $e['starred'] ? $a( 'unstar', __( 'Unstar', 'weberslink-forms-pro' ) ) : $a( 'star', __( '★ Star', 'weberslink-forms-pro' ) ) ) . ( 'spam' === $e['status'] ? $a( 'notspam', __( 'Not spam', 'weberslink-forms-pro' ) ) : $a( 'spam', __( 'Spam', 'weberslink-forms-pro' ) ) ) . $a( 'trash', __( 'Trash', 'weberslink-forms-pro' ) ) . $a( 'delete', __( 'Delete', 'weberslink-forms-pro' ), ' button-link-delete' ); // phpcs:ignore
 		echo '</p></div></div>';
 		$logs = WLFP_Entries::logs( $id );
@@ -534,6 +566,40 @@ class WLFP_Admin {
 			WLFP_Notifications::send_all( $f, $e );
 		}
 		wp_safe_redirect( self::url( 'wlfp-entries', array( 'entry' => $id, 'msg' => rawurlencode( __( 'Notifications re-sent.', 'weberslink-forms-pro' ) ) ) ) );
+		exit;
+	}
+
+	public static function entry_feeds() {
+		$id = isset( $_GET['entry'] ) ? (int) $_GET['entry'] : 0; // phpcs:ignore
+		self::guard( 'wlfp_feeds_' . $id );
+		$e = WLFP_Entries::get( $id );
+		$f = $e ? WLFP_Forms::get( $e['form_id'] ) : null;
+		if ( $e && $f ) {
+			WLFP_Integrations::run( $f, $e );
+		}
+		wp_safe_redirect( self::url( 'wlfp-entries', array( 'entry' => $id, 'msg' => rawurlencode( __( 'Integrations ran again. See the activity log.', 'weberslink-forms-pro' ) ) ) ) );
+		exit;
+	}
+
+	public static function entry_email() {
+		$id = isset( $_POST['entry'] ) ? (int) $_POST['entry'] : 0; // phpcs:ignore
+		self::guard( 'wlfp_entry_email_' . $id );
+		$to  = isset( $_POST['to'] ) ? sanitize_email( wp_unslash( $_POST['to'] ) ) : ''; // phpcs:ignore
+		$sub = isset( $_POST['subject'] ) ? sanitize_text_field( wp_unslash( $_POST['subject'] ) ) : ''; // phpcs:ignore
+		$msg = isset( $_POST['message'] ) ? sanitize_textarea_field( wp_unslash( $_POST['message'] ) ) : ''; // phpcs:ignore
+		$e   = WLFP_Entries::get( $id );
+		$ok  = false;
+		if ( $e && is_email( $to ) && $sub && $msg ) {
+			$s       = WLFP_Helpers::settings();
+			$headers = array( 'Content-Type: text/plain; charset=UTF-8' );
+			if ( $s['from_email'] && is_email( $s['from_email'] ) ) {
+				$headers[] = 'From: ' . wp_strip_all_tags( str_replace( array( "\r", "\n", '<', '>' ), '', $s['from_name'] ? $s['from_name'] : get_bloginfo( 'name' ) ) ) . ' <' . $s['from_email'] . '>';
+			}
+			$ok = wp_mail( $to, str_replace( array( "\r", "\n" ), ' ', $sub ), $msg, $headers );
+			WLFP_Entries::add_note( $id, ( $ok ? __( 'Email sent to ', 'weberslink-forms-pro' ) : __( 'Email FAILED to ', 'weberslink-forms-pro' ) ) . $to . ': ' . $sub );
+			WLFP_Install::log( $e['form_id'], $id, 'email', $ok ? 'success' : 'failed', 'Manual reply to ' . $to );
+		}
+		wp_safe_redirect( self::url( 'wlfp-entries', array( 'entry' => $id, 'msg' => rawurlencode( $ok ? __( 'Email sent.', 'weberslink-forms-pro' ) : __( 'Email could not be sent.', 'weberslink-forms-pro' ) ) ) ) );
 		exit;
 	}
 

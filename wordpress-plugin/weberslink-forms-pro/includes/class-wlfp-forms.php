@@ -10,7 +10,8 @@ class WLFP_Forms {
 
 	public static function default_settings() {
 		return array(
-			'confirmation'  => array( 'type' => 'message', 'message' => '<p>Thank you! Your submission has been received.</p>', 'url' => '', 'page_id' => 0, 'hide_form' => 1, 'scroll' => 1 ),
+			'confirmation'  => array( 'type' => 'message', 'message' => '<p>Thank you! Your submission has been received.</p>', 'url' => '', 'page_id' => 0, 'hide_form' => 1, 'scroll' => 1, 'rules' => array() ),
+			'quiz'          => array( 'enabled' => 0, 'pass_percent' => 60 ),
 			'button'        => array( 'text' => 'Submit', 'align' => 'left', 'loading_text' => 'Sending…', 'style' => 'solid' ),
 			'notifications' => array(
 				array(

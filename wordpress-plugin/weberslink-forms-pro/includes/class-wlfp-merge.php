@@ -5,7 +5,7 @@ defined( 'ABSPATH' ) || exit;
 class WLFP_Merge {
 
 	public static function tags_help() {
-		return array( '{all_data}', '{field:FIELD_NAME}', '{form_title}', '{entry_id}', '{entry_serial}', '{entry_url}', '{site_name}', '{site_url}', '{admin_email}', '{date}', '{time}', '{ip}', '{source_url}', '{user_email}', '{user_name}', '{user_id}', '{payment_total}', '{payment_status}', '{transaction_id}', '{get:PARAM}' );
+		return array( '{all_data}', '{field:FIELD_NAME}', '{form_title}', '{entry_id}', '{entry_serial}', '{entry_url}', '{site_name}', '{site_url}', '{admin_email}', '{date}', '{time}', '{ip}', '{source_url}', '{user_email}', '{user_name}', '{user_id}', '{payment_total}', '{payment_status}', '{transaction_id}', '{score}', '{score_max}', '{score_percent}', '{quiz_result}', '{get:PARAM}' );
 	}
 
 	/**
@@ -52,7 +52,12 @@ class WLFP_Merge {
 			return isset( $_GET[ $m[1] ] ) ? $esc( sanitize_text_field( wp_unslash( $_GET[ $m[1] ] ) ) ) : ''; // phpcs:ignore
 		}, $text );
 
+		$q   = isset( $data['_quiz'] ) && is_array( $data['_quiz'] ) ? $data['_quiz'] : array();
 		$map = array(
+			'{score}'          => isset( $q['score'] ) ? (string) $q['score'] : '',
+			'{score_max}'      => isset( $q['max'] ) ? (string) $q['max'] : '',
+			'{score_percent}'  => isset( $q['percent'] ) ? (string) $q['percent'] : '',
+			'{quiz_result}'    => $q ? $esc( ! empty( $q['passed'] ) ? __( 'Passed', 'weberslink-forms-pro' ) : __( 'Not passed', 'weberslink-forms-pro' ) ) : '',
 			'{form_title}'     => $esc( $form['title'] ),
 			'{form_id}'        => (string) $form['id'],
 			'{entry_id}'       => $entry ? (string) $entry['id'] : '',
@@ -92,6 +97,14 @@ class WLFP_Merge {
 				$rows .= '<tr><td style="padding:8px 12px;border:1px solid #e5e5e5;background:#f7f7f7;font-weight:600;vertical-align:top;width:35%">' . esc_html( $label ) . '</td><td style="padding:8px 12px;border:1px solid #e5e5e5;vertical-align:top">' . $val . '</td></tr>';
 			} else {
 				$rows .= $label . ': ' . $val . "\n";
+			}
+		}
+		if ( isset( $data['_quiz'] ) && is_array( $data['_quiz'] ) ) {
+			$qt = sprintf( /* translators: 1: score 2: max 3: percent 4: result */ __( '%1$s / %2$s (%3$s%%) — %4$s', 'weberslink-forms-pro' ), $data['_quiz']['score'], $data['_quiz']['max'], $data['_quiz']['percent'], ! empty( $data['_quiz']['passed'] ) ? __( 'Passed', 'weberslink-forms-pro' ) : __( 'Not passed', 'weberslink-forms-pro' ) );
+			if ( $html ) {
+				$rows .= '<tr><td style="padding:8px 12px;border:1px solid #e5e5e5;background:#f7f7f7;font-weight:600;vertical-align:top;width:35%">' . esc_html__( 'Quiz score', 'weberslink-forms-pro' ) . '</td><td style="padding:8px 12px;border:1px solid #e5e5e5;vertical-align:top">' . esc_html( $qt ) . '</td></tr>';
+			} else {
+				$rows .= __( 'Quiz score', 'weberslink-forms-pro' ) . ': ' . $qt . "\n";
 			}
 		}
 		return $html ? '<table cellspacing="0" cellpadding="0" style="border-collapse:collapse;width:100%;max-width:640px;font-family:Arial,Helvetica,sans-serif;font-size:14px">' . $rows . '</table>' : $rows;
