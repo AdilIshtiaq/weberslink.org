@@ -45,6 +45,9 @@ class WLFP_Renderer {
 				'couponBad' => __( 'Invalid or expired coupon.', 'weberslink-forms-pro' ),
 				'draft'     => __( 'We restored your saved progress.', 'weberslink-forms-pro' ),
 				'mismatch'  => __( 'The two values do not match.', 'weberslink-forms-pro' ),
+				'convOf'    => __( '%1$s of %2$s', 'weberslink-forms-pro' ),
+				'convHint'  => __( 'press Enter ↵', 'weberslink-forms-pro' ),
+				'convBack'  => __( 'Previous question', 'weberslink-forms-pro' ),
 				'rangeBad'  => __( 'The end date must be on or after the start date.', 'weberslink-forms-pro' ),
 			),
 		) );
@@ -203,7 +206,19 @@ class WLFP_Renderer {
 			$steps[0]['title'] = ! empty( $form['settings']['steps']['first_title'] ) ? $form['settings']['steps']['first_title'] : __( 'Start', 'weberslink-forms-pro' );
 		}
 
+		$cv   = $st['conversation'];
+		$conv = ! empty( $cv['enabled'] );
+		$conv_cfg = null;
+		if ( $conv ) {
+			$conv_cfg = array(
+				'auto'    => ! empty( $cv['auto_advance'] ),
+				'next'    => '' !== trim( (string) $cv['next_text'] ) ? $cv['next_text'] : 'OK',
+				'submit'  => apply_filters( 'wlfp_pay_button_text', $st['button']['text'], $form ),
+				'welcome' => ! empty( $cv['welcome'] ) ? array( 'title' => $cv['welcome_title'], 'text' => wp_kses( WLFP_Merge::parse( $cv['welcome_text'], $form, array(), null, true ), WLFP_Helpers::allowed_html() ), 'start' => '' !== trim( (string) $cv['start_text'] ) ? $cv['start_text'] : 'Start' ) : null,
+			);
+		}
 		$config = array(
+			'conv'     => $conv_cfg,
 			'formId'   => $form['id'],
 			'steps'    => array_map( function ( $s ) {
 				return $s['title'];
@@ -219,6 +234,9 @@ class WLFP_Renderer {
 		$classes = array( 'wlfp-wrap', 'wlfp-preset-' . sanitize_html_class( $style['preset'] ), 'wlfp-label-' . sanitize_html_class( $style['label_position'] ), 'wlfp-size-' . sanitize_html_class( $style['input_size'] ) );
 		if ( ! empty( $args['class'] ) ) {
 			$classes[] = sanitize_html_class( $args['class'] );
+		}
+		if ( $conv ) {
+			$classes[] = 'wlfp-conv';
 		}
 		if ( is_rtl() ) {
 			$classes[] = 'wlfp-rtl';

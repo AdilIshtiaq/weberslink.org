@@ -4,7 +4,7 @@ Tags: form builder, contact form, multi step form, payment form, conditional log
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -20,6 +20,7 @@ Drag-and-drop form builder with conditional logic, multi-step forms, calculation
 * Text, paragraph, email, number, phone, URL, password, date/time/date-time, colour, hidden, dropdown, multi-select, radio, checkboxes (with "Other"), consent, name, address, country
 * File & image upload, star rating, net-promoter score, range slider, Likert matrix, signature pad, repeater rows, calculation, section, HTML, divider, shortcode, CAPTCHA
 * Multi-step forms with progress bar or step tabs
+* Conversational mode: one question per screen, welcome screen, progress bar, Enter to continue, auto-advance on single-choice answers, conditional questions skipped automatically
 * Conditional logic (show/hide fields, conditional emails and integrations, 12 operators, ALL/ANY)
 * Calculations with a safe formula engine (client and server)
 * Input masks, character counters, default values & merge tags, URL prefill, browser auto-save
@@ -74,6 +75,9 @@ Add a Webhook integration pointing at a Google Apps Script web app, Zapier, Make
 Yes: Form → Settings → Appearance, CSS variables (`.wlfp-wrap{--wlfp-primary:#e11d48}`) or the per-form custom CSS box.
 
 == Changelog ==
+
+= 1.2.0 =
+* New: conversational (one-question-at-a-time) mode with welcome screen, progress, keyboard navigation, auto-advance and a ready-made template.
 
 = 1.1.0 =
 * New fields: toggle, image choice, ranking, date range, emoji rating, terms (scroll-to-agree), US state, dynamic dropdown from posts/terms, image block, video/oEmbed embed.

@@ -99,6 +99,8 @@
 		this.cfg = {};
 		try { this.cfg = JSON.parse( form.getAttribute( 'data-config' ) || '{}' ); } catch ( e ) {}
 		this.id = this.cfg.formId;
+		this.conv = this.cfg.conv && this.wrap.classList.contains( 'wlfp-conv' ) ? this.cfg.conv : null;
+		this.cslide = 0;
 		this.steps = $$( '.wlfp-step', form );
 		this.cur = 0;
 		this.discount = null;
@@ -157,7 +159,7 @@
 		var self = this;
 		this.wrap.classList.add( 'wlfp-js' );
 		this.refreshHidden();
-		this.buildProgress();
+		if ( this.conv ) { this.convInit(); } else { this.buildProgress(); }
 		this.bindMasks();
 		this.bindCounters();
 		this.bindRange();
@@ -177,6 +179,14 @@
 		$$( '.wlfp-btn-next', this.f ).forEach( function ( b ) { b.addEventListener( 'click', function () { self.next(); } ); } );
 		$$( '.wlfp-btn-prev', this.f ).forEach( function ( b ) { b.addEventListener( 'click', function () { self.go( self.prevVisible( self.cur ) ); } ); } );
 		this.f.addEventListener( 'keydown', function ( e ) {
+			if ( self.conv ) {
+				if ( e.key !== 'Enter' || e.isComposing ) { return; }
+				var t = e.target;
+				if ( t.tagName === 'BUTTON' || t.tagName === 'A' || ( t.tagName === 'TEXTAREA' && ! ( e.ctrlKey || e.metaKey ) ) || t.type === 'file' ) { return; }
+				e.preventDefault();
+				if ( self.cslide < 0 ) { self.convStart(); } else { self.convNext(); }
+				return;
+			}
 			if ( e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.type !== 'submit' && self.steps.length > 1 && self.cur < self.steps.length - 1 ) {
 				e.preventDefault(); self.next();
 			}
@@ -195,6 +205,7 @@
 			if ( w ) { this.clearError( w ); }
 		}
 		this.evaluate();
+		if ( this.conv ) { this.convAuto( e ); }
 		if ( this.cfg.autosave ) { this.saveDraft(); }
 	};
 
@@ -302,6 +313,7 @@
 		this.prog = p;
 	};
 	Form.prototype.updateProgress = function () {
+		if ( this.conv ) { if ( this.slides ) { this.convRefresh(); } return; }
 		if ( ! this.prog ) { return; }
 		var n = this.steps.length;
 		if ( this.cfg.progress === 'steps' ) {
@@ -396,6 +408,11 @@
 				if ( err ) { self.setError( w, err ); bad = true; } else { self.clearError( w ); }
 			} );
 			if ( bad && firstStep < 0 ) { firstStep = i; }
+		}
+		if ( firstStep >= 0 && this.conv ) {
+			var badEl = $( '.wlfp-field .wlfp-error:not(:empty)', this.f );
+			if ( badEl ) { this.convShowFor( badEl.closest( '.wlfp-field' ) ); }
+			return false;
 		}
 		if ( firstStep >= 0 ) {
 			if ( firstStep !== this.cur ) { this.go( firstStep ); }
@@ -504,6 +521,143 @@
 			window.addEventListener( 'resize', function () { if ( ! dirty ) { resize(); } } );
 		} );
 	};
+	/* ---------- conversational (one question at a time) ---------- */
+	Form.prototype.convInit = function () {
+		var self = this;
+		var LAY = [ 'section', 'html', 'divider', 'image_block', 'embed', 'shortcode', 'payment_summary' ];
+		var pre = [], tail = [], slides = [];
+		$$( '.wlfp-field', this.f ).forEach( function ( w ) {
+			var t = w.getAttribute( 'data-type' );
+			if ( t === 'hidden' ) { return; }
+			if ( t === 'captcha' ) { tail.push( w ); return; }
+			if ( LAY.indexOf( t ) !== -1 ) { pre.push( w ); return; }
+			slides.push( { els: pre.concat( [ w ] ), q: w } );
+			pre = [];
+		} );
+		if ( ! slides.length ) { this.conv = null; this.wrap.classList.remove( 'wlfp-conv' ); this.buildProgress(); return; }
+		var last = slides[ slides.length - 1 ];
+		last.els = last.els.concat( pre, tail );
+		this.slides = slides;
+		this.steps.forEach( function ( st ) { st.hidden = false; } ); // every fieldset is "open"; slides decide what shows.
+
+		var nav = document.createElement( 'div' );
+		nav.className = 'wlfp-conv-nav';
+		nav.innerHTML = '<div class="wlfp-conv-progress"><div class="wlfp-conv-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"><i></i></div><span class="wlfp-conv-count"></span></div><div class="wlfp-conv-btns"><button type="button" class="wlfp-btn wlfp-conv-back"></button><button type="button" class="wlfp-btn wlfp-conv-next"></button><span class="wlfp-conv-hint"></span></div>';
+		this.f.appendChild( nav );
+		this.nav = nav;
+		var back = $( '.wlfp-conv-back', nav );
+		back.textContent = '←';
+		back.setAttribute( 'aria-label', T.convBack || 'Back' );
+		$( '.wlfp-conv-hint', nav ).textContent = T.convHint || '';
+		$( '.wlfp-conv-next', nav ).addEventListener( 'click', function () { self.convNext(); } );
+		back.addEventListener( 'click', function () { self.convBack(); } );
+
+		var wl = this.conv.welcome;
+		if ( wl ) {
+			var panel = document.createElement( 'div' );
+			panel.className = 'wlfp-conv-welcome';
+			var h2 = document.createElement( 'h2' );
+			h2.textContent = wl.title || '';
+			var body = document.createElement( 'div' );
+			body.innerHTML = wl.text || ''; // sanitised on the server with wp_kses
+			var btn = document.createElement( 'button' );
+			btn.type = 'button';
+			btn.className = 'wlfp-btn wlfp-conv-start';
+			btn.textContent = wl.start;
+			btn.addEventListener( 'click', function () { self.convStart(); } );
+			if ( wl.title ) { panel.appendChild( h2 ); }
+			panel.appendChild( body );
+			panel.appendChild( btn );
+			this.f.insertBefore( panel, this.steps[ 0 ] );
+			this.welcomeEl = panel;
+			this.cslide = -1;
+			nav.hidden = true;
+		}
+		if ( ! wl ) { this.convShow( this.convVisible()[ 0 ] || 0, 'fwd', true ); }
+	};
+	Form.prototype.convVisible = function () {
+		var out = [];
+		this.slides.forEach( function ( s, i ) { if ( ! s.q.hasAttribute( 'hidden' ) ) { out.push( i ); } } );
+		return out;
+	};
+	Form.prototype.convShow = function ( i, dir, noFocus ) {
+		if ( ! this.slides[ i ] ) { return; }
+		this.slides.forEach( function ( s ) { s.els.forEach( function ( w ) { w.classList.remove( 'wlfp-slide-on', 'wlfp-dir-back' ); } ); } );
+		var s = this.slides[ i ];
+		this.cslide = i;
+		s.els.forEach( function ( w ) { w.classList.add( 'wlfp-slide-on' ); if ( dir === 'back' ) { w.classList.add( 'wlfp-dir-back' ); } } );
+		if ( this.welcomeEl ) { this.welcomeEl.hidden = true; }
+		this.msg( '' );
+		this.convRefresh();
+		if ( noFocus ) { return; }
+		setTimeout( function () {
+			var f = $( 'input:not([type=hidden]):not(:disabled),select:not(:disabled),textarea:not(:disabled)', s.q );
+			if ( f ) { try { f.focus( { preventScroll: true } ); } catch ( e ) {} }
+		}, 60 );
+	};
+	Form.prototype.convRefresh = function () {
+		if ( ! this.nav ) { return; }
+		if ( this.cslide < 0 ) { this.nav.hidden = true; return; }
+		this.nav.hidden = false;
+		var vis = this.convVisible();
+		var pos = Math.max( 0, vis.indexOf( this.cslide ) );
+		var total = Math.max( 1, vis.length );
+		var pct = Math.round( ( pos + 1 ) / total * 100 );
+		$( '.wlfp-conv-count', this.nav ).textContent = fmt( T.convOf || '%1$s of %2$s', pos + 1, total );
+		var bar = $( '.wlfp-conv-bar', this.nav );
+		bar.setAttribute( 'aria-valuenow', pct );
+		$( 'i', bar ).style.width = pct + '%';
+		$( '.wlfp-conv-back', this.nav ).disabled = pos <= 0;
+		if ( ! this.busy ) { $( '.wlfp-conv-next', this.nav ).textContent = pos >= vis.length - 1 ? this.conv.submit : this.conv.next; }
+	};
+	Form.prototype.convStart = function () {
+		var vis = this.convVisible();
+		this.convShow( vis[ 0 ] || 0, 'fwd' );
+	};
+	Form.prototype.convBack = function () {
+		var vis = this.convVisible();
+		var pos = vis.indexOf( this.cslide );
+		if ( pos > 0 ) { this.convShow( vis[ pos - 1 ], 'back' ); }
+	};
+	Form.prototype.convNext = function () {
+		if ( this.busy || this.cslide < 0 ) { return; }
+		var self = this;
+		var bad = null;
+		this.slides[ this.cslide ].els.forEach( function ( w ) {
+			if ( w.hasAttribute( 'hidden' ) ) { return; }
+			var err = self.checkField( w );
+			if ( err ) { self.setError( w, err ); if ( ! bad ) { bad = w; } } else { self.clearError( w ); }
+		} );
+		if ( bad ) { var inp = $( 'input:not([type=hidden]),select,textarea', bad ); if ( inp ) { inp.focus(); } return; }
+		var vis = this.convVisible();
+		var pos = vis.indexOf( this.cslide );
+		if ( pos >= vis.length - 1 ) { this.submit(); return; }
+		this.convShow( vis[ pos + 1 ], 'fwd' );
+	};
+	Form.prototype.convShowFor = function ( w ) {
+		for ( var i = 0; i < this.slides.length; i++ ) {
+			if ( this.slides[ i ].els.indexOf( w ) !== -1 ) { this.convShow( i, 'back', true ); return; }
+		}
+	};
+	Form.prototype.convAuto = function ( e ) {
+		if ( ! this.conv.auto || this.cslide < 0 || e.type !== 'change' || ! e.target.closest ) { return; }
+		var w = e.target.closest( '.wlfp-field' );
+		var s = this.slides[ this.cslide ];
+		if ( ! w || ! s || w !== s.q ) { return; }
+		var t = w.getAttribute( 'data-type' );
+		var single = t === 'radio' || t === 'rating' || t === 'nps' || t === 'emoji_rating' || ( t === 'image_choice' && $( '.wlfp-imgchoices', w ).getAttribute( 'data-multiple' ) === '0' );
+		if ( ! single || e.target.value === '__other__' || e.target.type === 'text' ) { return; }
+		var vis = this.convVisible();
+		if ( vis.indexOf( this.cslide ) >= vis.length - 1 ) { return; } // never auto-submit
+		var self = this;
+		clearTimeout( this.autoT );
+		this.autoT = setTimeout( function () { self.convNext(); }, 320 );
+	};
+	Form.prototype.convReset = function () {
+		if ( this.welcomeEl ) { this.welcomeEl.hidden = false; this.cslide = -1; this.slides.forEach( function ( s ) { s.els.forEach( function ( w ) { w.classList.remove( 'wlfp-slide-on' ); } ); } ); this.convRefresh(); }
+		else { this.convShow( this.convVisible()[ 0 ] || 0, 'fwd', true ); }
+	};
+
 	Form.prototype.bindRanking = function () {
 		$$( '.wlfp-rank', this.f ).forEach( function ( ol ) {
 			ol.addEventListener( 'click', function ( e ) {
@@ -628,7 +782,7 @@
 	};
 	Form.prototype.setBusy = function ( on ) {
 		this.busy = on;
-		var b = $( '.wlfp-btn-submit', this.f );
+		var b = this.conv ? $( '.wlfp-conv-next', this.f ) : $( '.wlfp-btn-submit', this.f );
 		if ( ! b ) { return; }
 		if ( on ) { b.setAttribute( 'data-label', b.textContent ); b.textContent = this.cfg.btnLoad || T.sending || '…'; b.disabled = true; b.classList.add( 'is-loading' ); }
 		else { b.textContent = b.getAttribute( 'data-label' ) || b.textContent; b.disabled = false; b.classList.remove( 'is-loading' ); }
@@ -683,6 +837,11 @@
 			var w = $( '.wlfp-field[data-name="' + name + '"]', self.f );
 			if ( w ) { self.setError( w, errs[ name ] ); var s = w.closest( '.wlfp-step' ); var idx = self.steps.indexOf( s ); if ( firstStep < 0 || idx < firstStep ) { firstStep = idx; } }
 		} );
+		if ( this.conv ) {
+			var fe = $( '.wlfp-field .wlfp-error:not(:empty)', this.f );
+			if ( fe ) { this.convShowFor( fe.closest( '.wlfp-field' ) ); }
+			return;
+		}
 		if ( firstStep >= 0 && firstStep !== this.cur ) { this.go( firstStep ); }
 	};
 	Form.prototype.done = function ( d ) {
@@ -692,7 +851,7 @@
 		box.innerHTML = d.message || '';
 		box.hidden = false;
 		if ( this.cfg.confirm && this.cfg.confirm.hide ) { this.f.hidden = true; this.f.style.display = 'none'; }
-		else { this.f.reset(); this.setBusy( false ); this.evaluate(); }
+		else { this.f.reset(); this.setBusy( false ); this.evaluate(); if ( this.conv ) { this.convReset(); } }
 		if ( this.cfg.confirm && this.cfg.confirm.scroll ) { box.scrollIntoView( { behavior: 'smooth', block: 'center' } ); }
 		box.focus( { preventScroll: true } );
 		this.wrap.dispatchEvent( new CustomEvent( 'wlfp:submitted', { bubbles: true, detail: { formId: this.id, data: d } } ) );

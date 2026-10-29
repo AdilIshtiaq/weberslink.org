@@ -316,6 +316,15 @@ class WLFP_Templates {
 			self::f( 'email', 'email', 'Email (optional)' ),
 		), 'settings' => array() );
 
+		$T['conv_lead'] = array( 'title' => __( 'Conversational lead form', 'weberslink-forms-pro' ), 'desc' => __( 'One question at a time with a welcome screen.', 'weberslink-forms-pro' ), 'fields' => array(
+			self::f( 'radio', 'need', 'What can we help you with?', array( 'options' => self::opts( array( 'A new website', 'Redesign', 'SEO', 'Something else' ) ), 'required' => 1 ) ),
+			self::f( 'image_choice', 'style', 'Which style feels closer to you?', array( 'columns' => 3 ) ),
+			self::f( 'select', 'budget', 'What is your budget?', array( 'options' => self::opts( array( 'Under $2k', '$2k – $5k', '$5k – $15k', '$15k+' ) ), 'required' => 1 ) ),
+			self::f( 'text', 'name', 'Great! What is your name?', array( 'required' => 1, 'placeholder' => 'Type your answer here…' ) ),
+			self::f( 'email', 'email', 'And your email address?', array( 'required' => 1, 'placeholder' => 'name@example.com' ) ),
+			self::f( 'textarea', 'details', 'Anything else we should know?' ),
+		), 'settings' => array( 'conversation' => array( 'enabled' => 1, 'welcome' => 1, 'welcome_title' => 'Let\'s find the right fit', 'welcome_text' => '<p>Answer a few quick questions and we will get back to you within one business day.</p>', 'start_text' => 'Start', 'auto_advance' => 1, 'next_text' => 'OK' ), 'button' => array( 'text' => 'Send' ), 'notifications' => array( self::notify( '{field:email}' ) ) ) );
+
 		$T['simple'] = array( 'title' => __( 'Simple contact (3 fields)', 'weberslink-forms-pro' ), 'desc' => __( 'Name, email, message. Nothing else.', 'weberslink-forms-pro' ), 'fields' => array(
 			self::f( 'text', 'name', 'Name', array( 'required' => 1 ) ),
 			self::f( 'email', 'email', 'Email', array( 'required' => 1 ) ),
@@ -350,7 +359,7 @@ class WLFP_Templates {
 			'appointment' => 'booking', 'tour' => 'booking', 'rsvp' => 'booking', 'reservation' => 'booking', 'tickets' => 'payment',
 			'order' => 'payment', 'donation' => 'payment', 'service_order' => 'payment',
 			'feedback' => 'survey', 'survey' => 'survey', 'nps' => 'survey', 'testimonial' => 'survey', 'quiz' => 'survey',
-			'stay' => 'booking', 'priorities' => 'survey', 'registration' => 'signup', 'job' => 'signup', 'course' => 'signup', 'membership' => 'signup', 'volunteer' => 'signup', 'contest' => 'signup',
+			'conv_lead' => 'contact', 'stay' => 'booking', 'priorities' => 'survey', 'registration' => 'signup', 'job' => 'signup', 'course' => 'signup', 'membership' => 'signup', 'volunteer' => 'signup', 'contest' => 'signup',
 			'support' => 'support', 'bug' => 'support', 'refund' => 'support', 'gdpr' => 'support',
 		);
 	}

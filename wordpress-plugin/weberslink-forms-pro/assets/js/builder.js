@@ -584,7 +584,7 @@
 	/* ---------- SETTINGS tab ---------- */
 	function settingsTab( body ) {
 		var S2 = F.settings;
-		var secs = [ [ 'confirmation', 'Confirmation' ], [ 'button', 'Button & steps' ], [ 'style', 'Appearance' ], [ 'restrictions', 'Restrictions' ], [ 'spam', 'Spam protection' ], [ 'quiz', 'Quiz scoring' ], [ 'entries', 'Entries & behaviour' ] ];
+		var secs = [ [ 'confirmation', 'Confirmation' ], [ 'button', 'Button & steps' ], [ 'style', 'Appearance' ], [ 'restrictions', 'Restrictions' ], [ 'spam', 'Spam protection' ], [ 'quiz', 'Quiz scoring' ], [ 'conversation', 'Conversational mode' ], [ 'entries', 'Entries & behaviour' ] ];
 		var nav = h( 'div', { class: 'wlfpb-panel wlfpb-nav' }, secs.map( function ( s ) { return h( 'button', { type: 'button', class: S.sub === s[ 0 ] ? 'on' : '', text: s[ 1 ], onclick: function () { S.sub = s[ 0 ]; renderTab(); } } ); } ) );
 		var main = h( 'div', { class: 'wlfpb-panel wlfpb-wide' } );
 		var c;
@@ -612,6 +612,22 @@
 				main.appendChild( h( 'button', { type: 'button', class: 'button', text: '+ Add conditional confirmation', onclick: function () { c.rules.push( { type: 'message', message: '<p>Thanks!</p>', conditional: { enabled: 1, match: 'all', rules: [] } } ); touch(); renderTab(); } } ) );
 				if ( c.type === 'redirect' ) { main.appendChild( text( c, 'url', { label: 'Redirect URL', ph: 'https://…/thank-you?name={field:name:first}', help: 'Merge tags allowed.' } ) ); }
 				if ( c.type === 'page' ) { main.appendChild( sel( c, 'page_id', [ [ 0, '— choose —' ] ].concat( Object.keys( C.pages ).map( function ( k ) { return [ k, C.pages[ k ] ]; } ) ), { label: 'Page' } ) ); }
+				break;
+			case 'conversation':
+				c = S2.conversation = S2.conversation || { enabled: 0, auto_advance: 1, next_text: 'OK', welcome: 0, welcome_title: '', welcome_text: '', start_text: 'Start' };
+				main.appendChild( check( c, 'enabled', 'Show one question at a time (conversational mode)', { on: renderTab } ) );
+				if ( Number( c.enabled ) ) {
+					main.appendChild( h( 'p', { class: 'description', text: 'Visitors answer one question per screen with a progress bar. Enter moves to the next question, Back returns. Section, text, image and video elements show together with the question that follows them. The CAPTCHA and any trailing summary appear on the last screen. Step breaks are ignored in this mode.' } ) );
+					main.appendChild( check( c, 'auto_advance', 'Move on automatically after a single-choice answer (radio, image choice, rating, NPS, emoji)' ) );
+					main.appendChild( text( c, 'next_text', { label: '"Next" button text', ph: 'OK' } ) );
+					main.appendChild( h( 'p', { class: 'description', text: 'The last question\'s button uses the submit button text from Button & steps.' } ) );
+					main.appendChild( check( c, 'welcome', 'Show a welcome screen first', { on: renderTab } ) );
+					if ( Number( c.welcome ) ) {
+						main.appendChild( text( c, 'welcome_title', { label: 'Welcome title' } ) );
+						main.appendChild( area( c, 'welcome_text', { label: 'Welcome text (HTML allowed)', rows: 4 } ) );
+						main.appendChild( text( c, 'start_text', { label: 'Start button text', ph: 'Start' } ) );
+					}
+				}
 				break;
 			case 'quiz':
 				c = S2.quiz = S2.quiz || { enabled: 0, pass_percent: 60 };

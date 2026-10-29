@@ -88,7 +88,7 @@ class WLFP_Helpers {
 			return $data;
 		}
 		$data = (string) $data;
-		$html = array( 'message', 'html', 'content', 'body', 'terms', 'terms_text', 'description', 'help', 'label_html', 'confirmation_message', 'success_message', 'error_message' );
+		$html = array( 'message', 'html', 'content', 'body', 'terms', 'terms_text', 'welcome_text', 'description', 'help', 'label_html', 'confirmation_message', 'success_message', 'error_message' );
 		if ( in_array( $key, $html, true ) ) {
 			return wp_kses( $data, self::allowed_html() );
 		}

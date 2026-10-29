@@ -12,6 +12,7 @@ class WLFP_Forms {
 		return array(
 			'confirmation'  => array( 'type' => 'message', 'message' => '<p>Thank you! Your submission has been received.</p>', 'url' => '', 'page_id' => 0, 'hide_form' => 1, 'scroll' => 1, 'rules' => array() ),
 			'quiz'          => array( 'enabled' => 0, 'pass_percent' => 60 ),
+			'conversation'  => array( 'enabled' => 0, 'auto_advance' => 1, 'next_text' => 'OK', 'welcome' => 0, 'welcome_title' => '', 'welcome_text' => '', 'start_text' => 'Start' ),
 			'button'        => array( 'text' => 'Submit', 'align' => 'left', 'loading_text' => 'Sending…', 'style' => 'solid' ),
 			'notifications' => array(
 				array(
