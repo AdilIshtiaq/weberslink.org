@@ -167,6 +167,7 @@
 		this.bindRepeaters();
 		this.bindSignatures();
 		this.bindCoupon();
+		this.bindResume();
 		this.bindRanking();
 		this.bindTerms();
 		this.initCaptcha();
@@ -656,6 +657,56 @@
 	Form.prototype.convReset = function () {
 		if ( this.welcomeEl ) { this.welcomeEl.hidden = false; this.cslide = -1; this.slides.forEach( function ( s ) { s.els.forEach( function ( w ) { w.classList.remove( 'wlfp-slide-on' ); } ); } ); this.convRefresh(); }
 		else { this.convShow( this.convVisible()[ 0 ] || 0, 'fwd', true ); }
+	};
+
+	/* ---------- save & resume later ---------- */
+	Form.prototype.bindResume = function () {
+		var cfg = this.cfg.resume;
+		if ( ! cfg ) { return; }
+		var self = this;
+		if ( cfg.step && this.steps[ cfg.step ] && ! this.conv ) { this.go( Math.min( cfg.step, this.steps.length - 1 ) ); }
+		var panel = document.createElement( 'div' );
+		panel.className = 'wlfp-resume-panel';
+		panel.hidden = true;
+		panel.innerHTML = '<p class="wlfp-resume-help"></p><div class="wlfp-resume-row"><input type="email" class="wlfp-input" autocomplete="email"><button type="button" class="wlfp-btn wlfp-resume-send"></button></div><p class="wlfp-resume-msg" role="status" aria-live="polite"></p>';
+		$( '.wlfp-resume-help', panel ).textContent = T.resumeHelp || '';
+		var em = $( 'input', panel );
+		em.placeholder = T.resumeEmail || 'Email';
+		em.setAttribute( 'aria-label', T.resumeEmail || 'Email' );
+		var send = $( '.wlfp-resume-send', panel );
+		send.textContent = T.resumeSend || 'Send';
+		var msg = $( '.wlfp-resume-msg', panel );
+		var trigger = document.createElement( 'button' );
+		trigger.type = 'button';
+		trigger.className = 'wlfp-resume-link';
+		trigger.textContent = cfg.button || 'Save & continue later';
+		trigger.addEventListener( 'click', function () { panel.hidden = ! panel.hidden; if ( ! panel.hidden ) { em.focus(); } } );
+		if ( this.conv ) { this.f.appendChild( trigger ); } else { var last = this.steps[ this.steps.length - 1 ]; this.f.insertBefore( trigger, null ); }
+		this.f.appendChild( panel );
+		var post = function ( retry ) {
+			var fd = new FormData();
+			fd.append( 'action', 'wlfp_save_draft' );
+			fd.append( 'wlfp_form_id', self.id );
+			fd.append( 'wlfp_nonce', $( 'input[name=wlfp_nonce]', self.f ).value );
+			fd.append( 'wlfp_source', $( 'input[name=wlfp_source]', self.f ).value );
+			fd.append( 'wlfp_resume_email', em.value );
+			fd.append( 'wlfp_resume_step', self.conv ? 0 : self.cur );
+			$$( 'input,select,textarea', self.f ).forEach( function ( e ) {
+				if ( ! e.name || e.disabled || e.name.indexOf( 'wlfp_' ) === 0 || e.closest( '.wlfp-resume-panel' ) || [ 'file', 'password', 'submit', 'button' ].indexOf( e.type ) !== -1 ) { return; }
+				if ( ( e.type === 'checkbox' || e.type === 'radio' ) && ! e.checked ) { return; }
+				if ( e.tagName === 'SELECT' && e.multiple ) { $$( 'option', e ).forEach( function ( o ) { if ( o.selected ) { fd.append( e.name, o.value ); } } ); return; }
+				fd.append( e.name, e.value );
+			} );
+			send.disabled = true;
+			fetch( G.ajax, { method: 'POST', body: fd, credentials: 'same-origin' } ).then( function ( r ) { return r.json(); } ).then( function ( j ) {
+				send.disabled = false;
+				if ( j && j.data && j.data.code === 'nonce' && ! retry ) { $( 'input[name=wlfp_nonce]', self.f ).value = j.data.nonce; return post( true ); }
+				msg.textContent = ( j && j.data && j.data.message ) || ( T.resumeFail || '' );
+				msg.className = 'wlfp-resume-msg ' + ( j && j.success ? 'is-ok' : 'is-err' );
+			} ).catch( function () { send.disabled = false; msg.textContent = T.resumeFail || ''; msg.className = 'wlfp-resume-msg is-err'; } );
+		};
+		send.addEventListener( 'click', function () { if ( ! em.value || ! em.checkValidity() ) { em.focus(); msg.textContent = T.resumeEmail || ''; msg.className = 'wlfp-resume-msg is-err'; return; } post( false ); } );
+		em.addEventListener( 'keydown', function ( e ) { if ( e.key === 'Enter' ) { e.preventDefault(); e.stopPropagation(); send.click(); } } );
 	};
 
 	Form.prototype.bindRanking = function () {

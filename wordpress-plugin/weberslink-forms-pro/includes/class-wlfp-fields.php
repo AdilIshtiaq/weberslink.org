@@ -239,6 +239,9 @@ class WLFP_Fields {
 		$req  = ! empty( $f['required'] );
 		$val  = null === $value ? ( isset( $f['default'] ) ? $f['default'] : '' ) : $value;
 		$desc = ! empty( $f['help'] ) ? $fid . '-help' : null;
+		if ( ! empty( $f['options'] ) && in_array( $f['type'], array( 'select', 'multiselect', 'radio', 'checkbox', 'image_choice' ), true ) ) {
+			$f = self::apply_limits( $f, isset( $form['id'] ) ? $form['id'] : 0 );
+		}
 		$base = array( 'id' => $fid, 'name' => $name, 'class' => 'wlfp-input', 'aria-describedby' => $desc, 'aria-required' => $req ? 'true' : null, 'data-wlfp-field' => $name, 'readonly' => ! empty( $f['readonly'] ) ? true : null );
 		if ( ! empty( $f['placeholder'] ) && in_array( $f['type'], array( 'text', 'textarea', 'email', 'number', 'phone', 'url', 'password' ), true ) ) {
 			$base['placeholder'] = $f['placeholder'];
@@ -320,7 +323,7 @@ class WLFP_Fields {
 					}
 				} else {
 					foreach ( (array) ( $f['options'] ?? array() ) as $opt ) {
-						$o .= '<option value="' . esc_attr( $opt['value'] ) . '"' . selected( in_array( (string) $opt['value'], array_map( 'strval', $sel ), true ), true, false ) . '>' . esc_html( $opt['label'] ) . '</option>';
+						$o .= '<option value="' . esc_attr( $opt['value'] ) . '"' . selected( in_array( (string) $opt['value'], array_map( 'strval', $sel ), true ), true, false ) . ( ! empty( $opt['disabled'] ) ? ' disabled' : '' ) . '>' . esc_html( $opt['label'] ) . '</option>';
 					}
 				}
 				$o .= '</select>';
@@ -332,7 +335,7 @@ class WLFP_Fields {
 				$n   = 0;
 				foreach ( (array) ( $f['options'] ?? array() ) as $opt ) {
 					$cid = $fid . '-' . $n++;
-					$o  .= '<label class="wlfp-choice" for="' . esc_attr( $cid ) . '"><input type="' . $f['type'] . '" id="' . esc_attr( $cid ) . '" name="' . esc_attr( $name ) . ( 'checkbox' === $f['type'] ? '[]' : '' ) . '" value="' . esc_attr( $opt['value'] ) . '"' . checked( in_array( (string) $opt['value'], $sel, true ), true, false ) . ' data-wlfp-field="' . esc_attr( $name ) . '" /><span>' . esc_html( $opt['label'] ) . '</span></label>';
+					$o  .= '<label class="wlfp-choice" for="' . esc_attr( $cid ) . '"><input type="' . $f['type'] . '" id="' . esc_attr( $cid ) . '" name="' . esc_attr( $name ) . ( 'checkbox' === $f['type'] ? '[]' : '' ) . '" value="' . esc_attr( $opt['value'] ) . '"' . checked( in_array( (string) $opt['value'], $sel, true ), true, false ) . ( ! empty( $opt['disabled'] ) ? ' disabled' : '' ) . ' data-wlfp-field="' . esc_attr( $name ) . '" /><span>' . esc_html( $opt['label'] ) . '</span></label>';
 				}
 				if ( ! empty( $f['other'] ) ) {
 					$cid = $fid . '-other';
@@ -341,7 +344,7 @@ class WLFP_Fields {
 				$o .= '</div>';
 				break;
 			case 'consent':
-				$o = '<label class="wlfp-choice wlfp-consent" for="' . esc_attr( $fid ) . '"><input type="checkbox" id="' . esc_attr( $fid ) . '" name="' . esc_attr( $name ) . '" value="yes" data-wlfp-field="' . esc_attr( $name ) . '"' . ( $req ? ' aria-required="true"' : '' ) . ' /><span>' . wp_kses( $f['terms'] ?? '', WLFP_Helpers::allowed_html() ) . '</span></label>';
+				$o = '<label class="wlfp-choice wlfp-consent" for="' . esc_attr( $fid ) . '"><input type="checkbox" id="' . esc_attr( $fid ) . '" name="' . esc_attr( $name ) . '" value="yes" data-wlfp-field="' . esc_attr( $name ) . '"' . checked( 'yes' === $val, true, false ) . ( $req ? ' aria-required="true"' : '' ) . ' /><span>' . wp_kses( $f['terms'] ?? '', WLFP_Helpers::allowed_html() ) . '</span></label>';
 				break;
 			case 'name':
 				$parts = array_merge( array( 'first' => 1, 'last' => 1 ), (array) ( $f['parts'] ?? array() ) );
@@ -473,13 +476,22 @@ class WLFP_Fields {
 				$n     = 0;
 				foreach ( (array) ( $f['options'] ?? array() ) as $opt ) {
 					$cid = $fid . '-' . $n++;
-					$o  .= '<label class="wlfp-imgchoice" for="' . esc_attr( $cid ) . '"><input type="' . $type . '" id="' . esc_attr( $cid ) . '" name="' . esc_attr( $name ) . ( $multi ? '[]' : '' ) . '" value="' . esc_attr( $opt['value'] ) . '"' . checked( in_array( (string) $opt['value'], $sel, true ), true, false ) . ' data-wlfp-field="' . esc_attr( $name ) . '" /><span class="wlfp-imgchoice-box">' . ( ! empty( $opt['image'] ) ? '<img src="' . esc_url( $opt['image'] ) . '" alt="" loading="lazy" />' : '' ) . '<span class="wlfp-imgchoice-cap">' . esc_html( $opt['label'] ) . '</span></span></label>';
+					$o  .= '<label class="wlfp-imgchoice" for="' . esc_attr( $cid ) . '"><input type="' . $type . '" id="' . esc_attr( $cid ) . '" name="' . esc_attr( $name ) . ( $multi ? '[]' : '' ) . '" value="' . esc_attr( $opt['value'] ) . '"' . checked( in_array( (string) $opt['value'], $sel, true ), true, false ) . ( ! empty( $opt['disabled'] ) ? ' disabled' : '' ) . ' data-wlfp-field="' . esc_attr( $name ) . '" /><span class="wlfp-imgchoice-box">' . ( ! empty( $opt['image'] ) ? '<img src="' . esc_url( $opt['image'] ) . '" alt="" loading="lazy" />' : '' ) . '<span class="wlfp-imgchoice-cap">' . esc_html( $opt['label'] ) . '</span></span></label>';
 				}
 				$o .= '</div>';
 				break;
 			case 'ranking':
+				$ropts = (array) ( $f['options'] ?? array() );
+				if ( is_array( $val ) && $val ) {
+					$pos = array_flip( array_map( 'strval', array_values( $val ) ) );
+					usort( $ropts, function ( $a, $b ) use ( $pos ) {
+						$pa = isset( $pos[ (string) $a['value'] ] ) ? $pos[ (string) $a['value'] ] : 999;
+						$pb = isset( $pos[ (string) $b['value'] ] ) ? $pos[ (string) $b['value'] ] : 999;
+						return $pa - $pb;
+					} );
+				}
 				$o = '<ol class="wlfp-rank" id="' . esc_attr( $fid ) . '" data-wlfp-field="' . esc_attr( $name ) . '">';
-				foreach ( (array) ( $f['options'] ?? array() ) as $opt ) {
+				foreach ( $ropts as $opt ) {
 					$o .= '<li class="wlfp-rank-item"><input type="hidden" name="' . esc_attr( $name ) . '[]" value="' . esc_attr( $opt['value'] ) . '" data-wlfp-field="' . esc_attr( $name ) . '" /><span class="wlfp-rank-label">' . esc_html( $opt['label'] ) . '</span><span class="wlfp-rank-btns"><button type="button" class="wlfp-rank-up" aria-label="' . esc_attr__( 'Move up', 'weberslink-forms-pro' ) . '">↑</button><button type="button" class="wlfp-rank-down" aria-label="' . esc_attr__( 'Move down', 'weberslink-forms-pro' ) . '">↓</button></span></li>';
 				}
 				$o .= '</ol>';
@@ -500,7 +512,7 @@ class WLFP_Fields {
 				$o .= '</div>';
 				break;
 			case 'terms':
-				$o = '<div class="wlfp-terms-box" tabindex="0" role="region" aria-label="' . esc_attr__( 'Terms and conditions', 'weberslink-forms-pro' ) . '"' . ( ! empty( $f['must_scroll'] ) ? ' data-must-scroll="1"' : '' ) . '>' . wp_kses( $f['terms_text'] ?? '', WLFP_Helpers::allowed_html() ) . '</div><label class="wlfp-choice wlfp-consent" for="' . esc_attr( $fid ) . '"><input type="checkbox" id="' . esc_attr( $fid ) . '" name="' . esc_attr( $name ) . '" value="yes" data-wlfp-field="' . esc_attr( $name ) . '"' . ( $req ? ' aria-required="true"' : '' ) . ' /><span>' . esc_html( $f['agree_label'] ?? '' ) . '</span></label>';
+				$o = '<div class="wlfp-terms-box" tabindex="0" role="region" aria-label="' . esc_attr__( 'Terms and conditions', 'weberslink-forms-pro' ) . '"' . ( ! empty( $f['must_scroll'] ) ? ' data-must-scroll="1"' : '' ) . '>' . wp_kses( $f['terms_text'] ?? '', WLFP_Helpers::allowed_html() ) . '</div><label class="wlfp-choice wlfp-consent" for="' . esc_attr( $fid ) . '"><input type="checkbox" id="' . esc_attr( $fid ) . '" name="' . esc_attr( $name ) . '" value="yes" data-wlfp-field="' . esc_attr( $name ) . '"' . checked( 'yes' === $val, true, false ) . ( $req ? ' aria-required="true"' : '' ) . ' /><span>' . esc_html( $f['agree_label'] ?? '' ) . '</span></label>';
 				break;
 			case 'us_state':
 				$o = '<select' . WLFP_Helpers::esc_attrs( $base ) . '><option value="">' . esc_html( ! empty( $f['placeholder'] ) ? $f['placeholder'] : __( '— Select state —', 'weberslink-forms-pro' ) ) . '</option>';
@@ -528,6 +540,47 @@ class WLFP_Fields {
 				$o = apply_filters( 'wlfp_render_field_' . $f['type'], '', $f, $form, $val );
 		}
 		return $o;
+	}
+
+	/** value => remaining seats for options that have a limit. */
+	public static function option_remaining( $f, $form_id ) {
+		$limits = array();
+		foreach ( (array) ( isset( $f['options'] ) ? $f['options'] : array() ) as $o ) {
+			if ( isset( $o['limit'] ) && (int) $o['limit'] > 0 ) {
+				$limits[ (string) $o['value'] ] = (int) $o['limit'];
+			}
+		}
+		if ( ! $limits || empty( $f['name'] ) || ! $form_id ) {
+			return array();
+		}
+		$used = WLFP_Entries::option_counts( $form_id, $f['name'] );
+		$out  = array();
+		foreach ( $limits as $v => $lim ) {
+			$out[ $v ] = max( 0, $lim - ( isset( $used[ $v ] ) ? (int) $used[ $v ] : 0 ) );
+		}
+		return $out;
+	}
+
+	/** Marks full options as disabled and (optionally) shows seats left. */
+	public static function apply_limits( $f, $form_id ) {
+		$left = self::option_remaining( $f, $form_id );
+		if ( ! $left ) {
+			return $f;
+		}
+		foreach ( $f['options'] as &$o ) {
+			$v = (string) $o['value'];
+			if ( ! isset( $left[ $v ] ) ) {
+				continue;
+			}
+			if ( 0 === $left[ $v ] ) {
+				$o['disabled'] = true;
+				$o['label']   .= ' (' . __( 'sold out', 'weberslink-forms-pro' ) . ')';
+			} elseif ( ! empty( $f['show_left'] ) ) {
+				$o['label'] .= ' (' . sprintf( /* translators: %d: seats */ __( '%d left', 'weberslink-forms-pro' ), $left[ $v ] ) . ')';
+			}
+		}
+		unset( $o );
+		return $f;
 	}
 
 	public static function emoji() {
@@ -866,6 +919,16 @@ class WLFP_Fields {
 					}
 				}
 				break;
+		}
+		if ( ! empty( $f['options'] ) && ! empty( $form['id'] ) ) {
+			$left = self::option_remaining( $f, $form['id'] );
+			if ( $left ) {
+				foreach ( (array) $v as $x ) {
+					if ( is_scalar( $x ) && isset( $left[ (string) $x ] ) && 0 === $left[ (string) $x ] ) {
+						return sprintf( /* translators: %s: option */ __( 'Sorry, "%s" is sold out.', 'weberslink-forms-pro' ), self::option_label( $f, $x ) );
+					}
+				}
+			}
 		}
 		if ( in_array( $f['type'], array( 'text', 'textarea' ), true ) && ! empty( $f['max_words'] ) && str_word_count( wp_strip_all_tags( (string) $v ) ) > (int) $f['max_words'] ) {
 			return sprintf( /* translators: %d: words */ __( 'Please use at most %d words.', 'weberslink-forms-pro' ), (int) $f['max_words'] );

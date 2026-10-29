@@ -325,6 +325,23 @@ class WLFP_Templates {
 			self::f( 'textarea', 'details', 'Anything else we should know?' ),
 		), 'settings' => array( 'conversation' => array( 'enabled' => 1, 'welcome' => 1, 'welcome_title' => 'Let\'s find the right fit', 'welcome_text' => '<p>Answer a few quick questions and we will get back to you within one business day.</p>', 'start_text' => 'Start', 'auto_advance' => 1, 'next_text' => 'OK' ), 'button' => array( 'text' => 'Send' ), 'notifications' => array( self::notify( '{field:email}' ) ) ) );
 
+		$T['event_seats'] = array( 'title' => __( 'Event registration with limited seats', 'weberslink-forms-pro' ), 'desc' => __( 'Per-session seat limits, reference number, PDF confirmation, follow-up email, save & resume.', 'weberslink-forms-pro' ), 'fields' => array(
+			self::f( 'name', 'name', 'Your name', array( 'required' => 1 ) ),
+			self::f( 'email', 'email', 'Email', array( 'required' => 1, 'confirm' => 1, 'unique' => 1 ) ),
+			self::f( 'radio', 'session', 'Choose a session', array( 'required' => 1, 'show_left' => 1, 'options' => array( array( 'label' => 'Morning workshop', 'value' => 'morning', 'price' => '', 'limit' => 20 ), array( 'label' => 'Afternoon workshop', 'value' => 'afternoon', 'price' => '', 'limit' => 20 ), array( 'label' => 'Evening talk', 'value' => 'evening', 'price' => '', 'limit' => 50 ) ) ) ),
+			self::f( 'textarea', 'needs', 'Accessibility or dietary needs' ),
+			self::f( 'terms', 'terms', 'Event terms', array( 'terms_text' => '<p>By registering you agree to our code of conduct.</p>', 'agree_label' => 'I agree' ) ),
+		), 'settings' => array(
+			'reference'     => array( 'prefix' => 'EVT-', 'pad' => 4, 'suffix' => '' ),
+			'resume'        => array( 'enabled' => 1 ),
+			'confirmation'  => array( 'message' => '<h3>You are registered!</h3><p>Your reference is <strong>{reference}</strong>. A confirmation with a PDF copy is on its way to {field:email}.</p>' ),
+			'notifications' => array(
+				array_merge( self::notify( '{field:email}' ), array( 'name' => 'Admin alert' ) ),
+				array_merge( self::autoreply( 'Registration confirmed: {reference}' ), array( 'attach_pdf' => 1 ) ),
+				array_merge( self::autoreply( 'Thanks for joining us' ), array( 'name' => 'Follow-up (2 days later)', 'message' => '<p>Hi {field:name}, thank you for registering ({reference}). We hope to see you there!</p>', 'delay' => 2, 'delay_unit' => 'days' ) ),
+			),
+		) );
+
 		$T['simple'] = array( 'title' => __( 'Simple contact (3 fields)', 'weberslink-forms-pro' ), 'desc' => __( 'Name, email, message. Nothing else.', 'weberslink-forms-pro' ), 'fields' => array(
 			self::f( 'text', 'name', 'Name', array( 'required' => 1 ) ),
 			self::f( 'email', 'email', 'Email', array( 'required' => 1 ) ),
@@ -359,7 +376,7 @@ class WLFP_Templates {
 			'appointment' => 'booking', 'tour' => 'booking', 'rsvp' => 'booking', 'reservation' => 'booking', 'tickets' => 'payment',
 			'order' => 'payment', 'donation' => 'payment', 'service_order' => 'payment',
 			'feedback' => 'survey', 'survey' => 'survey', 'nps' => 'survey', 'testimonial' => 'survey', 'quiz' => 'survey',
-			'conv_lead' => 'contact', 'stay' => 'booking', 'priorities' => 'survey', 'registration' => 'signup', 'job' => 'signup', 'course' => 'signup', 'membership' => 'signup', 'volunteer' => 'signup', 'contest' => 'signup',
+			'event_seats' => 'booking', 'conv_lead' => 'contact', 'stay' => 'booking', 'priorities' => 'survey', 'registration' => 'signup', 'job' => 'signup', 'course' => 'signup', 'membership' => 'signup', 'volunteer' => 'signup', 'contest' => 'signup',
 			'support' => 'support', 'bug' => 'support', 'refund' => 'support', 'gdpr' => 'support',
 		);
 	}

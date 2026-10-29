@@ -116,6 +116,32 @@ class WLFP_Entries {
 		return array( 'total' => $total, 'rows' => array_map( array( __CLASS__, 'hydrate' ), (array) $rows ) );
 	}
 
+	/** How many live entries chose each value of a field (used for per-option limits). */
+	public static function option_counts( $form_id, $name ) {
+		static $cache = array();
+		$k = (int) $form_id . '|' . $name;
+		if ( isset( $cache[ $k ] ) ) {
+			return $cache[ $k ];
+		}
+		global $wpdb;
+		$like = '%' . $wpdb->esc_like( '"' . $name . '":' ) . '%';
+		$rows = $wpdb->get_col( $wpdb->prepare( 'SELECT data FROM ' . self::table() . " WHERE form_id=%d AND status NOT IN ('spam','trashed') AND payment_status NOT IN ('failed','cancelled','abandoned') AND data LIKE %s LIMIT 20000", (int) $form_id, $like ) ); // phpcs:ignore
+		$out  = array();
+		foreach ( (array) $rows as $json ) {
+			$d = json_decode( (string) $json, true );
+			if ( ! is_array( $d ) || ! isset( $d[ $name ] ) ) {
+				continue;
+			}
+			foreach ( (array) $d[ $name ] as $v ) {
+				if ( is_scalar( $v ) ) {
+					$out[ (string) $v ] = ( isset( $out[ (string) $v ] ) ? $out[ (string) $v ] : 0 ) + 1;
+				}
+			}
+		}
+		$cache[ $k ] = $out;
+		return $out;
+	}
+
 	/** True when another live entry already holds this exact value for the field (used by "unique" fields). */
 	public static function value_exists( $form_id, $name, $value ) {
 		global $wpdb;

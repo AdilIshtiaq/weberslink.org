@@ -182,6 +182,9 @@ class WLFP_Submit {
 			WLFP_Payments::use_coupon( $form, $calc['coupon'] );
 		}
 		WLFP_Install::log( $form['id'], $entry['id'], 'form', 'success', 'Form submitted' );
+		if ( ! empty( $slashed['wlfp_draft'] ) && is_scalar( $slashed['wlfp_draft'] ) ) {
+			WLFP_Drafts::delete( wp_unslash( (string) $slashed['wlfp_draft'] ) );
+		}
 
 		if ( $pay && in_array( $provider, array( 'stripe', 'paypal' ), true ) ) {
 			$res = WLFP_Payments::start( $form, $entry, $data );

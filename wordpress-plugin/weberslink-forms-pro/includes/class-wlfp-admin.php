@@ -14,6 +14,9 @@ class WLFP_Admin {
 		add_action( 'admin_post_wlfp_entry_note', array( __CLASS__, 'entry_note' ) );
 		add_action( 'admin_post_wlfp_entry_resend', array( __CLASS__, 'entry_resend' ) );
 		add_action( 'admin_post_wlfp_entry_feeds', array( __CLASS__, 'entry_feeds' ) );
+		add_action( 'admin_post_wlfp_entry_pdf', array( __CLASS__, 'entry_pdf' ) );
+		add_action( 'wp_ajax_wlfp_revisions', array( __CLASS__, 'ajax_revisions' ) );
+		add_action( 'wp_ajax_wlfp_revision', array( __CLASS__, 'ajax_revision' ) );
 		add_action( 'admin_post_wlfp_entry_email', array( __CLASS__, 'entry_email' ) );
 		add_action( 'admin_post_wlfp_test_email', array( __CLASS__, 'test_email' ) );
 		add_action( 'admin_post_wlfp_clear_logs', array( __CLASS__, 'clear_logs' ) );
@@ -489,7 +492,8 @@ class WLFP_Admin {
 			echo '<div class="wlfp-note"><strong>' . esc_html( $u ? $u->display_name : '—' ) . '</strong> <span class="description">' . esc_html( get_date_from_gmt( $n['created_at'], 'Y-m-d H:i' ) ) . '</span><br>' . nl2br( esc_html( $n['note'] ) ) . '</div>';
 		}
 		echo '</div><div class="wlfp-entry-side">';
-		echo '<div class="postbox"><h2 class="hndle">' . esc_html__( 'Details', 'weberslink-forms-pro' ) . '</h2><div class="inside"><p><strong>' . esc_html__( 'Submitted', 'weberslink-forms-pro' ) . ':</strong><br>' . esc_html( get_date_from_gmt( $e['created_at'], get_option( 'date_format' ) . ' ' . get_option( 'time_format' ) ) ) . '</p>';
+		$refno = WLFP_Merge::reference( $form, $e );
+		echo '<div class="postbox"><h2 class="hndle">' . esc_html__( 'Details', 'weberslink-forms-pro' ) . '</h2><div class="inside">' . ( $refno ? '<p><strong>' . esc_html__( 'Reference', 'weberslink-forms-pro' ) . ':</strong> <code>' . esc_html( $refno ) . '</code></p>' : '' ) . '<p><strong>' . esc_html__( 'Submitted', 'weberslink-forms-pro' ) . ':</strong><br>' . esc_html( get_date_from_gmt( $e['created_at'], get_option( 'date_format' ) . ' ' . get_option( 'time_format' ) ) ) . '</p>';
 		if ( $e['ip'] ) {
 			echo '<p><strong>IP:</strong> ' . esc_html( $e['ip'] ) . '</p>';
 		}
@@ -511,7 +515,8 @@ class WLFP_Admin {
 			return '<a class="button' . $extra . '" href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=wlfp_entries_action_single&do=' . $do . '&entry=' . $id ), 'wlfp_single_' . $id ) ) . '">' . esc_html( $label ) . '</a> ';
 		};
 		echo '<a class="button" href="' . esc_url( self::url( 'wlfp-entries', array( 'entry' => $id, 'edit' => 1 ) ) ) . '">' . esc_html__( 'Edit', 'weberslink-forms-pro' ) . '</a> ';
-		echo '<a class="button" target="_blank" href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=wlfp_print_entry&entry=' . $id ), 'wlfp_print' ) ) . '">' . esc_html__( 'Print / PDF', 'weberslink-forms-pro' ) . '</a> ';
+		echo '<a class="button" href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=wlfp_entry_pdf&entry=' . $id ), 'wlfp_pdf_' . $id ) ) . '">' . esc_html__( 'Download PDF', 'weberslink-forms-pro' ) . '</a> ';
+		echo '<a class="button" target="_blank" href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=wlfp_print_entry&entry=' . $id ), 'wlfp_print' ) ) . '">' . esc_html__( 'Print view', 'weberslink-forms-pro' ) . '</a> ';
 		echo '<a class="button" href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=wlfp_entry_resend&entry=' . $id ), 'wlfp_resend_' . $id ) ) . '">' . esc_html__( 'Resend emails', 'weberslink-forms-pro' ) . '</a> ';
 		echo '<a class="button" href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=wlfp_entry_feeds&entry=' . $id ), 'wlfp_feeds_' . $id ) ) . '">' . esc_html__( 'Run integrations again', 'weberslink-forms-pro' ) . '</a> ';
 		echo ( $e['starred'] ? $a( 'unstar', __( 'Unstar', 'weberslink-forms-pro' ) ) : $a( 'star', __( '★ Star', 'weberslink-forms-pro' ) ) ) . ( 'spam' === $e['status'] ? $a( 'notspam', __( 'Not spam', 'weberslink-forms-pro' ) ) : $a( 'spam', __( 'Spam', 'weberslink-forms-pro' ) ) ) . $a( 'trash', __( 'Trash', 'weberslink-forms-pro' ) ) . $a( 'delete', __( 'Delete', 'weberslink-forms-pro' ), ' button-link-delete' ); // phpcs:ignore
@@ -579,6 +584,45 @@ class WLFP_Admin {
 		}
 		wp_safe_redirect( self::url( 'wlfp-entries', array( 'entry' => $id, 'msg' => rawurlencode( __( 'Integrations ran again. See the activity log.', 'weberslink-forms-pro' ) ) ) ) );
 		exit;
+	}
+
+	public static function entry_pdf() {
+		$id = isset( $_GET['entry'] ) ? (int) $_GET['entry'] : 0; // phpcs:ignore
+		self::guard( 'wlfp_pdf_' . $id );
+		$e = WLFP_Entries::get( $id );
+		$f = $e ? WLFP_Forms::get( $e['form_id'] ) : null;
+		if ( ! $e || ! $f ) {
+			wp_die( esc_html__( 'Entry not found.', 'weberslink-forms-pro' ) );
+		}
+		list( $name, $bytes ) = WLFP_Pdf::entry( $f, $e );
+		nocache_headers();
+		header( 'Content-Type: application/pdf' );
+		header( 'Content-Disposition: attachment; filename="' . $name . '"' );
+		header( 'Content-Length: ' . strlen( $bytes ) );
+		echo $bytes; // phpcs:ignore
+		exit;
+	}
+
+	public static function ajax_revisions() {
+		check_ajax_referer( 'wlfp_builder', 'nonce' );
+		if ( ! WLFP_Helpers::can_manage() ) {
+			wp_send_json_error( array(), 403 );
+		}
+		$out = array();
+		foreach ( WLFP_Forms::revisions( isset( $_POST['form_id'] ) ? (int) $_POST['form_id'] : 0 ) as $r ) { // phpcs:ignore
+			$u     = get_userdata( (int) $r['user_id'] );
+			$out[] = array( 'id' => (int) $r['id'], 'title' => $r['title'], 'when' => get_date_from_gmt( $r['created_at'], 'Y-m-d H:i' ), 'user' => $u ? $u->display_name : '—' );
+		}
+		wp_send_json_success( $out );
+	}
+
+	public static function ajax_revision() {
+		check_ajax_referer( 'wlfp_builder', 'nonce' );
+		if ( ! WLFP_Helpers::can_manage() ) {
+			wp_send_json_error( array(), 403 );
+		}
+		$r = WLFP_Forms::revision( isset( $_POST['revision'] ) ? (int) $_POST['revision'] : 0, isset( $_POST['form_id'] ) ? (int) $_POST['form_id'] : 0 ); // phpcs:ignore
+		$r ? wp_send_json_success( $r ) : wp_send_json_error( array(), 404 );
 	}
 
 	public static function entry_email() {
@@ -650,7 +694,91 @@ class WLFP_Admin {
 			$r = (float) $wpdb->get_var( $wpdb->prepare( "SELECT COALESCE(SUM(payment_total),0) FROM {$wpdb->prefix}wlfp_entries WHERE form_id=%d AND payment_status='paid' AND created_at >= %s", $f['id'], $since ) ); // phpcs:ignore
 			echo '<tr><td>' . esc_html( $f['title'] ) . '</td><td>' . $n . '</td><td>' . $v . '</td><td>' . ( $v ? esc_html( round( $n / $v * 100, 1 ) ) . '%' : '—' ) . '</td><td>' . esc_html( WLFP_Helpers::money( $r ) ) . '</td></tr>'; // phpcs:ignore
 		}
-		echo '</tbody></table></div>';
+		echo '</tbody></table>';
+		if ( $form_id ) {
+			self::answer_breakdown( $form_id, $since );
+		} else {
+			echo '<p class="description" style="margin-top:20px">' . esc_html__( 'Pick a single form above to see an answer-by-answer breakdown of its choice, rating and NPS questions.', 'weberslink-forms-pro' ) . '</p>';
+		}
+		echo '</div>';
+	}
+
+	/** Per-question result charts for one form. */
+	private static function answer_breakdown( $form_id, $since ) {
+		global $wpdb;
+		$form = WLFP_Forms::get( $form_id );
+		if ( ! $form ) {
+			return;
+		}
+		$rows  = $wpdb->get_col( $wpdb->prepare( "SELECT data FROM {$wpdb->prefix}wlfp_entries WHERE form_id=%d AND created_at >= %s AND status NOT IN ('spam','trashed') LIMIT 20000", $form_id, $since ) ); // phpcs:ignore
+		$total = count( $rows );
+		echo '<h2>' . esc_html__( 'Answer breakdown', 'weberslink-forms-pro' ) . ' <span class="description">(' . (int) $total . ' ' . esc_html__( 'entries', 'weberslink-forms-pro' ) . ')</span></h2>';
+		if ( ! $total ) {
+			echo '<p>' . esc_html__( 'No entries in this period yet.', 'weberslink-forms-pro' ) . '</p>';
+			return;
+		}
+		$decoded = array();
+		foreach ( $rows as $j ) {
+			$d = json_decode( (string) $j, true );
+			if ( is_array( $d ) ) {
+				$decoded[] = $d;
+			}
+		}
+		$types = array( 'radio', 'select', 'checkbox', 'multiselect', 'image_choice', 'rating', 'nps', 'emoji_rating', 'toggle', 'us_state', 'country' );
+		$shown = 0;
+		foreach ( WLFP_Forms::value_fields( $form ) as $f ) {
+			if ( ! in_array( $f['type'], $types, true ) ) {
+				continue;
+			}
+			$counts = array();
+			$n      = 0;
+			$sum    = 0;
+			foreach ( $decoded as $d ) {
+				if ( ! isset( $d[ $f['name'] ] ) || WLFP_Fields::is_empty( $d[ $f['name'] ] ) ) {
+					continue;
+				}
+				$n++;
+				foreach ( (array) $d[ $f['name'] ] as $v ) {
+					if ( is_scalar( $v ) ) {
+						$counts[ (string) $v ] = ( isset( $counts[ (string) $v ] ) ? $counts[ (string) $v ] : 0 ) + 1;
+						$sum                  += is_numeric( $v ) ? (float) $v : 0;
+					}
+				}
+			}
+			if ( ! $n ) {
+				continue;
+			}
+			$shown++;
+			echo '<div class="wlfp-card" style="max-width:760px;margin:12px 0"><strong>' . esc_html( $f['label'] ? $f['label'] : $f['name'] ) . '</strong> <span class="description">' . (int) $n . ' ' . esc_html__( 'answers', 'weberslink-forms-pro' ) . '</span>';
+			if ( in_array( $f['type'], array( 'rating', 'emoji_rating', 'nps' ), true ) ) {
+				echo '<div style="margin:6px 0">' . esc_html__( 'Average', 'weberslink-forms-pro' ) . ': <strong>' . esc_html( round( $sum / $n, 2 ) ) . '</strong>';
+				if ( 'nps' === $f['type'] ) {
+					$pro = 0;
+					$det = 0;
+					foreach ( $counts as $v => $c ) {
+						if ( (int) $v >= 9 ) {
+							$pro += $c;
+						} elseif ( (int) $v <= 6 ) {
+							$det += $c;
+						}
+					}
+					echo ' &nbsp;|&nbsp; NPS: <strong>' . esc_html( round( ( $pro - $det ) / $n * 100 ) ) . '</strong> <span class="description">(' . (int) $pro . ' promoters, ' . (int) $det . ' detractors)</span>';
+				}
+				echo '</div>';
+				ksort( $counts, SORT_NUMERIC );
+			} else {
+				arsort( $counts );
+			}
+			foreach ( $counts as $v => $c ) {
+				$label = WLFP_Fields::format_value( $f, $v, false );
+				$pct   = round( $c / $n * 100 );
+				echo '<div style="display:grid;grid-template-columns:minmax(120px,32%) 1fr 70px;gap:8px;align-items:center;margin:4px 0"><span>' . esc_html( $label ) . '</span><span style="background:#e8eef5;border-radius:4px;height:14px;overflow:hidden"><i style="display:block;height:100%;width:' . (int) $pct . '%;background:#2271b1"></i></span><span>' . (int) $c . ' (' . (int) $pct . '%)</span></div>';
+			}
+			echo '</div>';
+		}
+		if ( ! $shown ) {
+			echo '<p class="description">' . esc_html__( 'This form has no choice, rating or NPS questions with answers yet.', 'weberslink-forms-pro' ) . '</p>';
+		}
 	}
 
 	public static function dashboard_widget() {

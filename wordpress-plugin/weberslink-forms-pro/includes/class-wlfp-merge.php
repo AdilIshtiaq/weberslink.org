@@ -5,7 +5,7 @@ defined( 'ABSPATH' ) || exit;
 class WLFP_Merge {
 
 	public static function tags_help() {
-		return array( '{all_data}', '{field:FIELD_NAME}', '{form_title}', '{entry_id}', '{entry_serial}', '{entry_url}', '{site_name}', '{site_url}', '{admin_email}', '{date}', '{time}', '{ip}', '{source_url}', '{user_email}', '{user_name}', '{user_id}', '{payment_total}', '{payment_status}', '{transaction_id}', '{score}', '{score_max}', '{score_percent}', '{quiz_result}', '{get:PARAM}' );
+		return array( '{all_data}', '{field:FIELD_NAME}', '{form_title}', '{entry_id}', '{entry_serial}', '{reference}', '{entry_url}', '{site_name}', '{site_url}', '{admin_email}', '{date}', '{time}', '{ip}', '{source_url}', '{user_email}', '{user_name}', '{user_id}', '{payment_total}', '{payment_status}', '{transaction_id}', '{score}', '{score_max}', '{score_percent}', '{quiz_result}', '{get:PARAM}' );
 	}
 
 	/**
@@ -62,6 +62,7 @@ class WLFP_Merge {
 			'{form_id}'        => (string) $form['id'],
 			'{entry_id}'       => $entry ? (string) $entry['id'] : '',
 			'{entry_serial}'   => $entry ? (string) $entry['serial'] : '',
+			'{reference}'      => $entry ? $esc( self::reference( $form, $entry ) ) : '',
 			'{entry_url}'      => $entry ? admin_url( 'admin.php?page=wlfp-entries&entry=' . (int) $entry['id'] ) : '',
 			'{site_name}'      => $esc( wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ) ),
 			'{site_url}'       => home_url( '/' ),
@@ -83,6 +84,15 @@ class WLFP_Merge {
 			$text = str_replace( '{all_data}', self::all_data( $form, $data, $html ), $text );
 		}
 		return apply_filters( 'wlfp_merge_parse', $text, $form, $data, $entry );
+	}
+
+	/** Human reference like INV-0042 from the form's reference settings and the entry serial. */
+	public static function reference( $form, $entry ) {
+		if ( empty( $entry['serial'] ) ) {
+			return '';
+		}
+		$r = isset( $form['settings']['reference'] ) ? $form['settings']['reference'] : array( 'prefix' => '', 'pad' => 4, 'suffix' => '' );
+		return $r['prefix'] . str_pad( (string) (int) $entry['serial'], max( 0, (int) $r['pad'] ), '0', STR_PAD_LEFT ) . $r['suffix'];
 	}
 
 	public static function all_data( $form, $data, $html = true ) {

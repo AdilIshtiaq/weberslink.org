@@ -129,6 +129,13 @@ class WLFP_Integrations {
 			$args['headers']['Content-Type'] = 'application/json';
 			$args['body']                    = wp_json_encode( $body );
 		}
+		if ( ! empty( $feed['secret'] ) && isset( $args['body'] ) ) {
+			// Signature = HMAC-SHA256( timestamp . "." . raw_body ), hex, header "sha256=<hex>".
+			$raw = is_array( $args['body'] ) ? http_build_query( $args['body'] ) : $args['body'];
+			$ts  = (string) time();
+			$args['headers']['X-Weberslink-Timestamp'] = $ts;
+			$args['headers']['X-Weberslink-Signature'] = 'sha256=' . hash_hmac( 'sha256', $ts . '.' . $raw, (string) $feed['secret'] );
+		}
 		return self::http_result( wp_remote_request( $url, $args ) );
 	}
 

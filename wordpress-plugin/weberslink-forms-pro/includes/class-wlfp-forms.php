@@ -12,6 +12,8 @@ class WLFP_Forms {
 		return array(
 			'confirmation'  => array( 'type' => 'message', 'message' => '<p>Thank you! Your submission has been received.</p>', 'url' => '', 'page_id' => 0, 'hide_form' => 1, 'scroll' => 1, 'rules' => array() ),
 			'quiz'          => array( 'enabled' => 0, 'pass_percent' => 60 ),
+			'reference'     => array( 'prefix' => '', 'pad' => 4, 'suffix' => '' ),
+			'resume'        => array( 'enabled' => 0, 'button_text' => 'Save & continue later', 'expire_days' => 30, 'subject' => 'Continue your form: {form_title}', 'message' => '<p>Click the link below to pick up where you left off:</p><p><a href="{resume_link}">{resume_link}</a></p><p>The link works for a limited time.</p>' ),
 			'conversation'  => array( 'enabled' => 0, 'auto_advance' => 1, 'next_text' => 'OK', 'welcome' => 0, 'welcome_title' => '', 'welcome_text' => '', 'start_text' => 'Start' ),
 			'button'        => array( 'text' => 'Submit', 'align' => 'left', 'loading_text' => 'Sending…', 'style' => 'solid' ),
 			'notifications' => array(
@@ -28,6 +30,9 @@ class WLFP_Forms {
 					'message'    => '{all_data}',
 					'format'     => 'html',
 					'attach'     => 0,
+					'attach_pdf' => 0,
+					'delay'      => 0,
+					'delay_unit' => 'hours',
 					'conditional' => array( 'enabled' => 0, 'match' => 'all', 'rules' => array() ),
 				),
 			),
@@ -41,7 +46,7 @@ class WLFP_Forms {
 			),
 			'spam'          => array( 'honeypot' => 1, 'min_seconds' => 3, 'captcha' => 'none', 'keywords' => '', 'max_links' => 0, 'rate_limit' => 5, 'akismet' => 0 ),
 			'style'         => array( 'preset' => 'inherit', 'primary' => '', 'text' => '', 'bg' => '', 'border' => '', 'radius' => '6', 'label_position' => 'top', 'input_size' => 'md', 'custom_css' => '', 'show_title' => 0, 'asterisk' => 'end' ),
-			'payment'       => array( 'provider' => 'none', 'currency' => '', 'send_after_payment' => 1, 'coupons' => array(), 'tax_percent' => 0, 'success_url' => '', 'cancel_url' => '', 'description' => '{form_title}' ),
+			'payment'       => array( 'provider' => 'none', 'currency' => '', 'send_after_payment' => 1, 'coupons' => array(), 'tax_percent' => 0, 'recurring' => 0, 'interval' => 'month', 'success_url' => '', 'cancel_url' => '', 'description' => '{form_title}' ),
 			'entries'       => array( 'store' => 1, 'delete_after_days' => 0 ),
 			'steps'         => array( 'progress' => 'bar', 'show_prev' => 1, 'next_text' => 'Next', 'prev_text' => 'Back' ),
 			'misc'          => array( 'autosave' => 0, 'ajax' => 1, 'prefill_get' => 1, 'label_ids' => 0 ),
@@ -118,6 +123,10 @@ class WLFP_Forms {
 			'updated_at' => $now,
 		);
 		if ( $id ) {
+			$old = self::get( $id );
+			if ( $old && ( wp_json_encode( $old['fields'] ) !== $row['fields'] || wp_json_encode( $old['settings'] ) !== $row['settings'] || $old['title'] !== $row['title'] ) ) {
+				self::add_revision( $old );
+			}
 			$wpdb->update( self::table(), $row, array( 'id' => (int) $id ) );
 			return (int) $id;
 		}
@@ -125,6 +134,34 @@ class WLFP_Forms {
 		$row['created_by'] = get_current_user_id();
 		$wpdb->insert( self::table(), $row );
 		return (int) $wpdb->insert_id;
+	}
+
+	/* ---------- revisions (version history) ---------- */
+
+	public static function add_revision( $form ) {
+		global $wpdb;
+		$t = $wpdb->prefix . 'wlfp_revisions';
+		$wpdb->insert( $t, array( 'form_id' => (int) $form['id'], 'user_id' => get_current_user_id(), 'title' => $form['title'], 'fields' => wp_json_encode( $form['fields'] ), 'settings' => wp_json_encode( $form['settings'] ), 'created_at' => current_time( 'mysql', true ) ) );
+		$keep = (int) apply_filters( 'wlfp_revisions_to_keep', 25 );
+		$ids  = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM $t WHERE form_id=%d ORDER BY id DESC LIMIT %d, 1000", (int) $form['id'], $keep ) ); // phpcs:ignore
+		if ( $ids ) {
+			$wpdb->query( "DELETE FROM $t WHERE id IN (" . implode( ',', array_map( 'intval', $ids ) ) . ')' ); // phpcs:ignore
+		}
+	}
+
+	public static function revisions( $form_id ) {
+		global $wpdb;
+		return (array) $wpdb->get_results( $wpdb->prepare( "SELECT id, user_id, title, created_at FROM {$wpdb->prefix}wlfp_revisions WHERE form_id=%d ORDER BY id DESC", (int) $form_id ), ARRAY_A ); // phpcs:ignore
+	}
+
+	public static function revision( $id, $form_id ) {
+		global $wpdb;
+		$r = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}wlfp_revisions WHERE id=%d AND form_id=%d", (int) $id, (int) $form_id ), ARRAY_A ); // phpcs:ignore
+		if ( ! $r ) {
+			return null;
+		}
+		$f = json_decode( (string) $r['fields'], true );
+		return array( 'title' => $r['title'], 'fields' => is_array( $f ) ? $f : array(), 'settings' => self::normalize_settings( json_decode( (string) $r['settings'], true ) ) );
 	}
 
 	public static function sanitize_fields( $fields ) {
@@ -173,6 +210,8 @@ class WLFP_Forms {
 		$wpdb->delete( self::table(), array( 'id' => (int) $id ) );
 		$wpdb->delete( $wpdb->prefix . 'wlfp_views', array( 'form_id' => (int) $id ) );
 		$wpdb->delete( $wpdb->prefix . 'wlfp_logs', array( 'form_id' => (int) $id ) );
+		$wpdb->delete( $wpdb->prefix . 'wlfp_revisions', array( 'form_id' => (int) $id ) );
+		$wpdb->delete( $wpdb->prefix . 'wlfp_drafts', array( 'form_id' => (int) $id ) );
 	}
 
 	public static function set_status( $id, $status ) {

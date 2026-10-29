@@ -148,7 +148,29 @@
 		var prev = h( 'a', { class: 'button', target: '_blank', rel: 'noopener', text: 'Preview', onclick: function ( e ) { if ( ! F.id ) { e.preventDefault(); toast( 'Save the form first', true ); } else { prev.href = C.previewUrl + '?wlfp_preview=' + F.id; } } } );
 		prev.href = F.id ? C.previewUrl + '?wlfp_preview=' + F.id : '#';
 		var save = h( 'button', { class: 'button button-primary', type: 'button', text: 'Save', onclick: function () { save.textContent = I.saving; doSave( function () { save.textContent = 'Save'; } ); } } );
-		return h( 'div', { class: 'wlfpb-top' }, back, title, status, scEl, prev, save );
+		var hist = h( 'button', { type: 'button', class: 'button', text: 'History', onclick: function () { if ( ! F.id ) { toast( 'Save the form first', true ); return; } showHistory(); } } );
+		return h( 'div', { class: 'wlfpb-top' }, back, title, status, scEl, hist, prev, save );
+	}
+	function showHistory() {
+		var fd = new FormData();
+		fd.append( 'action', 'wlfp_revisions' ); fd.append( 'nonce', C.nonce ); fd.append( 'form_id', F.id );
+		fetch( C.ajax, { method: 'POST', body: fd, credentials: 'same-origin' } ).then( function ( r ) { return r.json(); } ).then( function ( j ) {
+			var list = ( j && j.success ) ? j.data : [];
+			var box = h( 'div', { style: 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100000;display:flex;align-items:center;justify-content:center', onclick: function ( e ) { if ( e.target === box ) { box.remove(); } } } );
+			var inner = h( 'div', { style: 'background:#fff;border-radius:8px;padding:18px;max-width:560px;width:92%;max-height:80vh;overflow:auto' }, h( 'h2', { text: 'Version history', style: 'margin-top:0' } ), h( 'p', { class: 'description', text: 'A snapshot is kept every time you save a change (last 25). Restoring loads that version into the builder; click Save to apply it.' } ) );
+			if ( ! list.length ) { inner.appendChild( h( 'p', { text: 'No earlier versions yet.' } ) ); }
+			list.forEach( function ( r ) {
+				inner.appendChild( h( 'div', { style: 'display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px solid #f0f0f1' }, h( 'span', { style: 'flex:1' }, h( 'strong', { text: r.when } ), ' · ' + r.user, h( 'br' ), h( 'span', { class: 'description', text: r.title } ) ), h( 'button', { type: 'button', class: 'button', text: 'Restore', onclick: function () {
+					var f2 = new FormData(); f2.append( 'action', 'wlfp_revision' ); f2.append( 'nonce', C.nonce ); f2.append( 'form_id', F.id ); f2.append( 'revision', r.id );
+					fetch( C.ajax, { method: 'POST', body: f2, credentials: 'same-origin' } ).then( function ( x ) { return x.json(); } ).then( function ( k ) {
+						if ( ! k || ! k.success ) { toast( 'Could not load that version', true ); return; }
+						F.title = k.data.title; F.fields = k.data.fields; F.settings = k.data.settings; S.sel = null; touch(); box.remove(); renderAll(); toast( 'Version loaded. Click Save to apply it.' );
+					} );
+				} } ) ) );
+			} );
+			inner.appendChild( h( 'p', null, h( 'button', { type: 'button', class: 'button', text: 'Close', onclick: function () { box.remove(); } } ) ) );
+			box.appendChild( inner ); document.body.appendChild( box );
+		} );
 	}
 	function shortcodeText() { return F.id ? '[weberslink_form id="' + F.id + '"]' : '(save to get the shortcode)'; }
 	function tabsBar() {
@@ -390,7 +412,7 @@
 				var manual = op.value !== slug( op.label );
 				lab.addEventListener( 'input', function () { op.label = lab.value; if ( ! manual ) { op.value = slug( lab.value ); val.value = op.value; } touch(); if ( o.on ) { o.on(); } } );
 				val.addEventListener( 'input', function () { manual = true; op.value = val.value; touch(); } );
-				var cols = '1fr 1fr' + ( o.image ? ' 1.5fr' : '' ) + ( o.price ? ' 70px' : '' ) + ( o.score ? ' 60px' : '' ) + ' auto auto';
+				var cols = '1fr 1fr' + ( o.image ? ' 1.5fr' : '' ) + ( o.price ? ' 70px' : '' ) + ( o.score ? ' 60px' : '' ) + ( o.limit ? ' 64px' : '' ) + ' auto auto';
 				var r = h( 'div', { class: 'wlfpb-opt', style: 'grid-template-columns:' + cols }, lab, val );
 				if ( o.image ) {
 					var im = h( 'input', { type: 'text', value: op.image || '', placeholder: 'Image URL', 'aria-label': 'Option image URL' } );
@@ -398,6 +420,7 @@
 					r.appendChild( h( 'div', { style: 'display:flex;gap:2px;min-width:0' }, im, h( 'button', { type: 'button', class: 'button button-small', text: '…', title: 'Choose from media library', onclick: function () { mediaPick( function ( u ) { op.image = u; im.value = u; touch(); if ( o.on ) { o.on(); } } ); } } ) ) );
 				}
 				if ( o.price ) { var pr = h( 'input', { type: 'text', value: op.price || '', placeholder: 'Price', 'aria-label': 'Option price' } ); pr.addEventListener( 'input', function () { op.price = pr.value; touch(); } ); r.appendChild( pr ); }
+				if ( o.limit ) { var lm = h( 'input', { type: 'number', min: 0, value: op.limit || '', placeholder: 'Max', title: 'Maximum number of times this option can be chosen (leave empty for unlimited)', 'aria-label': 'Option limit' } ); lm.addEventListener( 'input', function () { op.limit = lm.value; touch(); if ( o.on ) { o.on(); } } ); r.appendChild( lm ); }
 				if ( o.score ) { var sc = h( 'input', { type: 'number', step: 'any', value: op.score === undefined ? '' : op.score, placeholder: 'Score', 'aria-label': 'Option score' } ); sc.addEventListener( 'input', function () { op.score = sc.value; touch(); } ); r.appendChild( sc ); }
 				r.appendChild( h( 'button', { type: 'button', class: 'wlfpb-ib', title: 'Move up', text: '↑', onclick: function () { if ( i ) { f.options.splice( i - 1, 0, f.options.splice( i, 1 )[ 0 ] ); touch(); draw(); if ( o.on ) { o.on(); } } } } ) );
 				r.appendChild( h( 'button', { type: 'button', class: 'wlfpb-ib del', title: 'Remove', text: '✕', onclick: function () { f.options.splice( i, 1 ); touch(); draw(); if ( o.on ) { o.on(); } } } ) );
@@ -439,7 +462,8 @@
 		var any = true;
 		switch ( f.type ) {
 			case 'select': case 'multiselect': case 'radio': case 'checkbox':
-				w.appendChild( optionsEditor( f, { on: refresh, score: quizOn() } ) );
+				w.appendChild( optionsEditor( f, { on: refresh, score: quizOn(), limit: true } ) );
+				w.appendChild( check( f, 'show_left', 'Show seats left next to limited options' ) );
 				if ( f.type === 'radio' || f.type === 'checkbox' ) {
 					w.appendChild( sel( f, 'layout', [ [ 'vertical', 'Vertical list' ], [ 'horizontal', 'Inline' ] ], { label: 'Layout' } ) );
 					w.appendChild( check( f, 'other', 'Add an "Other" option with text box' ) );
@@ -487,7 +511,7 @@
 				w.appendChild( sel( f, 'kind', [ [ 'fixed', 'Fixed price' ], [ 'custom', 'Customer enters amount' ], [ 'select', 'Dropdown of priced options' ], [ 'radio', 'Radio buttons (pick one)' ], [ 'checkbox', 'Checkboxes (pick many)' ] ], { label: 'Pricing type', on: function () { renderSide(); refresh(); } } ) );
 				if ( f.kind === 'fixed' ) { w.appendChild( text( f, 'price', { label: 'Price', type: 'number', step: 'any', on: refresh } ) ); }
 				else if ( f.kind === 'custom' ) { w.appendChild( text( f, 'min', { label: 'Minimum amount', type: 'number', step: 'any' } ) ); }
-				else { w.appendChild( optionsEditor( f, { price: true, on: refresh } ) ); }
+				else { w.appendChild( optionsEditor( f, { price: true, limit: true, on: refresh } ) ); w.appendChild( check( f, 'show_left', 'Show units left next to limited options' ) ); }
 				break;
 			case 'quantity': {
 				var items = F.fields.filter( function ( x ) { return x.type === 'payment_item'; } ).map( function ( x ) { return [ x.name, x.label + ' (' + x.name + ')' ]; } );
@@ -497,7 +521,8 @@
 			case 'coupon': w.appendChild( h( 'p', { class: 'description', text: 'Create coupon codes under Payments.' } ) ); break;
 			case 'toggle': w.appendChild( text( f, 'toggle_text', { label: 'Text next to the switch' } ) ); break;
 			case 'image_choice':
-				w.appendChild( optionsEditor( f, { image: true, score: quizOn(), on: refresh } ) );
+				w.appendChild( optionsEditor( f, { image: true, score: quizOn(), limit: true, on: refresh } ) );
+				w.appendChild( check( f, 'show_left', 'Show seats left next to limited options' ) );
 				w.appendChild( check( f, 'multiple', 'Allow multiple selections' ) );
 				w.appendChild( text( f, 'columns', { label: 'Columns (1-6)', type: 'number', min: 1, max: 6 } ) ); break;
 			case 'ranking': w.appendChild( optionsEditor( f, { on: refresh } ) ); break;
@@ -584,7 +609,7 @@
 	/* ---------- SETTINGS tab ---------- */
 	function settingsTab( body ) {
 		var S2 = F.settings;
-		var secs = [ [ 'confirmation', 'Confirmation' ], [ 'button', 'Button & steps' ], [ 'style', 'Appearance' ], [ 'restrictions', 'Restrictions' ], [ 'spam', 'Spam protection' ], [ 'quiz', 'Quiz scoring' ], [ 'conversation', 'Conversational mode' ], [ 'entries', 'Entries & behaviour' ] ];
+		var secs = [ [ 'confirmation', 'Confirmation' ], [ 'button', 'Button & steps' ], [ 'style', 'Appearance' ], [ 'restrictions', 'Restrictions' ], [ 'spam', 'Spam protection' ], [ 'quiz', 'Quiz scoring' ], [ 'conversation', 'Conversational mode' ], [ 'resume', 'Save & resume' ], [ 'reference', 'Reference numbers' ], [ 'entries', 'Entries & behaviour' ] ];
 		var nav = h( 'div', { class: 'wlfpb-panel wlfpb-nav' }, secs.map( function ( s ) { return h( 'button', { type: 'button', class: S.sub === s[ 0 ] ? 'on' : '', text: s[ 1 ], onclick: function () { S.sub = s[ 0 ]; renderTab(); } } ); } ) );
 		var main = h( 'div', { class: 'wlfpb-panel wlfpb-wide' } );
 		var c;
@@ -612,6 +637,25 @@
 				main.appendChild( h( 'button', { type: 'button', class: 'button', text: '+ Add conditional confirmation', onclick: function () { c.rules.push( { type: 'message', message: '<p>Thanks!</p>', conditional: { enabled: 1, match: 'all', rules: [] } } ); touch(); renderTab(); } } ) );
 				if ( c.type === 'redirect' ) { main.appendChild( text( c, 'url', { label: 'Redirect URL', ph: 'https://…/thank-you?name={field:name:first}', help: 'Merge tags allowed.' } ) ); }
 				if ( c.type === 'page' ) { main.appendChild( sel( c, 'page_id', [ [ 0, '— choose —' ] ].concat( Object.keys( C.pages ).map( function ( k ) { return [ k, C.pages[ k ] ]; } ) ), { label: 'Page' } ) ); }
+				break;
+			case 'resume':
+				c = S2.resume = S2.resume || { enabled: 0, button_text: 'Save & continue later', expire_days: 30, subject: 'Continue your form: {form_title}', message: '' };
+				main.appendChild( check( c, 'enabled', 'Let visitors save their progress and finish later by email', { on: renderTab } ) );
+				if ( Number( c.enabled ) ) {
+					main.appendChild( h( 'p', { class: 'description', text: 'Adds a "Save & continue later" link to the form. The visitor enters an email address and receives a private link that reloads their answers (files, passwords and signatures are not saved). Drafts are deleted when the form is submitted or after the expiry below. Make sure your site can send email (Tools & logs → Send test email).' } ) );
+					main.appendChild( text( c, 'button_text', { label: 'Link text' } ) );
+					main.appendChild( text( c, 'expire_days', { label: 'Keep drafts for (days)', type: 'number', min: 1, max: 365 } ) );
+					main.appendChild( text( c, 'subject', { label: 'Email subject' } ) );
+					main.appendChild( area( c, 'message', { label: 'Email message (HTML). {resume_link} is required.', rows: 6 } ) );
+				}
+				break;
+			case 'reference':
+				c = S2.reference = S2.reference || { prefix: '', pad: 4, suffix: '' };
+				main.appendChild( h( 'p', { class: 'description', text: 'Give every submission a readable reference number such as INV-0042, built from the entry number. Use {reference} in the confirmation message, emails, redirects and webhooks.' } ) );
+				main.appendChild( text( c, 'prefix', { label: 'Prefix', ph: 'INV-' } ) );
+				main.appendChild( text( c, 'pad', { label: 'Minimum digits (zero-padded)', type: 'number', min: 0, max: 10 } ) );
+				main.appendChild( text( c, 'suffix', { label: 'Suffix', ph: '' } ) );
+				main.appendChild( h( 'p', { class: 'description', text: 'Example: ' + ( c.prefix || '' ) + '42'.padStart( parseInt( c.pad, 10 ) || 0, '0' ) + ( c.suffix || '' ) } ) );
 				break;
 			case 'conversation':
 				c = S2.conversation = S2.conversation || { enabled: 0, auto_advance: 1, next_text: 'OK', welcome: 0, welcome_title: '', welcome_text: '', start_text: 'Start' };
@@ -698,6 +742,7 @@
 		wrap.appendChild( h( 'p', { class: 'description', text: 'Send admin alerts and auto-replies. To e-mail the visitor, use their email field as the recipient, e.g. {field:email}.' } ) );
 		list.forEach( function ( n, i ) {
 			n.conditional = n.conditional || { enabled: 0, match: 'all', rules: [] };
+			n.delay_unit = n.delay_unit || 'hours';
 			var item = h( 'div', { class: 'wlfpb-list-item' } );
 			item.appendChild( h( 'header', null, check( n, 'enabled', '' ), h( 'span', { text: n.name || 'Notification' } ),
 				h( 'button', { type: 'button', class: 'button button-small', text: 'Duplicate', onclick: function () { list.splice( i + 1, 0, clone( n ) ); touch(); renderTab(); } } ),
@@ -705,11 +750,11 @@
 			var d = h( 'div' );
 			d.appendChild( text( n, 'name', { label: 'Internal name' } ) ); d.appendChild( text( n, 'to', { label: 'Send to', help: 'Comma-separated. Merge tags allowed.' } ) );
 			d.appendChild( text( n, 'subject', { label: 'Subject' } ) ); d.appendChild( area( n, 'message', { label: 'Message', rows: 8, help: 'HTML allowed. {all_data} prints a table of every answer.' } ) );
-			d.appendChild( h( 'details', null, h( 'summary', { text: 'More options' } ), text( n, 'reply_to', { label: 'Reply-To' } ), text( n, 'cc', { label: 'CC' } ), text( n, 'bcc', { label: 'BCC' } ), text( n, 'from_name', { label: 'From name' } ), text( n, 'from_email', { label: 'From email' } ), sel( n, 'format', [ [ 'html', 'HTML' ], [ 'plain', 'Plain text' ] ], { label: 'Format' } ), check( n, 'attach', 'Attach uploaded files' ) ) );
+			d.appendChild( h( 'details', null, h( 'summary', { text: 'More options' } ), text( n, 'reply_to', { label: 'Reply-To' } ), text( n, 'cc', { label: 'CC' } ), text( n, 'bcc', { label: 'BCC' } ), text( n, 'from_name', { label: 'From name' } ), text( n, 'from_email', { label: 'From email' } ), sel( n, 'format', [ [ 'html', 'HTML' ], [ 'plain', 'Plain text' ] ], { label: 'Format' } ), check( n, 'attach', 'Attach uploaded files' ), check( n, 'attach_pdf', 'Attach a PDF copy of the submission' ), h( 'div', { class: 'wlfpb-f' }, h( 'label', { text: 'Send later (follow-up / reminder)' } ), h( 'div', { style: 'display:flex;gap:6px' }, text( n, 'delay', { label: false, type: 'number', min: 0, ph: '0 = immediately' } ), sel( n, 'delay_unit', [ [ 'minutes', 'minutes' ], [ 'hours', 'hours' ], [ 'days', 'days' ] ], { label: false } ) ), h( 'div', { class: 'd', text: 'Delayed emails use WP-Cron (runs when your site gets visits). Spam and trashed entries are skipped.' } ) ) ) );
 			d.appendChild( h( 'details', { open: !! Number( n.conditional.enabled ) }, h( 'summary', { text: 'Send only if…' } ), condEditor( n.conditional, null ) ) );
 			item.appendChild( d ); wrap.appendChild( item );
 		} );
-		wrap.appendChild( h( 'button', { type: 'button', class: 'button', text: '+ Add notification', onclick: function () { list.push( { name: 'Notification ' + ( list.length + 1 ), enabled: 1, to: '{admin_email}', cc: '', bcc: '', reply_to: '', from_name: '', from_email: '', subject: 'New submission: {form_title}', message: '{all_data}', format: 'html', attach: 0, conditional: { enabled: 0, match: 'all', rules: [] } } ); touch(); renderTab(); } } ) );
+		wrap.appendChild( h( 'button', { type: 'button', class: 'button', text: '+ Add notification', onclick: function () { list.push( { name: 'Notification ' + ( list.length + 1 ), enabled: 1, to: '{admin_email}', cc: '', bcc: '', reply_to: '', from_name: '', from_email: '', subject: 'New submission: {form_title}', message: '{all_data}', format: 'html', attach: 0, attach_pdf: 0, delay: 0, delay_unit: 'hours', conditional: { enabled: 0, match: 'all', rules: [] } } ); touch(); renderTab(); } } ) );
 		wrap.appendChild( h( 'div', { class: 'wlfpb-panel', style: 'margin-top:16px' }, h( 'strong', { text: 'Merge tags' } ), tagChips() ) );
 		body.appendChild( wrap );
 	}
@@ -730,7 +775,8 @@
 					d.appendChild( text( fd, 'url', { label: 'Webhook URL', ph: 'https://hooks.zapier.com/…' } ) );
 					d.appendChild( sel( fd, 'method', [ [ 'POST', 'POST' ], [ 'GET', 'GET' ] ], { label: 'Method' } ) ); d.appendChild( sel( fd, 'format', [ [ 'json', 'JSON body' ], [ 'form', 'Form-encoded' ] ], { label: 'Format' } ) );
 					d.appendChild( area( fd, 'mapping', { label: 'Custom payload (optional)', rows: 4, ph: 'email={field:email}\nname={field:name}', help: 'One key=value per line. Leave empty to send every field.' } ) );
-					d.appendChild( area( fd, 'headers', { label: 'Extra headers (optional)', rows: 2, ph: 'Authorization: Bearer abc' } ) ); break;
+					d.appendChild( area( fd, 'headers', { label: 'Extra headers (optional)', rows: 2, ph: 'Authorization: Bearer abc' } ) );
+					d.appendChild( text( fd, 'secret', { label: 'Signing secret (optional)', help: 'Adds X-Weberslink-Timestamp and X-Weberslink-Signature: sha256=HMAC(timestamp + "." + body) so your endpoint can verify the request.' } ) ); break;
 				case 'slack': case 'discord': case 'teams':
 					d.appendChild( text( fd, 'url', { label: 'Incoming webhook URL' } ) ); d.appendChild( area( fd, 'message', { label: 'Message', rows: 4, ph: 'New submission on {form_title}\n{all_data}' } ) ); break;
 				case 'telegram':
@@ -774,6 +820,13 @@
 		if ( p.provider === 'paypal' && ! C.hasPaypal ) { wrap.appendChild( h( 'div', { class: 'wlfpb-warn' }, 'Add your PayPal credentials in ', h( 'a', { href: C.settingsUrl, target: '_blank', text: 'Settings' } ), '.' ) ); }
 		wrap.appendChild( sel( p, 'currency', [ [ '', 'Site default (' + C.globalCurrency + ')' ] ].concat( C.currencies.map( function ( c ) { return [ c, c ]; } ) ), { label: 'Currency' } ) );
 		wrap.appendChild( text( p, 'tax_percent', { label: 'Tax (%)', type: 'number', step: 'any' } ) );
+		if ( p.provider === 'stripe' ) {
+			wrap.appendChild( check( p, 'recurring', 'Subscription: charge this amount repeatedly (Stripe)', { on: renderTab } ) );
+			if ( Number( p.recurring ) ) {
+				wrap.appendChild( sel( p, 'interval', [ [ 'day', 'Every day' ], [ 'week', 'Every week' ], [ 'month', 'Every month' ], [ 'year', 'Every year' ] ], { label: 'Billing interval' } ) );
+				wrap.appendChild( h( 'div', { class: 'wlfpb-warn', text: 'Coupons and tax are folded into each recurring charge. Cancel subscriptions from your Stripe dashboard; the entry becomes "cancelled" when Stripe sends customer.subscription.deleted (add that event to your webhook).' } ) );
+			}
+		}
 		wrap.appendChild( text( p, 'description', { label: 'Payment description', help: 'Merge tags allowed.' } ) );
 		wrap.appendChild( check( p, 'send_after_payment', 'Send emails & run integrations only after payment succeeds' ) );
 		wrap.appendChild( text( p, 'success_url', { label: 'Success URL (optional)' } ) ); wrap.appendChild( text( p, 'cancel_url', { label: 'Cancel URL (optional)' } ) );

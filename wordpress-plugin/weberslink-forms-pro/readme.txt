@@ -4,7 +4,7 @@ Tags: form builder, contact form, multi step form, payment form, conditional log
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.2.0
+Stable tag: 1.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -20,6 +20,11 @@ Drag-and-drop form builder with conditional logic, multi-step forms, calculation
 * Text, paragraph, email, number, phone, URL, password, date/time/date-time, colour, hidden, dropdown, multi-select, radio, checkboxes (with "Other"), consent, name, address, country
 * File & image upload, star rating, net-promoter score, range slider, Likert matrix, signature pad, repeater rows, calculation, section, HTML, divider, shortcode, CAPTCHA
 * Multi-step forms with progress bar or step tabs
+* Save & resume later: visitors get a private email link that restores their answers
+* Per-option limits (seats / stock) with live "sold out" and "n left" labels
+* PDF copy of every submission: download from the entry or attach to emails
+* Delayed follow-up / reminder emails (WP-Cron), reference numbers (INV-0042), version history with restore
+* Answer-by-answer report with NPS score
 * Conversational mode: one question per screen, welcome screen, progress bar, Enter to continue, auto-advance on single-choice answers, conditional questions skipped automatically
 * Conditional logic (show/hide fields, conditional emails and integrations, 12 operators, ALL/ANY)
 * Calculations with a safe formula engine (client and server)
@@ -75,6 +80,17 @@ Add a Webhook integration pointing at a Google Apps Script web app, Zapier, Make
 Yes: Form → Settings → Appearance, CSS variables (`.wlfp-wrap{--wlfp-primary:#e11d48}`) or the per-form custom CSS box.
 
 == Changelog ==
+
+= 1.3.0 =
+* New: save & resume by email link (drafts expire automatically).
+* New: per-option limits (seats/stock) enforced on the server, with sold-out / seats-left labels.
+* New: PDF export of any entry, optional PDF attachment on notification emails.
+* New: delayed notifications (minutes, hours, days) for follow-ups and reminders.
+* New: reference numbers with {reference} merge tag.
+* New: form version history (last 25 saves) with one-click restore in the builder.
+* New: answer breakdown report per form (choice, rating, NPS with score).
+* New: webhook signing secret (HMAC-SHA256), Stripe subscriptions (recurring billing).
+* New template: event registration with limited seats.
 
 = 1.2.0 =
 * New: conversational (one-question-at-a-time) mode with welcome screen, progress, keyboard navigation, auto-advance and a ready-made template.

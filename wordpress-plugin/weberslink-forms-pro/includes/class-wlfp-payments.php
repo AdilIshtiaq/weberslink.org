@@ -180,14 +180,20 @@ class WLFP_Payments {
 		$cur  = strtolower( self::currency( $form ) );
 		$zero = WLFP_Helpers::zero_decimal( $cur );
 		$mult = $zero ? 1 : 100;
+		$sub  = ! empty( $form['settings']['payment']['recurring'] );
+		$intv = isset( $form['settings']['payment']['interval'] ) && in_array( $form['settings']['payment']['interval'], array( 'day', 'week', 'month', 'year' ), true ) ? $form['settings']['payment']['interval'] : 'month';
 		$body = array(
-			'mode'                => 'payment',
+			'mode'                => $sub ? 'subscription' : 'payment',
 			'success_url'         => self::return_url( $entry, 'stripe_ok' ) . '&session_id={CHECKOUT_SESSION_ID}',
 			'cancel_url'          => self::return_url( $entry, 'cancel' ),
 			'client_reference_id' => (string) $entry['id'],
 			'metadata'            => array( 'wlfp_entry' => (string) $entry['id'], 'wlfp_form' => (string) $form['id'] ),
-			'payment_intent_data' => array( 'metadata' => array( 'wlfp_entry' => (string) $entry['id'] ) ),
 		);
+		if ( $sub ) {
+			$body['subscription_data'] = array( 'metadata' => array( 'wlfp_entry' => (string) $entry['id'] ) );
+		} else {
+			$body['payment_intent_data'] = array( 'metadata' => array( 'wlfp_entry' => (string) $entry['id'] ) );
+		}
 		foreach ( $form['fields'] as $f ) {
 			if ( 'email' === $f['type'] && ! empty( $data[ $f['name'] ] ) ) {
 				$body['customer_email'] = $data[ $f['name'] ];
@@ -203,7 +209,7 @@ class WLFP_Payments {
 			$amount = ( $idx === $n - 1 ) ? round( $calc['total'] - $sum, 2 ) : round( $l['amount'] * $factor, 2 );
 			$sum   += $amount;
 			$unit   = $l['qty'] > 0 ? $amount / $l['qty'] : $amount;
-			$body['line_items'][ $i ] = array( 'quantity' => max( 1, (int) $l['qty'] ), 'price_data' => array( 'currency' => $cur, 'unit_amount' => (int) round( $unit * $mult ), 'product_data' => array( 'name' => mb_substr( $l['label'], 0, 120 ) ) ) );
+			$body['line_items'][ $i ] = array( 'quantity' => max( 1, (int) $l['qty'] ), 'price_data' => array( 'currency' => $cur, 'unit_amount' => (int) round( $unit * $mult ), 'product_data' => array( 'name' => mb_substr( $l['label'], 0, 120 ) ) ) + ( $sub ? array( 'recurring' => array( 'interval' => $intv ) ) : array() ) );
 			$i++;
 		}
 		if ( ! $i || $calc['total'] <= 0 ) {
@@ -330,7 +336,7 @@ class WLFP_Payments {
 		}
 		$j = json_decode( wp_remote_retrieve_body( $r ), true );
 		if ( ! empty( $j['payment_status'] ) && 'paid' === $j['payment_status'] && ( $j['client_reference_id'] ?? '' ) === (string) $entry['id'] ) {
-			self::mark_paid( $entry['id'], isset( $j['payment_intent'] ) ? $j['payment_intent'] : $session_id, 'stripe' );
+			self::mark_paid( $entry['id'], ! empty( $j['payment_intent'] ) ? $j['payment_intent'] : ( ! empty( $j['subscription'] ) ? $j['subscription'] : $session_id ), 'stripe' );
 			return true;
 		}
 		return false;
@@ -425,10 +431,13 @@ class WLFP_Payments {
 			$type = isset( $ev['type'] ) ? $ev['type'] : '';
 			if ( 'checkout.session.completed' === $type || 'checkout.session.async_payment_succeeded' === $type ) {
 				if ( isset( $obj['payment_status'] ) && 'paid' === $obj['payment_status'] ) {
-					self::mark_paid( $eid, isset( $obj['payment_intent'] ) ? $obj['payment_intent'] : ( $obj['id'] ?? '' ), 'stripe' );
+					self::mark_paid( $eid, ! empty( $obj['payment_intent'] ) ? $obj['payment_intent'] : ( ! empty( $obj['subscription'] ) ? $obj['subscription'] : ( $obj['id'] ?? '' ) ), 'stripe' );
 				}
 			} elseif ( 'checkout.session.expired' === $type || 'checkout.session.async_payment_failed' === $type ) {
 				WLFP_Entries::update( $eid, array( 'payment_status' => 'failed' ) );
+			} elseif ( 'customer.subscription.deleted' === $type ) {
+				WLFP_Entries::update( $eid, array( 'payment_status' => 'cancelled' ) );
+				WLFP_Install::log( 0, $eid, 'stripe', 'info', 'Subscription cancelled' );
 			} elseif ( 'charge.refunded' === $type ) {
 				WLFP_Entries::update( $eid, array( 'payment_status' => 'refunded' ) );
 			}

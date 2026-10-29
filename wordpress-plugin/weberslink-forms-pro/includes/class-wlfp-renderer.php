@@ -46,6 +46,10 @@ class WLFP_Renderer {
 				'draft'     => __( 'We restored your saved progress.', 'weberslink-forms-pro' ),
 				'mismatch'  => __( 'The two values do not match.', 'weberslink-forms-pro' ),
 				'convOf'    => __( '%1$s of %2$s', 'weberslink-forms-pro' ),
+				'resumeEmail' => __( 'Your email address', 'weberslink-forms-pro' ),
+				'resumeSend'  => __( 'Email me the link', 'weberslink-forms-pro' ),
+				'resumeHelp'  => __( 'We will email you a private link to finish this form later.', 'weberslink-forms-pro' ),
+				'resumeFail'  => __( 'Could not save. Please try again.', 'weberslink-forms-pro' ),
 				'convHint'  => __( 'press Enter ↵', 'weberslink-forms-pro' ),
 				'convBack'  => __( 'Previous question', 'weberslink-forms-pro' ),
 				'rangeBad'  => __( 'The end date must be on or after the start date.', 'weberslink-forms-pro' ),
@@ -160,8 +164,18 @@ class WLFP_Renderer {
 			$css_vars[] = '--wlfp-radius:' . (int) $style['radius'] . 'px';
 		}
 
-		// Prefill values.
-		$prefill = array();
+		// Prefill values (from a saved draft first, then URL parameters).
+		$prefill      = array();
+		$draft_token  = '';
+		$resume_step  = 0;
+		if ( ! empty( $st['resume']['enabled'] ) && isset( $_GET['wlfp_resume'] ) ) { // phpcs:ignore
+			$draft = WLFP_Drafts::get( sanitize_text_field( wp_unslash( $_GET['wlfp_resume'] ) ) ); // phpcs:ignore
+			if ( $draft && (int) $draft['form_id'] === (int) $form['id'] ) {
+				$prefill     = isset( $draft['data']['values'] ) && is_array( $draft['data']['values'] ) ? $draft['data']['values'] : array();
+				$draft_token = $draft['token'];
+				$resume_step = (int) $draft['step'];
+			}
+		}
 		if ( ! empty( $st['misc']['prefill_get'] ) ) {
 			foreach ( $form['fields'] as $f ) {
 				if ( ! empty( $f['name'] ) && isset( $_GET[ $f['name'] ] ) ) { // phpcs:ignore
@@ -219,6 +233,7 @@ class WLFP_Renderer {
 		}
 		$config = array(
 			'conv'     => $conv_cfg,
+			'resume'   => ! empty( $st['resume']['enabled'] ) ? array( 'button' => $st['resume']['button_text'], 'step' => $resume_step ) : null,
 			'formId'   => $form['id'],
 			'steps'    => array_map( function ( $s ) {
 				return $s['title'];
@@ -259,6 +274,9 @@ class WLFP_Renderer {
 		echo '<input type="hidden" name="wlfp_source" value="' . esc_url( ( is_ssl() ? 'https://' : 'http://' ) . ( isset( $_SERVER['HTTP_HOST'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_HOST'] ) ) : '' ) . ( isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '' ) ) . '" />';
 		if ( $is_preview ) {
 			echo '<input type="hidden" name="wlfp_preview" value="1" />';
+		}
+		if ( $draft_token ) {
+			echo '<input type="hidden" name="wlfp_draft" value="' . esc_attr( $draft_token ) . '" />';
 		}
 		if ( ! empty( $st['spam']['honeypot'] ) ) {
 			echo '<div class="wlfp-hp" aria-hidden="true"><label>' . esc_html__( 'Leave this field empty', 'weberslink-forms-pro' ) . '<input type="text" name="' . esc_attr( WLFP_Spam::hp_name( $form['id'] ) ) . '" value="" tabindex="-1" autocomplete="off" /></label></div>';

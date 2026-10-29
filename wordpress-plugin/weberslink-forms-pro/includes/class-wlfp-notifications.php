@@ -6,6 +6,34 @@ class WLFP_Notifications {
 	public static function init() {
 		// Show confirmation after a payment redirect.
 		add_filter( 'the_content', array( __CLASS__, 'thanks_banner' ), 5 );
+		add_action( 'wlfp_delayed_email', array( __CLASS__, 'run_delayed' ), 10, 2 );
+	}
+
+	public static function delay_seconds( $n ) {
+		$d = isset( $n['delay'] ) ? (float) $n['delay'] : 0;
+		if ( $d <= 0 ) {
+			return 0;
+		}
+		$unit = isset( $n['delay_unit'] ) ? $n['delay_unit'] : 'hours';
+		$mult = 'minutes' === $unit ? MINUTE_IN_SECONDS : ( 'days' === $unit ? DAY_IN_SECONDS : HOUR_IN_SECONDS );
+		return (int) min( 90 * DAY_IN_SECONDS, $d * $mult );
+	}
+
+	/** WP-Cron callback for delayed / follow-up emails. */
+	public static function run_delayed( $entry_id, $index ) {
+		$entry = WLFP_Entries::get( (int) $entry_id );
+		if ( ! $entry || in_array( $entry['status'], array( 'spam', 'trashed' ), true ) ) {
+			return;
+		}
+		$form = WLFP_Forms::get( $entry['form_id'] );
+		if ( ! $form || empty( $form['settings']['notifications'][ (int) $index ] ) ) {
+			return;
+		}
+		$n = $form['settings']['notifications'][ (int) $index ];
+		if ( empty( $n['enabled'] ) || ! WLFP_Logic::passes( isset( $n['conditional'] ) ? $n['conditional'] : array(), $entry['data'] ) ) {
+			return;
+		}
+		self::send( $form, $entry, $n );
 	}
 
 	/** Prepends the confirmation after returning from a payment or a non-AJAX submit. */
@@ -28,6 +56,12 @@ class WLFP_Notifications {
 				continue;
 			}
 			if ( ! WLFP_Logic::passes( isset( $n['conditional'] ) ? $n['conditional'] : array(), $entry['data'] ) ) {
+				continue;
+			}
+			$delay = self::delay_seconds( $n );
+			if ( $delay > 0 && ! empty( $entry['id'] ) ) {
+				wp_schedule_single_event( time() + $delay, 'wlfp_delayed_email', array( (int) $entry['id'], (int) $i ) );
+				WLFP_Install::log( $form['id'], $entry['id'], 'email', 'info', ( isset( $n['name'] ) ? $n['name'] : 'Notification' ) . ' scheduled', sprintf( /* translators: %s: time */ __( 'Will send around %s (requires WP-Cron)', 'weberslink-forms-pro' ), get_date_from_gmt( gmdate( 'Y-m-d H:i:s', time() + $delay ), 'Y-m-d H:i' ) ) );
 				continue;
 			}
 			self::send( $form, $entry, $n );
@@ -94,7 +128,20 @@ class WLFP_Notifications {
 				}
 			}
 		}
+		$tmp_files = array();
+		if ( ! empty( $n['attach_pdf'] ) ) {
+			list( $pdf_name, $pdf_bytes ) = WLFP_Pdf::entry( $form, $entry );
+			$dir = trailingslashit( get_temp_dir() );
+			$tmp = $dir . wp_unique_filename( $dir, $pdf_name );
+			if ( false !== file_put_contents( $tmp, $pdf_bytes ) ) { // phpcs:ignore
+				$attach[]    = $tmp;
+				$tmp_files[] = $tmp;
+			}
+		}
 		$ok = wp_mail( $to, $subject, $body, $headers, $attach );
+		foreach ( $tmp_files as $tf ) {
+			@unlink( $tf ); // phpcs:ignore
+		}
 		WLFP_Install::log( $form['id'], $entry['id'], 'email', $ok ? 'success' : 'failed', ( $n['name'] ?? 'Notification' ) . ( $ok ? ' sent' : ' failed' ), implode( ', ', $to ) );
 		return $ok;
 	}

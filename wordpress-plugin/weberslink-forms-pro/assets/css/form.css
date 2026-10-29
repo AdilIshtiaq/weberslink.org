@@ -322,3 +322,16 @@
 .wlfp-wrap .wlfp-conv-welcome>div{margin-bottom:1.5rem;opacity:.9}
 @keyframes wlfp-slide-in{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
 @keyframes wlfp-slide-back{from{opacity:0;transform:translateY(-22px)}to{opacity:1;transform:none}}
+
+/* ---------- Save & resume ---------- */
+.wlfp-wrap .wlfp-resume-link{display:inline-block;margin:1rem 0 0;padding:0;border:0;background:none;color:inherit;font:inherit;font-size:.9em;text-decoration:underline;opacity:.8;cursor:pointer}
+.wlfp-wrap .wlfp-resume-link:hover{opacity:1;color:var(--wlfp-p)}
+.wlfp-wrap .wlfp-resume-panel{margin-top:.8rem;padding:1em;border:1px solid var(--wlfp-b);border-radius:var(--wlfp-r)}
+.wlfp-wrap .wlfp-resume-panel[hidden]{display:none}
+.wlfp-wrap .wlfp-resume-help{margin:0 0 .6rem;font-size:.9em;opacity:.85}
+.wlfp-wrap .wlfp-resume-row{display:flex;gap:.6rem;flex-wrap:wrap}
+.wlfp-wrap .wlfp-resume-row .wlfp-input{flex:1 1 200px;width:auto}
+.wlfp-wrap .wlfp-form .wlfp-resume-send{padding:.6em 1.1em}
+.wlfp-wrap .wlfp-resume-msg{margin:.6rem 0 0;font-size:.9em}
+.wlfp-wrap .wlfp-resume-msg:empty{display:none}
+.wlfp-wrap .wlfp-resume-msg.is-ok{color:#1a7f45}.wlfp-wrap .wlfp-resume-msg.is-err{color:var(--wlfp-err)}

@@ -101,6 +101,33 @@ class WLFP_Install {
 			KEY created_at (created_at)
 		) $c;" );
 
+		dbDelta( "CREATE TABLE {$p}wlfp_drafts (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			token varchar(40) NOT NULL,
+			form_id bigint(20) unsigned NOT NULL,
+			email varchar(190) NOT NULL DEFAULT '',
+			data longtext,
+			step int(10) unsigned NOT NULL DEFAULT 0,
+			created_at datetime NOT NULL,
+			expires_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY token (token),
+			KEY form_id (form_id),
+			KEY expires_at (expires_at)
+		) $c;" );
+
+		dbDelta( "CREATE TABLE {$p}wlfp_revisions (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			form_id bigint(20) unsigned NOT NULL,
+			user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			title varchar(255) NOT NULL DEFAULT '',
+			fields longtext,
+			settings longtext,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			KEY form_id (form_id)
+		) $c;" );
+
 		dbDelta( "CREATE TABLE {$p}wlfp_views (
 			form_id bigint(20) unsigned NOT NULL,
 			day date NOT NULL,
@@ -145,6 +172,7 @@ class WLFP_Install {
 			$cut = gmdate( 'Y-m-d H:i:s', time() - $ld * DAY_IN_SECONDS );
 			$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->prefix}wlfp_logs WHERE created_at < %s", $cut ) ); // phpcs:ignore
 		}
+		WLFP_Drafts::cleanup();
 		// Abandoned pending payments older than 3 days -> failed status label (kept for the record).
 		$cut = gmdate( 'Y-m-d H:i:s', time() - 3 * DAY_IN_SECONDS );
 		$wpdb->query( $wpdb->prepare( "UPDATE {$wpdb->prefix}wlfp_entries SET payment_status='abandoned' WHERE payment_status='pending' AND created_at < %s", $cut ) ); // phpcs:ignore
