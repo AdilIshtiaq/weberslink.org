@@ -33,13 +33,14 @@ const GUIDES = pages.filter((p) => p.type === "guide");
 function nav() {
   return `<header class="nav scrolled" id="nav">
   <div class="wrap">
-    <a href="/" class="logo"><span class="logo-mark" aria-hidden="true">W</span>WebersLink</a>
+    <a href="/" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="187" height="33"></a>
     <nav class="nav-links" id="navLinks" aria-label="Main">
       <a href="/services/">Services</a>
       <a href="/industries/">Industries</a>
       <a href="/#work">Work</a>
       <a href="/#pricing">Pricing</a>
       <a href="/blog/">Guides</a>
+      <a href="/plugins/">Plugins</a>
     </nav>
     <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="nav">Book a free call</a>
     <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false"><span></span><span></span></button>
@@ -54,7 +55,7 @@ function footer() {
   <div class="wrap">
     <div class="foot-cols">
       <div class="fcol fcol-brand">
-        <a href="/" class="logo"><span class="logo-mark" aria-hidden="true">W</span>WebersLink</a>
+        <a href="/" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="187" height="33"></a>
         <p>Done-for-you lead systems — websites, AI that answers every lead in 60 seconds, and automatic follow-up — for contractors and service businesses in the US &amp; Europe.</p>
         <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="footer">Book a free call</a>
       </div>
@@ -63,7 +64,7 @@ function footer() {
       ${col("Guides", GUIDES.slice(0, 5))}
     </div>
     <div class="foot-big" aria-hidden="true">WebersLink</div>
-    <div class="copy"><span>© <span id="yr">${new Date().getFullYear()}</span> WebersLink · Lahore, Pakistan · Serving clients in the US &amp; Europe</span><span><a href="/privacy">Privacy</a> · <a href="mailto:hassan@weberslink.org">hassan@weberslink.org</a></span></div>
+    <div class="copy"><span>© <span id="yr">${new Date().getFullYear()}</span> WebersLink · Lahore, Pakistan · Serving clients in the US &amp; Europe</span><span><a href="/plugins/">Plugins</a> · <a href="/privacy">Privacy</a> · <a href="mailto:hassan@weberslink.org">hassan@weberslink.org</a></span></div>
   </div>
 </footer>`;
 }
@@ -112,6 +113,20 @@ function schema(p) {
       image: SITE + "/og.png",
     });
   }
+  if (p.software) {
+    graph.push({
+      "@type": "SoftwareApplication",
+      name: p.software.name,
+      description: p.description,
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "WordPress 5.8+",
+      softwareVersion: p.software.version,
+      downloadUrl: SITE + p.software.download,
+      fileSize: p.software.size,
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+      publisher: org,
+    });
+  }
   if (p.faqs && p.faqs.length) {
     graph.push({
       "@type": "FAQPage",
@@ -137,7 +152,7 @@ function render(p) {
 <meta name="description" content="${esc(p.description)}">
 <link rel="canonical" href="${url}">
 <meta name="theme-color" content="#0a0a0a">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48"><link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta property="og:type" content="${p.type === "guide" ? "article" : "website"}">
 <meta property="og:site_name" content="WebersLink">
@@ -169,10 +184,10 @@ ${nav()}
     <h1>${p.h1}</h1>
     <p class="lead">${p.lead}</p>
     ${meta}
-    <div class="hero-cta">
+    ${p.heroCta || `<div class="hero-cta">
       <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="${p.path}">Book a free strategy call →</a>
       <a href="/#audit" class="btn btn-ghost" data-track="Audit CTA" data-loc="${p.path}">Get a free website audit</a>
-    </div>
+    </div>`}
   </div>
 </section>
 
@@ -286,6 +301,95 @@ write("/blog/", hub({
   items: GUIDES,
 }));
 
+// ---------- Plugins (/plugins/ and /plugins/<slug>) ----------
+const PLUGIN_DIR = path.join(__dirname, "..", "wordpress-plugin", "weberslink-forms-pro");
+const PLUGIN_ZIP = "/downloads/weberslink-forms-pro.zip";
+const pluginVersion = (fs.readFileSync(path.join(PLUGIN_DIR, "weberslink-forms-pro.php"), "utf8").match(/^\s*\*\s*Version:\s*([\d.]+)/m) || [])[1] || "1.0.0";
+const zipFile = path.join(PUBLIC, PLUGIN_ZIP);
+const zipBytes = fs.existsSync(zipFile) ? fs.statSync(zipFile).size : 0;
+const zipSize = zipBytes ? (zipBytes < 1048576 ? Math.round(zipBytes / 1024) + " KB" : (zipBytes / 1048576).toFixed(1) + " MB") : "";
+const SOFTWARE = { name: "Weberslink Forms Pro", version: pluginVersion, download: PLUGIN_ZIP, size: zipSize };
+
+const pluginFaqs = [
+  ["Is Weberslink Forms Pro free?", "Yes. The download is free and licensed under the GPL, so you can use it on as many of your own WordPress sites as you like."],
+  ["Will it look right on my theme?", "Yes. Forms inherit your theme's fonts and text colour, use translucent borders that read on light and dark backgrounds, and ship with six style presets plus per-form colour and custom CSS."],
+  ["Which WordPress and PHP versions does it need?", "WordPress 5.8 or newer and PHP 7.4 or newer. It works with classic themes, block themes, Elementor and other page builders through a shortcode, a Gutenberg block, a widget and an Elementor widget."],
+  ["How do I install it?", "In your WordPress admin go to Plugins → Add New → Upload Plugin, choose the ZIP you downloaded, install and activate. Then open Weberslink Forms → Add new and pick a template."],
+  ["Can it take payments?", "Yes: Stripe Checkout (including subscriptions) and PayPal, with products, quantities, coupons and tax. Totals are always calculated on the server. You add your own Stripe or PayPal keys in the plugin settings."],
+  ["Where is my data stored?", "In your own WordPress database. Nothing is sent to us. You can anonymise or disable IP storage, auto-delete old entries, and the plugin hooks into WordPress's personal-data export and erase tools for GDPR requests."],
+];
+
+const pluginCard = (loc) => `<div class="plugin-card">
+  <div class="plugin-head"><span class="plugin-badge">WordPress plugin</span><span class="plugin-ver">v${pluginVersion}${zipSize ? " · " + zipSize : ""} · Free download</span></div>
+  <h2>Weberslink Forms Pro</h2>
+  <p>A complete drag-and-drop form builder: 45+ field types, multi-step and conversational forms, conditional logic, payments, file uploads, PDFs, spam protection and integrations — styled to blend into any theme.</p>
+  <ul class="plugin-feats">
+    <li>30+ ready-made templates</li>
+    <li>Stripe, PayPal &amp; subscriptions</li>
+    <li>Save &amp; resume by email link</li>
+    <li>Seat / stock limits per option</li>
+    <li>Quizzes, calculations &amp; reports</li>
+    <li>Webhooks, Slack, Mailchimp &amp; more</li>
+  </ul>
+  <div class="plugin-actions">
+    <a class="btn btn-dark" href="${PLUGIN_ZIP}" download data-track="Plugin download" data-loc="${loc}">Download ZIP ↓</a>
+    <a class="btn btn-outline" href="/plugins/weberslink-forms-pro" data-track="Plugin details" data-loc="${loc}">Features &amp; install guide →</a>
+  </div>
+</div>`;
+
+write("/plugins/", render({
+  path: "/plugins/", type: "hub", kicker: "Plugins",
+  title: "Free WordPress Plugins | WebersLink",
+  description: "Free WordPress plugins from WebersLink. Download Weberslink Forms Pro, a drag-and-drop form builder with payments, conditional logic and 30+ templates.",
+  h1: "Free WordPress plugins <em>you can download.</em>",
+  lead: "Tools we build and use for our own client sites, packaged so you can install them in a minute.",
+  card: { title: "Plugins" },
+  software: SOFTWARE,
+  heroCta: `<div class="hero-cta">
+      <a href="${PLUGIN_ZIP}" class="btn btn-light" download data-track="Plugin download" data-loc="hero">Download Weberslink Forms Pro ↓</a>
+      <a href="/plugins/weberslink-forms-pro" class="btn btn-ghost" data-track="Plugin details" data-loc="hero">See features</a>
+    </div>`,
+  faqs: pluginFaqs,
+  body: pluginCard("plugins-hub"),
+}).replace('<div class="wrap prose-wrap">', '<div class="wrap prose-wrap hub">'));
+
+write("/plugins/weberslink-forms-pro", render({
+  path: "/plugins/weberslink-forms-pro", type: "plugin", kicker: "WordPress plugin",
+  title: "Weberslink Forms Pro: Free WordPress Form Builder Plugin | WebersLink",
+  description: "Download Weberslink Forms Pro: a free drag-and-drop WordPress form builder with multi-step and conversational forms, conditional logic, Stripe & PayPal payments, PDFs and 30+ templates.",
+  h1: "Weberslink Forms Pro — the <em>form builder</em> that fits any theme.",
+  lead: "Build contact, quote, booking, payment, quiz and survey forms visually. Free to download and use.",
+  crumbs: [["Plugins", "/plugins/"]],
+  card: { title: "Weberslink Forms Pro" },
+  software: SOFTWARE,
+  heroCta: `<div class="hero-cta">
+      <a href="${PLUGIN_ZIP}" class="btn btn-light" download data-track="Plugin download" data-loc="hero">Download Weberslink Forms Pro ↓</a>
+      <a href="/plugins/weberslink-forms-pro" class="btn btn-ghost" data-track="Plugin details" data-loc="hero">See features</a>
+    </div>`,
+  faqs: pluginFaqs,
+  related: ["/services/web-design", "/services/automation"],
+  body: `<p><a class="btn btn-dark" href="${PLUGIN_ZIP}" download data-track="Plugin download" data-loc="plugin-detail-top">Download ZIP ↓</a> <span class="plugin-ver">Version ${pluginVersion}${zipSize ? " · " + zipSize : ""} · WordPress 5.8+ · PHP 7.4+ · GPL-2.0-or-later</span></p>
+<h2>What's inside</h2>
+<ul>
+  <li><strong>Visual builder:</strong> drag &amp; drop, 45+ field types (text, choice, image choice, ranking, date range, file &amp; image upload, signature, repeater, rating, NPS, calculation, dynamic dropdowns, embeds), 30+ templates, undo-friendly version history.</li>
+  <li><strong>Smart forms:</strong> conditional logic, multi-step with progress, conversational one-question-at-a-time mode, calculations, quizzes with scoring, conditional confirmations, save &amp; resume by email.</li>
+  <li><strong>Works with every theme:</strong> inherits your fonts and colours, readable on light and dark backgrounds, RTL ready. Shortcode, Gutenberg block, widget and Elementor widget.</li>
+  <li><strong>Entries &amp; reports:</strong> search, filter, notes, edit, reply by email, PDF download, CSV export, answer-breakdown reports with NPS, conversion tracking.</li>
+  <li><strong>Emails:</strong> unlimited notifications and auto-responders with merge tags, PDF or file attachments, delayed follow-ups and reference numbers.</li>
+  <li><strong>Payments:</strong> Stripe Checkout (one-time and subscriptions), PayPal, offline; products, quantities, coupons, tax, per-option seat or stock limits.</li>
+  <li><strong>Integrations:</strong> signed webhooks (Zapier, Make, n8n, Google Sheets via Apps Script), Slack, Discord, Teams, Telegram, Mailchimp, create WordPress users or posts.</li>
+  <li><strong>Spam &amp; privacy:</strong> honeypot, time trap, rate limits, Akismet, reCAPTCHA, hCaptcha, Turnstile; IP anonymising, auto-delete, GDPR export and erase.</li>
+</ul>
+<h2>Install in 3 steps</h2>
+<ol>
+  <li>Download the ZIP above.</li>
+  <li>In WordPress go to <em>Plugins → Add New → Upload Plugin</em>, choose the ZIP, install and activate.</li>
+  <li>Open <em>Weberslink Forms → Add new</em>, pick a template, then embed it with <code>[weberslink_form id="1"]</code>.</li>
+</ol>
+<p><a class="btn btn-dark" href="${PLUGIN_ZIP}" download data-track="Plugin download" data-loc="plugin-detail-bottom">Download ZIP ↓</a></p>
+<p class="plugin-note">Need a custom form setup, payments wired up or a site built around it? <a href="/#book">Book a free call</a> and we'll sort it for you.</p>`,
+}));
+
 // ---------- Shared footer on the homepage ----------
 const homeFile = path.join(PUBLIC, "index.html");
 const home = fs.readFileSync(homeFile, "utf8");
@@ -299,6 +403,7 @@ const urls = [
   ...SERVICES.map((p) => [p.path, "0.9"]),
   ...INDUSTRIES.map((p) => [p.path, "0.8"]),
   ...GUIDES.map((p) => [p.path, "0.7"]),
+  ["/plugins/", "0.7"], ["/plugins/weberslink-forms-pro", "0.7"],
   ["/privacy", "0.2"],
 ];
 fs.writeFileSync(path.join(PUBLIC, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>
@@ -307,4 +412,4 @@ ${urls.map(([u, pr]) => `  <url><loc>${SITE}${u}</loc><lastmod>${(byPath[u] && (
 </urlset>
 `);
 
-console.log(`Built ${pages.length + 3} pages and sitemap.xml (${urls.length} URLs).`);
+console.log(`Built ${pages.length + 5} pages and sitemap.xml (${urls.length} URLs).`);

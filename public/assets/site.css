@@ -525,3 +525,20 @@ form.sent .form-fields{display:none}
   .chat-open .chat-launch,.chat-open .sticky-cta{display:none}
 }
 @media(prefers-reduced-motion:reduce){.chat-msg.typing span{animation:none}}
+
+/* ---------- Plugins ---------- */
+.plugin-card{border:1px solid var(--line-l);border-radius:16px;padding:28px 26px;background:var(--white);box-shadow:0 24px 60px -34px rgba(0,0,0,.3)}
+.plugin-head{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;margin-bottom:14px}
+.plugin-badge{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:5px 11px;border-radius:999px;background:var(--black);color:var(--white)}
+.plugin-ver{font-size:13px;color:var(--grey-5)}
+.plugin-card h2{margin:0 0 10px!important;font-size:clamp(24px,3vw,30px);letter-spacing:-.03em;color:var(--ink)}
+.plugin-card p{margin:0 0 16px}
+.plugin-feats{list-style:none;padding:0!important;margin:0 0 22px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 18px}
+.plugin-feats li{margin:0!important;padding-left:24px;position:relative;font-size:15px}
+.plugin-feats li::before{content:"✓";position:absolute;left:0;font-weight:600;color:var(--ink)}
+.plugin-actions{display:flex;flex-wrap:wrap;gap:12px}
+.prose .btn{text-decoration:none!important}
+.prose .btn-dark{color:var(--white)}
+.prose .btn-outline{color:var(--ink)}
+.plugin-note{padding:16px 18px;border:1px solid var(--line-l);border-radius:12px;background:var(--paper)}
+@media(max-width:560px){.plugin-feats{grid-template-columns:1fr}}

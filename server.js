@@ -216,11 +216,13 @@ function redirect(res, location) {
   res.writeHead(301, { Location: location, "Cache-Control": "public, max-age=86400" });
   res.end();
 }
+const LEGACY_REDIRECTS = { "/weberslink-forms-pro": "/plugins/weberslink-forms-pro" };
 function seoRedirect(req, res) {
   const host = (req.headers.host || "").toLowerCase();
   const [rawPath, query] = req.url.split("?");
   const qs = query ? "?" + query : "";
   if (host === "www." + CANONICAL_HOST) return redirect(res, `https://${CANONICAL_HOST}${req.url}`), true;
+  if (LEGACY_REDIRECTS[rawPath.replace(/\.html$/, "").replace(/\/+$/, "")]) return redirect(res, LEGACY_REDIRECTS[rawPath.replace(/\.html$/, "").replace(/\/+$/, "")] + qs), true;
   let p = rawPath.replace(/\/{2,}/g, "/");
   if (/\/index\.html$/.test(p)) p = p.replace(/index\.html$/, "");
   else if (/\.html$/.test(p) && p !== "/404.html") p = p.replace(/\.html$/, "");
