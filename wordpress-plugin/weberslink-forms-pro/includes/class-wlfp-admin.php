@@ -39,9 +39,14 @@ class WLFP_Admin {
 		add_submenu_page( 'wlfp', __( 'Reports', 'weberslink-forms-pro' ), __( 'Reports', 'weberslink-forms-pro' ), $cap, 'wlfp-reports', array( __CLASS__, 'page_reports' ) );
 		add_submenu_page( 'wlfp', __( 'Tools & logs', 'weberslink-forms-pro' ), __( 'Tools & logs', 'weberslink-forms-pro' ), $cap, 'wlfp-tools', array( __CLASS__, 'page_tools' ) );
 		add_submenu_page( 'wlfp', __( 'Settings', 'weberslink-forms-pro' ), __( 'Settings', 'weberslink-forms-pro' ), $cap, 'wlfp-settings', array( __CLASS__, 'page_settings' ) );
-		// Hidden page: registered under our menu, then removed from the visible submenu.
-		add_submenu_page( 'wlfp', __( 'Form builder', 'weberslink-forms-pro' ), '', $cap, 'wlfp-builder', array( __CLASS__, 'page_builder' ) );
-		remove_submenu_page( 'wlfp', 'wlfp-builder' );
+		// The builder is a real submenu page (so WordPress always grants access to it); it is only hidden visually.
+		add_submenu_page( 'wlfp', __( 'Form builder', 'weberslink-forms-pro' ), __( 'Form builder', 'weberslink-forms-pro' ), $cap, 'wlfp-builder', array( __CLASS__, 'page_builder' ) );
+		add_action( 'admin_head', array( __CLASS__, 'hide_builder_link' ) );
+	}
+
+	public static function hide_builder_link() {
+		echo '<style>#adminmenu .wp-submenu li:has(> a[href$="page=wlfp-builder"]){display:none}</style>';
+		echo '<script>document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll(\'#adminmenu a[href$="page=wlfp-builder"]\').forEach(function(a){if(a.parentNode.tagName==="LI"){a.parentNode.style.display="none";}});});</script>';
 	}
 
 	public static function assets( $hook ) {
@@ -160,6 +165,7 @@ class WLFP_Admin {
 		echo '<table class="wp-list-table widefat fixed striped"><thead><tr><th style="width:28%">' . esc_html__( 'Title', 'weberslink-forms-pro' ) . '</th><th>' . esc_html__( 'Shortcode', 'weberslink-forms-pro' ) . '</th><th>' . esc_html__( 'Entries', 'weberslink-forms-pro' ) . '</th><th>' . esc_html__( 'Views', 'weberslink-forms-pro' ) . '</th><th>' . esc_html__( 'Conversion', 'weberslink-forms-pro' ) . '</th><th>' . esc_html__( 'Status', 'weberslink-forms-pro' ) . '</th></tr></thead><tbody>';
 		if ( ! $forms ) {
 			echo '<tr><td colspan="6">' . esc_html__( 'No forms yet.', 'weberslink-forms-pro' ) . ' <a href="' . esc_url( self::url( 'wlfp-new' ) ) . '">' . esc_html__( 'Create your first form', 'weberslink-forms-pro' ) . '</a></td></tr>';
+			$empty = true;
 		}
 		foreach ( $forms as $f ) {
 			$n  = WLFP_Forms::entry_count( $f['id'] );
@@ -181,16 +187,44 @@ class WLFP_Admin {
 			echo '<tr><td><strong><a href="' . esc_url( $edit ) . '">' . esc_html( $f['title'] ) . '</a></strong> <span class="description">#' . (int) $f['id'] . '</span><div class="row-actions visible">' . implode( ' | ', $acts ) . '</div></td>'; // phpcs:ignore
 			echo '<td><input type="text" readonly class="wlfp-sc" value="' . esc_attr( '[weberslink_form id="' . $f['id'] . '"]' ) . '" onclick="this.select()" /></td><td>' . (int) $n . '</td><td>' . (int) $v . '</td><td>' . esc_html( $cv ) . '</td><td><span class="wlfp-pill wlfp-pill-' . esc_attr( $f['status'] ) . '">' . esc_html( ucfirst( $f['status'] ) ) . '</span></td></tr>';
 		}
-		echo '</tbody></table></div>';
+		echo '</tbody></table>';
+		if ( ! empty( $empty ) && ! $search ) {
+			echo '<h2 style="margin-top:28px">' . esc_html__( 'Start from a template', 'weberslink-forms-pro' ) . '</h2>';
+			self::template_cards( 8 );
+			echo '<p><a class="button" href="' . esc_url( self::url( 'wlfp-new' ) ) . '">' . esc_html__( 'Browse all templates', 'weberslink-forms-pro' ) . '</a></p>';
+		}
+		echo '</div>';
+	}
+
+	private static function template_cards( $limit = 0, $cat = 'all' ) {
+		$n = 0;
+		echo '<div class="wlfp-tpls">';
+		foreach ( WLFP_Templates::all() as $slug => $t ) {
+			if ( 'all' !== $cat && ( isset( $t['cat'] ) ? $t['cat'] : 'contact' ) !== $cat ) {
+				continue;
+			}
+			if ( $limit && ++$n > $limit ) {
+				break;
+			}
+			echo '<a class="wlfp-tpl" data-title="' . esc_attr( strtolower( $t['title'] . ' ' . $t['desc'] ) ) . '" href="' . esc_url( self::nonce_url( array( 'action' => 'wlfp_create_form', 'tpl' => $slug ), 'wlfp_create' ) ) . '"><strong>' . esc_html( $t['title'] ) . '</strong><span>' . esc_html( $t['desc'] ) . '</span><em>' . (int) count( $t['fields'] ) . ' ' . esc_html__( 'fields', 'weberslink-forms-pro' ) . '</em></a>';
+		}
+		echo '</div>';
 	}
 
 	public static function page_new() {
+		$cat = isset( $_GET['cat'] ) ? sanitize_key( $_GET['cat'] ) : 'all'; // phpcs:ignore
 		self::header( __( 'Create a form', 'weberslink-forms-pro' ) );
-		echo '<p>' . esc_html__( 'Pick a template or start blank. Everything can be changed in the builder.', 'weberslink-forms-pro' ) . '</p><div class="wlfp-tpls">';
-		foreach ( WLFP_Templates::all() as $slug => $t ) {
-			echo '<a class="wlfp-tpl" href="' . esc_url( self::nonce_url( array( 'action' => 'wlfp_create_form', 'tpl' => $slug ), 'wlfp_create' ) ) . '"><strong>' . esc_html( $t['title'] ) . '</strong><span>' . esc_html( $t['desc'] ) . '</span><em>' . (int) count( $t['fields'] ) . ' ' . esc_html__( 'fields', 'weberslink-forms-pro' ) . '</em></a>';
+		echo '<p>' . esc_html__( 'Pick a template or start blank. Everything can be changed in the builder.', 'weberslink-forms-pro' ) . '</p>';
+		echo '<ul class="subsubsub" style="float:none;margin-bottom:10px">';
+		$cats = WLFP_Templates::categories();
+		$i    = 0;
+		foreach ( $cats as $k => $l ) {
+			echo '<li><a href="' . esc_url( self::url( 'wlfp-new', array( 'cat' => $k ) ) ) . '"' . ( $cat === $k ? ' class="current"' : '' ) . '>' . esc_html( $l ) . '</a>' . ( ++$i < count( $cats ) ? ' | ' : '' ) . '</li>';
 		}
-		echo '</div></div>';
+		echo '</ul><p><input type="search" id="wlfp-tpl-search" placeholder="' . esc_attr__( 'Search templates…', 'weberslink-forms-pro' ) . '" style="width:280px" /></p>';
+		self::template_cards( 0, isset( $cats[ $cat ] ) ? $cat : 'all' );
+		echo '<script>(function(){var s=document.getElementById("wlfp-tpl-search");if(!s)return;s.addEventListener("input",function(){var q=s.value.toLowerCase();document.querySelectorAll(".wlfp-tpl").forEach(function(a){a.style.display=a.getAttribute("data-title").indexOf(q)===-1?"none":""});});}());</script>';
+		echo '</div>';
 	}
 
 	public static function create_form() {

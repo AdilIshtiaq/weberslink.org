@@ -4,7 +4,7 @@ Tags: form builder, contact form, multi step form, payment form, conditional log
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -73,6 +73,10 @@ Add a Webhook integration pointing at a Google Apps Script web app, Zapier, Make
 Yes: Form → Settings → Appearance, CSS variables (`.wlfp-wrap{--wlfp-primary:#e11d48}`) or the per-form custom CSS box.
 
 == Changelog ==
+
+= 1.0.1 =
+* Fix: Edit/Form builder page was blocked for administrators.
+* New: 25+ templates in categories with search; templates shown on the empty Forms screen.
 
 = 1.0.0 =
 * Initial release.

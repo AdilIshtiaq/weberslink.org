@@ -3,7 +3,7 @@
  * Plugin Name:       Weberslink Forms Pro
  * Plugin URI:        https://weberslink.org/
  * Description:       A complete drag-and-drop form builder: 35+ field types, multi-step forms, conditional logic, calculations, file uploads, spam protection, entries manager, email notifications, payments and integrations. Styled to blend into any theme.
- * Version:           1.0.0
+ * Version:           1.0.1
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            WebersLink
@@ -16,7 +16,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'WLFP_VERSION', '1.0.0' );
+define( 'WLFP_VERSION', '1.0.1' );
 define( 'WLFP_FILE', __FILE__ );
 define( 'WLFP_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WLFP_URL', plugin_dir_url( __FILE__ ) );
