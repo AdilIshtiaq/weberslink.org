@@ -1,0 +1,74 @@
+{
+ "forms-1-builder": [
+  1200,
+  759
+ ],
+ "forms-10-conv-question": [
+  884,
+  440
+ ],
+ "forms-11-booking": [
+  784,
+  411
+ ],
+ "forms-2-field-logic": [
+  1200,
+  759
+ ],
+ "forms-3-emails": [
+  1200,
+  759
+ ],
+ "forms-4-integrations": [
+  1200,
+  759
+ ],
+ "forms-5-payments": [
+  1200,
+  759
+ ],
+ "forms-6-settings": [
+  1200,
+  759
+ ],
+ "forms-7-form-step1": [
+  884,
+  915
+ ],
+ "forms-8-form-payment": [
+  884,
+  569
+ ],
+ "forms-9-conv-welcome": [
+  884,
+  440
+ ],
+ "smtp-1-log": [
+  1200,
+  794
+ ],
+ "smtp-2-email": [
+  1200,
+  794
+ ],
+ "smtp-3-settings": [
+  1200,
+  882
+ ],
+ "smtp-4-backup": [
+  1200,
+  794
+ ],
+ "smtp-5-routing": [
+  1200,
+  794
+ ],
+ "smtp-6-controls": [
+  1200,
+  794
+ ],
+ "smtp-7-tools": [
+  1200,
+  1015
+ ]
+}

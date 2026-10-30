@@ -125,12 +125,10 @@ class WLSMTP_Admin {
 				$o .= '<rect x="' . $x . '" y="' . ( $h - 1 ) . '" width="' . ( $w - 6 ) . '" height="1" fill="#c3c4c7"/>';
 			}
 			$o .= '</g>';
-			if ( 0 === $i || $i === $n - 1 ) {
-				$o .= '<text x="' . ( $i * $w + $w / 2 ) . '" y="' . ( $h + 11 ) . '" font-size="8" text-anchor="' . ( 0 === $i ? 'start' : 'end' ) . '" fill="#646970">' . esc_html( substr( $day, 5 ) ) . '</text>';
-			}
 			$i++;
 		}
-		return $o . '</svg><span class="wlsmtp-legend"><i style="background:#2271b1"></i>' . esc_html__( 'Sent', 'weberslink-smtp' ) . ' <i style="background:#d63638"></i>' . esc_html__( 'Failed', 'weberslink-smtp' ) . ' · ' . esc_html__( 'last 14 days', 'weberslink-smtp' ) . '</span></div>';
+		$days = array_keys( $series );
+		return $o . '</svg><span class="wlsmtp-axis"><span>' . esc_html( substr( reset( $days ), 5 ) ) . '</span><span>' . esc_html( substr( end( $days ), 5 ) ) . '</span></span><span class="wlsmtp-legend"><i style="background:#2271b1"></i>' . esc_html__( 'Sent', 'weberslink-smtp' ) . ' <i style="background:#d63638"></i>' . esc_html__( 'Failed', 'weberslink-smtp' ) . ' · ' . esc_html__( 'last 14 days', 'weberslink-smtp' ) . '</span></div>';
 	}
 
 	/* ---------------- Email log ---------------- */

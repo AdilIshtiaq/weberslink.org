@@ -338,6 +338,40 @@ const pluginFaqs = [
 ];
 
 
+
+// ---------- Screen-by-screen walkthroughs (screenshots rendered from the plugins' real admin and front-end UI) ----------
+const SHOT_DIMS = JSON.parse(fs.readFileSync(path.join(__dirname, "shots.json"), "utf8"));
+const shotsSection = (heading, intro, list) => `<h2>${heading}</h2>
+<p>${intro}</p>
+<div class="shots">
+${list.map(([id, title, text], i) => { const d = SHOT_DIMS[id]; return `  <figure class="shot${d[0] < 1000 ? " shot-narrow" : ""}">
+    <a href="/assets/plugins/${id}.webp" target="_blank" rel="noopener"><img src="/assets/plugins/${id}.webp" width="${d[0]}" height="${d[1]}" alt="${esc(title)}" loading="lazy"></a>
+    <figcaption><span class="shot-n">${i + 1}</span><strong>${esc(title)}</strong> ${esc(text)}</figcaption>
+  </figure>`; }).join("\n")}
+</div>`;
+const FORMS_SHOTS = shotsSection("Screen by screen", "How building and publishing a form works, from the editor to what your visitors see. Click any screen to enlarge it.", [
+  ["forms-1-builder", "Build the form.", "Click or drag any of 50 field types into the canvas. Fields can sit side by side (half or third width) and be reordered with the arrows or by dragging."],
+  ["forms-2-field-logic", "Fine-tune each field.", "Select a field to set its label, placeholder, required message, width and options. Conditional logic shows or hides a field based on earlier answers, here the phone number only appears when the visitor prefers a call."],
+  ["forms-3-emails", "Send the right emails.", "Unlimited notifications and auto-responders with merge tags such as {field:name}, optional PDF attachment, and a \"send only if\" rule per email."],
+  ["forms-4-integrations", "Connect your tools.", "Feeds run after each submission: signed webhooks with automatic retries (Zapier, Make, n8n, Google Sheets), Slack, Mailchimp and more."],
+  ["forms-5-payments", "Take payments.", "Add product fields, then choose Stripe Checkout, PayPal or offline. Set currency, tax, coupons and run emails only after payment succeeds."],
+  ["forms-6-settings", "Control the details.", "Confirmation message or redirect, button text, multi-step, styling, entry limits and schedule, spam protection and more."],
+  ["forms-7-form-step1", "Visitors fill it in.", "A clean, theme-proof front end with a progress bar, inline validation, live calculations and fields that appear only when needed."],
+  ["forms-8-form-payment", "Pay as part of the form.", "Package choice, tax and total update live before the visitor submits."],
+  ["forms-9-conv-welcome", "Or one question at a time.", "Conversational mode turns any form into a full-screen, one-question-per-slide flow with an optional welcome screen."],
+  ["forms-10-conv-question", "Keyboard friendly.", "Enter moves to the next question, a progress bar shows how far along the visitor is, and conditional questions are skipped automatically."],
+  ["forms-11-booking", "Take bookings.", "The slot picker shows only open times, respects capacity and closed days, and sends a calendar invite with the confirmation."],
+]);
+const SMTP_SHOTS = shotsSection("Screen by screen", "What you see in WordPress once the plugin is active. Click any screen to enlarge it.", [
+  ["smtp-1-log", "Email log.", "Every email with status, recipient, subject, the plugin or theme that sent it, how it was delivered and opens/clicks, plus a 14-day sent and failed chart."],
+  ["smtp-2-email", "Preview any email.", "A safe, sandboxed preview of exactly what was sent, with full details and one-click resend."],
+  ["smtp-3-settings", "Connect your provider.", "Pick SMTP with one-click presets, or send over the SendGrid, Brevo, Mailgun or Postmark API. Passwords and keys are stored encrypted."],
+  ["smtp-4-backup", "Add a backup connection.", "If the primary connection fails, the email is re-sent through the backup straight away and the log shows which one delivered it."],
+  ["smtp-5-routing", "Route emails smartly.", "Send some emails another way, for example shop receipts through a transactional service, based on plugin, subject, recipient domain or sender."],
+  ["smtp-6-controls", "Alerts, reports and controls.", "Slack or Discord failure alerts, a weekly summary email, and switches to turn off WordPress notification emails you do not want."],
+  ["smtp-7-tools", "Test and check deliverability.", "Send a test through the primary or backup connection and see the SMTP conversation with credentials hidden, then check SPF, DKIM and DMARC with plain-English advice."],
+]);
+
 // ---------- Second plugin: Weberslink SMTP & Email Log ----------
 const SMTP_DIR = path.join(__dirname, "..", "wordpress-plugin", "weberslink-smtp");
 const SMTP_ZIP = "/downloads/weberslink-smtp.zip";
@@ -448,6 +482,7 @@ ${HIGHLIGHTS[pluginVersion] ? `<div class="plugin-new plugin-new-box"><strong>Wh
   <li><strong>Integrations &amp; API:</strong> signed webhooks with automatic retries (Zapier, Make, n8n, Google Sheets via Apps Script), Slack, Discord, Teams, Telegram, Mailchimp, create WordPress users or posts, plus a read-only REST API with API keys.</li>
   <li><strong>Spam &amp; privacy:</strong> honeypot, time trap, rate limits, Akismet, reCAPTCHA, hCaptcha, Turnstile; IP anonymising, auto-delete, GDPR export and erase.</li>
 </ul>
+${FORMS_SHOTS}
 <h2>Install in 3 steps</h2>
 <ol>
   <li>Download the ZIP above.</li>
@@ -491,6 +526,7 @@ write("/plugins/weberslink-smtp", render({
   <li><strong>Test tool:</strong> sends a real test message and shows the full SMTP conversation with your credentials hidden, so you can see exactly where a connection breaks.</li>
   <li><strong>Deliverability check:</strong> looks up your domain's SPF (including the 10-lookup limit), DKIM and DMARC and explains what to fix in plain English.</li>
 </ul>
+${SMTP_SHOTS}
 <h2>Install in 3 steps</h2>
 <ol>
   <li>Download the ZIP above.</li>

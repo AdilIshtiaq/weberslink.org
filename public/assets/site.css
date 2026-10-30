@@ -548,3 +548,12 @@ form.sent .form-fields{display:none}
 .plugin-new-box ul{margin:8px 0 0;padding-left:20px}
 .plugin-new-box li{margin:3px 0}
 .plugin-card .plugin-new{margin:0 0 20px}
+
+.shots{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin:22px 0 8px}
+.shot:not(.shot-narrow){grid-column:1/-1}
+.shot{margin:0;border:1px solid var(--line-l);border-radius:14px;background:var(--white);overflow:hidden;box-shadow:0 18px 44px -30px rgba(0,0,0,.35)}
+.shot a{display:block;background:var(--paper)}
+.shot img{display:block;width:100%;height:auto;border-bottom:1px solid var(--line-l)}
+.shot figcaption{padding:14px 16px 16px;font-size:14px;line-height:1.55;color:var(--ink-2,inherit)}
+.shot-n{display:inline-grid;place-items:center;width:22px;height:22px;margin-right:8px;border-radius:50%;background:var(--ink,#111);color:#fff;font-size:12px;font-weight:700;vertical-align:1px}
+@media(max-width:760px){.shots{grid-template-columns:1fr}}
