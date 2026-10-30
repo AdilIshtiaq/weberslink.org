@@ -603,6 +603,74 @@ const EXTRA = [
       ["Which WordPress and PHP versions does it need?", "WordPress 5.9 or newer and PHP 7.4 or newer."],
     ],
   },
+  {
+    slug: "weberslink-images", dir: "weberslink-images", file: "weberslink-images.php", name: "Weberslink Image Optimizer", short: "Image Optimizer", menu: "Image Optimizer",
+    title: "Weberslink Image Optimizer: Free WordPress Image Compression & WebP Plugin | WebersLink",
+    description: "Download Weberslink Image Optimizer: a free WordPress plugin that compresses and resizes images on upload, fixes phone rotation, removes location data, creates WebP versions and optimises your whole media library, with no external service.",
+    h1: "Weberslink Image Optimizer — <em>lighter pages, same pictures.</em>",
+    lead: "Shrink every image on your site without visible loss, serve modern WebP automatically, and keep your originals safe.",
+    cardText: "Compress and resize images on upload, straighten phone photos, strip location data, serve WebP automatically, optimise your whole library and restore any original. Runs on your own server.",
+    feats: ["Compress & resize on upload", "WebP versions served automatically", "Bulk-optimise the whole library", "Fixes phone rotation, strips GPS", "Restore any original", "No account, no external service"],
+    inside: [
+      ["Smaller files, same look", "Compresses JPEG, PNG and WebP uploads and every generated thumbnail at the quality you choose. It never makes a file bigger, skips files already at your quality so repeat runs cannot degrade them, and keeps PNG transparency."],
+      ["Scales huge photos", "Camera originals of 4000 pixels and more are scaled down to the maximum you set. Generated thumbnails keep their sizes, and WordPress's own unscaled copy is compressed too."],
+      ["Upright and private", "Phone photos are turned upright and camera metadata such as GPS location is removed, so a picture can no longer reveal where it was taken."],
+      ["WebP without server rules", "Creates a WebP twin of each image and wraps images in a picture tag, so every browser picks the best format. It needs no .htaccess changes and is safe with page caches and CDNs."],
+      ["Your whole library", "Optimise existing media in small steps with a progress bar, so it works on slow hosts too. See the savings per image in the media library, and optimise or restore any single image."],
+      ["Safe and private", "Originals can be kept for one-click restore. Everything runs on your server with PHP's GD library: no account, no API key and no image ever leaves your site."],
+    ],
+    phases: [["Set up", "Choose quality and limits"], ["Optimise", "Bulk or on upload"], ["Check", "See the savings"]],
+    steps: [
+      ["img-1-optimizer", "Settings", "Set it and forget it", "Pick your quality and maximum size, switch on WebP and original backups, then optimise the whole library with one click. New uploads are handled automatically.", 0, "yoursite.com/wp-admin · Image Optimizer"],
+      ["img-2-library", "Media library", "See what you saved", "Each image shows how much smaller it got and whether it has a WebP version. Optimise a single image, or restore its original, from the same list.", 2, "yoursite.com/wp-admin · Media Library"],
+    ],
+    install: "Open <em>Media → Image Optimizer</em>, check the settings and click <em>Optimise all images</em>.",
+    faqs: [
+      ["Is Weberslink Image Optimizer free?", "Yes. It is a free download under the GPL and works on as many of your own WordPress sites as you like."],
+      ["Does it send my images to an outside service?", "No. Everything runs on your own server using PHP's GD library. There is no account, no API key and no monthly image quota."],
+      ["Will my images look worse?", "PNG recompression is lossless. JPEG and WebP are compressed at the quality you choose; around 80 to 85 is normally indistinguishable from the original. Files already at that quality are skipped, so running it again never degrades them."],
+      ["Can I get my original back?", "Yes, when Keep originals is on. Restore original puts the uploaded file back and removes its WebP versions. Thumbnails stay optimised."],
+      ["How does it serve WebP?", "It wraps images in a picture tag with a WebP source, so each browser picks the best format. No server rules are needed and it is safe with caching plugins and CDNs. If a theme styles images in a way that conflicts, switch this option off and compression still works."],
+      ["Which WordPress and PHP versions does it need?", "WordPress 5.9 or newer and PHP 7.4 or newer, with the GD extension (WebP support is needed only for the WebP files)."],
+    ],
+  },
+  {
+    slug: "weberslink-popups", dir: "weberslink-popups", file: "weberslink-popups.php", name: "Weberslink Popups & Lead Capture", short: "Popups & Lead Capture", menu: "Popups",
+    title: "Weberslink Popups & Lead Capture: Free WordPress Popup & Email Capture Plugin | WebersLink",
+    description: "Download Weberslink Popups & Lead Capture: a free WordPress plugin for popups, slide-ins and announcement bars with exit-intent, scroll and click triggers, targeting, frequency limits, spam-protected email capture, CSV export and a webhook.",
+    h1: "Weberslink Popups &amp; Lead Capture — <em>turn visitors into subscribers.</em>",
+    lead: "Show the right message at the right moment, collect emails safely, and see which popups actually work.",
+    cardText: "Popups, slide-ins and announcement bars with exit-intent, scroll and click triggers, page and device targeting, frequency limits, spam-protected email capture, CSV export and a webhook.",
+    feats: ["Popup, slide-in & announcement bar", "Delay, scroll, exit & click triggers", "Page, device & schedule targeting", "Spam-protected email capture", "Leads list, CSV export & webhook", "Views, sign-ups & conversion rate"],
+    inside: [
+      ["Three formats", "A centred popup, a corner slide-in and an announcement bar at the top or bottom, with your headline, text, colours and button. Collect an email (with optional name and consent checkbox) or show a call-to-action button."],
+      ["Triggers that respect visitors", "Show after a delay, after scrolling a percentage, on exit intent (desktop), when a button is clicked, or straight away. Once per visit, once every N days or every time; people who subscribe are not asked again."],
+      ["Precise targeting", "Everywhere, the home page only, or a list of pages with wildcards. Never on checkout or thank-you pages. Desktop or mobile only, logged-out visitors only, and start and end dates for sales."],
+      ["Leads you can use", "Search the leads list, export CSV (spreadsheet formulas neutralised), or send each new lead as signed JSON to Zapier, Make, n8n or your CRM. Optional email notification, capped so bots cannot flood your inbox."],
+      ["Spam protection", "A hidden honeypot field, per-visitor rate limits, duplicate emails ignored and an optional consent checkbox keep your list clean."],
+      ["Measured and accessible", "Views, sign-ups and conversion rate for the last 30 days. Dialogs trap focus, close with Escape, return focus afterwards and have large touch targets."],
+    ],
+    phases: [["Design", "Message and colours"], ["Target", "When and who"], ["Collect", "Leads and results"]],
+    steps: [
+      ["pop-5-modal", "Popup", "A message with a purpose", "A centred popup with a headline, a short pitch, an email field and an optional consent checkbox.", 0, "yoursite.com"],
+      ["pop-6-slide", "Slide-in", "Less intrusive", "A slide-in that appears in the corner while the page stays scrollable. A good fit for mobile and for returning readers.", 0, "yoursite.com"],
+      ["pop-7-bar", "Announcement bar", "Tell everyone, quietly", "A bar across the top or bottom for shipping offers, sales and news, with a button to the page you want.", 0, "yoursite.com"],
+      ["pop-8-mobile", "Mobile", "Built for phones", "Full-width fields, large touch targets and a dialog that always fits the screen.", 0, "yoursite.com (mobile)"],
+      ["pop-2-editor", "Editor", "Write it in a minute", "Headline, text, form options, button, colours and thank-you message, with a one-click preview on your real site.", 1, "yoursite.com/wp-admin · Popups"],
+      ["pop-3-targeting", "Targeting", "Right place, right time", "Triggers, frequency and who sees it: pages, devices, logged-out visitors and a date range.", 1, "yoursite.com/wp-admin · Popups"],
+      ["pop-1-list", "Results", "See what works", "Views, sign-ups and conversion rate for each popup, with preview, on/off, duplicate and delete in one row.", 2, "yoursite.com/wp-admin · Popups"],
+      ["pop-4-leads", "Leads", "Your list, your data", "Search, delete and export every lead as CSV, and send new leads to your tools with a webhook.", 2, "yoursite.com/wp-admin · Leads"],
+    ],
+    install: "Open <em>Popups → Add new</em>, write your message, choose when and where it shows, save, then click <em>Preview</em>.",
+    faqs: [
+      ["Is Weberslink Popups & Lead Capture free?", "Yes. It is a free download under the GPL and works on as many of your own WordPress sites as you like."],
+      ["Can it send leads to Mailchimp, Klaviyo or my CRM?", "Use the webhook with Zapier, Make or n8n, or post straight to an endpoint that accepts JSON. A signature header lets you verify each request came from your site. You can also export a CSV at any time."],
+      ["Will popups hurt my SEO?", "Large popups that cover the page right after arrival on mobile can. Use a delay, a slide-in or a bar, and limit full-screen popups on phones."],
+      ["Is it GDPR friendly?", "You can require a consent checkbox with your own wording, and the leads list lets you delete any lead. Visitors' IP addresses are not stored, only a one-way fingerprint used for rate limiting. This is not legal advice."],
+      ["Does it work with caching plugins?", "Yes. Page targeting is decided on the server for each URL, while triggers, devices and frequency run in the browser."],
+      ["Which WordPress and PHP versions does it need?", "WordPress 5.9 or newer and PHP 7.4 or newer."],
+    ],
+  },
 ];
 for (const x of EXTRA) {
   x.zip = `/downloads/${x.slug}.zip`;
@@ -628,14 +696,14 @@ ${x.feats.map((f) => `    <li>${esc(f)}</li>`).join("\n")}
 write("/plugins/", render({
   path: "/plugins/", type: "hub", kicker: "Plugins",
   title: "Free WordPress Plugins | WebersLink",
-  description: "Free WordPress plugins from WebersLink: Forms Pro, SMTP & Email Log, Redirects & 404 Monitor, Security Shield, SEO Toolkit and Cookie Consent.",
+  description: "Free WordPress plugins from WebersLink: Forms Pro, SMTP & Email Log, Redirects & 404 Monitor, Security Shield, SEO Toolkit, Cookie Consent, Image Optimizer and Popups & Lead Capture.",
   h1: "Free WordPress plugins <em>you can download.</em>",
   lead: "Tools we build and use for our own client sites, packaged so you can install them in a minute.",
   card: { title: "Plugins" },
   software: SOFTWARE,
   heroCta: `<div class="hero-cta">
       <a href="${PLUGIN_ZIP}" class="btn btn-light" download data-track="Plugin download" data-loc="hero">Download Forms Pro ↓</a>
-      <a href="/plugins/weberslink-smtp" class="btn btn-ghost" data-track="Plugin details" data-loc="hero-all">Browse all 6 plugins</a>
+      <a href="/plugins/weberslink-smtp" class="btn btn-ghost" data-track="Plugin details" data-loc="hero-all">Browse all 8 plugins</a>
     </div>`,
   faqs: pluginFaqs,
   body: pluginCard("plugins-hub") + "\n" + smtpCard("plugins-hub") + "\n" + EXTRA.map((x) => x.card("plugins-hub")).join("\n"),
@@ -770,7 +838,7 @@ const urls = [
   ...SERVICES.map((p) => [p.path, "0.9"]),
   ...INDUSTRIES.map((p) => [p.path, "0.8"]),
   ...GUIDES.map((p) => [p.path, "0.7"]),
-  ["/plugins/", "0.7"], ["/plugins/weberslink-forms-pro", "0.7"], ["/plugins/weberslink-smtp", "0.7"], ["/plugins/weberslink-redirects", "0.7"], ["/plugins/weberslink-security", "0.7"], ["/plugins/weberslink-seo", "0.7"], ["/plugins/weberslink-cookies", "0.7"],
+  ["/plugins/", "0.7"], ["/plugins/weberslink-forms-pro", "0.7"], ["/plugins/weberslink-smtp", "0.7"], ["/plugins/weberslink-redirects", "0.7"], ["/plugins/weberslink-security", "0.7"], ["/plugins/weberslink-seo", "0.7"], ["/plugins/weberslink-cookies", "0.7"], ["/plugins/weberslink-images", "0.7"], ["/plugins/weberslink-popups", "0.7"],
   ["/privacy", "0.2"],
 ];
 fs.writeFileSync(path.join(PUBLIC, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>

@@ -28,5 +28,7 @@
   <url><loc>https://weberslink.org/plugins/weberslink-security</loc><lastmod>2026-10-30</lastmod><priority>0.7</priority></url>
   <url><loc>https://weberslink.org/plugins/weberslink-seo</loc><lastmod>2026-10-30</lastmod><priority>0.7</priority></url>
   <url><loc>https://weberslink.org/plugins/weberslink-cookies</loc><lastmod>2026-10-30</lastmod><priority>0.7</priority></url>
+  <url><loc>https://weberslink.org/plugins/weberslink-images</loc><lastmod>2026-10-30</lastmod><priority>0.7</priority></url>
+  <url><loc>https://weberslink.org/plugins/weberslink-popups</loc><lastmod>2026-10-30</lastmod><priority>0.7</priority></url>
   <url><loc>https://weberslink.org/privacy</loc><lastmod>2026-10-30</lastmod><priority>0.2</priority></url>
 </urlset>
