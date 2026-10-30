@@ -310,27 +310,48 @@ const zipBytes = fs.existsSync(zipFile) ? fs.statSync(zipFile).size : 0;
 const zipSize = zipBytes ? (zipBytes < 1048576 ? Math.round(zipBytes / 1024) + " KB" : (zipBytes / 1048576).toFixed(1) + " MB") : "";
 const SOFTWARE = { name: "Weberslink Forms Pro", version: pluginVersion, download: PLUGIN_ZIP, size: zipSize };
 
+// Changelog comes straight from the plugin's readme.txt so the site never drifts from the release.
+const readmeTxt = fs.readFileSync(path.join(PLUGIN_DIR, "readme.txt"), "utf8");
+const changelog = [];
+{
+  const sec = (readmeTxt.split(/==\s*Changelog\s*==/)[1] || "").trim();
+  sec.split(/^=\s*([\d.]+)\s*=\s*$/m).slice(1).reduce((acc, part, i, arr) => {
+    if (i % 2 === 0) changelog.push({ version: part, items: (arr[i + 1] || "").split("\n").map((l) => l.replace(/^\*\s*/, "").trim()).filter((l) => l && !l.startsWith("=")) });
+    return acc;
+  }, null);
+}
+const HIGHLIGHTS = {
+  "1.4.0": ["Live appointment slots with calendar invites", "Entry workflow stages & assignment", "Excel export & branded emails", "REST API with keys", "Auto-retry for failed webhooks"],
+};
+const newBadge = HIGHLIGHTS[pluginVersion] ? `<p class="plugin-new"><strong>New in v${pluginVersion}:</strong> ${HIGHLIGHTS[pluginVersion].map(esc).join(" · ")}</p>` : "";
+const changelogHtml = changelog.slice(0, 4).map((c) => `<h3>Version ${esc(c.version)}</h3>\n<ul>\n${c.items.map((i) => `  <li>${esc(i)}</li>`).join("\n")}\n</ul>`).join("\n");
+
 const pluginFaqs = [
   ["Is Weberslink Forms Pro free?", "Yes. The download is free and licensed under the GPL, so you can use it on as many of your own WordPress sites as you like."],
   ["Will it look right on my theme?", "Yes. Forms inherit your theme's fonts and text colour, use translucent borders that read on light and dark backgrounds, and ship with six style presets plus per-form colour and custom CSS."],
   ["Which WordPress and PHP versions does it need?", "WordPress 5.8 or newer and PHP 7.4 or newer. It works with classic themes, block themes, Elementor and other page builders through a shortcode, a Gutenberg block, a widget and an Elementor widget."],
   ["How do I install it?", "In your WordPress admin go to Plugins → Add New → Upload Plugin, choose the ZIP you downloaded, install and activate. Then open Weberslink Forms → Add new and pick a template."],
   ["Can it take payments?", "Yes: Stripe Checkout (including subscriptions) and PayPal, with products, quantities, coupons and tax. Totals are always calculated on the server. You add your own Stripe or PayPal keys in the plugin settings."],
+  ["Can visitors book appointments?", "Yes. The appointment-slots field lets people pick a date and a free time. You set opening hours, slot length, how many bookings per slot, closed weekdays, blocked dates and minimum notice. Booked times disappear for everyone else, and the confirmation email can include a calendar invite (.ics)."],
+  ["Can I connect it to my own tools?", "Yes. Use signed webhooks (Zapier, Make, n8n, Google Sheets via Apps Script), Slack, Discord, Teams, Telegram or Mailchimp, export entries to Excel or CSV, or read forms and entries through the REST API with revocable API keys. Failed webhooks retry automatically."],
   ["Where is my data stored?", "In your own WordPress database. Nothing is sent to us. You can anonymise or disable IP storage, auto-delete old entries, and the plugin hooks into WordPress's personal-data export and erase tools for GDPR requests."],
 ];
 
 const pluginCard = (loc) => `<div class="plugin-card">
   <div class="plugin-head"><span class="plugin-badge">WordPress plugin</span><span class="plugin-ver">v${pluginVersion}${zipSize ? " · " + zipSize : ""} · Free download</span></div>
   <h2>Weberslink Forms Pro</h2>
-  <p>A complete drag-and-drop form builder: 45+ field types, multi-step and conversational forms, conditional logic, payments, file uploads, PDFs, spam protection and integrations — styled to blend into any theme.</p>
+  <p>A complete drag-and-drop form builder: 50 field types, multi-step and conversational forms, conditional logic, payments, file uploads, PDFs, spam protection and integrations — styled to blend into any theme.</p>
   <ul class="plugin-feats">
-    <li>30+ ready-made templates</li>
+    <li>35+ ready-made templates</li>
     <li>Stripe, PayPal &amp; subscriptions</li>
     <li>Save &amp; resume by email link</li>
     <li>Seat / stock limits per option</li>
+    <li>Live appointment booking with calendar invites</li>
+    <li>Entry workflow, assignment &amp; Excel export</li>
     <li>Quizzes, calculations &amp; reports</li>
-    <li>Webhooks, Slack, Mailchimp &amp; more</li>
+    <li>REST API, webhooks, Slack, Mailchimp &amp; more</li>
   </ul>
+  ${newBadge}
   <div class="plugin-actions">
     <a class="btn btn-dark" href="${PLUGIN_ZIP}" download data-track="Plugin download" data-loc="${loc}">Download ZIP ↓</a>
     <a class="btn btn-outline" href="/plugins/weberslink-forms-pro" data-track="Plugin details" data-loc="${loc}">Features &amp; install guide →</a>
@@ -369,15 +390,17 @@ write("/plugins/weberslink-forms-pro", render({
   faqs: pluginFaqs,
   related: ["/services/web-design", "/services/automation"],
   body: `<p><a class="btn btn-dark" href="${PLUGIN_ZIP}" download data-track="Plugin download" data-loc="plugin-detail-top">Download ZIP ↓</a> <span class="plugin-ver">Version ${pluginVersion}${zipSize ? " · " + zipSize : ""} · WordPress 5.8+ · PHP 7.4+ · GPL-2.0-or-later</span></p>
+${HIGHLIGHTS[pluginVersion] ? `<div class="plugin-new plugin-new-box"><strong>What's new in v${pluginVersion}</strong><ul>${HIGHLIGHTS[pluginVersion].map((h) => `<li>${esc(h)}</li>`).join("")}</ul></div>` : ""}
 <h2>What's inside</h2>
 <ul>
-  <li><strong>Visual builder:</strong> drag &amp; drop, 45+ field types (text, choice, image choice, ranking, date range, file &amp; image upload, signature, repeater, rating, NPS, calculation, dynamic dropdowns, embeds), 30+ templates, undo-friendly version history.</li>
+  <li><strong>Visual builder:</strong> drag &amp; drop, 50 field types (text, choice, image choice, ranking, date range, file &amp; image upload, signature, repeater, rating, NPS, calculation, dynamic dropdowns, embeds), 35+ templates, version history with one-click restore.</li>
   <li><strong>Smart forms:</strong> conditional logic, multi-step with progress, conversational one-question-at-a-time mode, calculations, quizzes with scoring, conditional confirmations, save &amp; resume by email.</li>
   <li><strong>Works with every theme:</strong> inherits your fonts and colours, readable on light and dark backgrounds, RTL ready. Shortcode, Gutenberg block, widget and Elementor widget.</li>
-  <li><strong>Entries &amp; reports:</strong> search, filter, notes, edit, reply by email, PDF download, CSV export, answer-breakdown reports with NPS, conversion tracking.</li>
-  <li><strong>Emails:</strong> unlimited notifications and auto-responders with merge tags, PDF or file attachments, delayed follow-ups and reference numbers.</li>
+  <li><strong>Bookings:</strong> appointment-slot field with live availability, per-slot capacity, closed days, blocked dates, notice period and .ics calendar invites; per-option seat and stock limits.</li>
+  <li><strong>Entries &amp; team workflow:</strong> custom stages (New → In progress → Done), assign entries to teammates with an email alert, search, filter, notes, edit, reply by email, PDF download, Excel and CSV export, answer-breakdown reports with NPS, conversion tracking.</li>
+  <li><strong>Emails:</strong> unlimited notifications and auto-responders with merge tags, a branded layout with your logo and colours, PDF, calendar or file attachments, delayed follow-ups and reference numbers.</li>
   <li><strong>Payments:</strong> Stripe Checkout (one-time and subscriptions), PayPal, offline; products, quantities, coupons, tax, per-option seat or stock limits.</li>
-  <li><strong>Integrations:</strong> signed webhooks (Zapier, Make, n8n, Google Sheets via Apps Script), Slack, Discord, Teams, Telegram, Mailchimp, create WordPress users or posts.</li>
+  <li><strong>Integrations &amp; API:</strong> signed webhooks with automatic retries (Zapier, Make, n8n, Google Sheets via Apps Script), Slack, Discord, Teams, Telegram, Mailchimp, create WordPress users or posts, plus a read-only REST API with API keys.</li>
   <li><strong>Spam &amp; privacy:</strong> honeypot, time trap, rate limits, Akismet, reCAPTCHA, hCaptcha, Turnstile; IP anonymising, auto-delete, GDPR export and erase.</li>
 </ul>
 <h2>Install in 3 steps</h2>
@@ -387,6 +410,8 @@ write("/plugins/weberslink-forms-pro", render({
   <li>Open <em>Weberslink Forms → Add new</em>, pick a template, then embed it with <code>[weberslink_form id="1"]</code>.</li>
 </ol>
 <p><a class="btn btn-dark" href="${PLUGIN_ZIP}" download data-track="Plugin download" data-loc="plugin-detail-bottom">Download ZIP ↓</a></p>
+<h2>Changelog</h2>
+${changelogHtml}
 <p class="plugin-note">Need a custom form setup, payments wired up or a site built around it? <a href="/#book">Book a free call</a> and we'll sort it for you.</p>`,
 }));
 

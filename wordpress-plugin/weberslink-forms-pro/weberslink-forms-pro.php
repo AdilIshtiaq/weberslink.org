@@ -2,8 +2,8 @@
 /**
  * Plugin Name:       Weberslink Forms Pro
  * Plugin URI:        https://weberslink.org/
- * Description:       A complete drag-and-drop form builder: 45+ field types, multi-step and conversational (one-question-at-a-time) forms, conditional logic, calculations, file uploads, spam protection, entries manager, email notifications, payments and integrations. Styled to blend into any theme.
- * Version:           1.3.0
+ * Description:       A complete drag-and-drop form builder: 50+ field types, multi-step and conversational (one-question-at-a-time) forms, conditional logic, calculations, file uploads, spam protection, entries manager, email notifications, payments and integrations. Styled to blend into any theme.
+ * Version:           1.4.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            WebersLink
@@ -16,11 +16,11 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'WLFP_VERSION', '1.3.0' );
+define( 'WLFP_VERSION', '1.4.0' );
 define( 'WLFP_FILE', __FILE__ );
 define( 'WLFP_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WLFP_URL', plugin_dir_url( __FILE__ ) );
-define( 'WLFP_DB_VERSION', '2' );
+define( 'WLFP_DB_VERSION', '3' );
 
 require_once WLFP_DIR . 'includes/class-wlfp-helpers.php';
 require_once WLFP_DIR . 'includes/class-wlfp-install.php';
@@ -44,6 +44,9 @@ require_once WLFP_DIR . 'includes/class-wlfp-blocks.php';
 require_once WLFP_DIR . 'includes/class-wlfp-shortcodes.php';
 require_once WLFP_DIR . 'includes/class-wlfp-pdf.php';
 require_once WLFP_DIR . 'includes/class-wlfp-drafts.php';
+require_once WLFP_DIR . 'includes/class-wlfp-slots.php';
+require_once WLFP_DIR . 'includes/class-wlfp-xlsx.php';
+require_once WLFP_DIR . 'includes/class-wlfp-api.php';
 require_once WLFP_DIR . 'includes/class-wlfp-admin.php';
 
 register_activation_hook( __FILE__, array( 'WLFP_Install', 'activate' ) );
@@ -65,6 +68,8 @@ final class WLFP_Plugin {
 		WLFP_Blocks::init();
 		WLFP_Shortcodes::init();
 		WLFP_Drafts::init();
+		WLFP_Slots::init();
+		WLFP_Api::init();
 		WLFP_Install::init_cron();
 
 		if ( is_admin() ) {

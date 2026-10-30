@@ -15,6 +15,7 @@ class WLFP_Admin {
 		add_action( 'admin_post_wlfp_entry_resend', array( __CLASS__, 'entry_resend' ) );
 		add_action( 'admin_post_wlfp_entry_feeds', array( __CLASS__, 'entry_feeds' ) );
 		add_action( 'admin_post_wlfp_entry_pdf', array( __CLASS__, 'entry_pdf' ) );
+		add_action( 'admin_post_wlfp_entry_workflow', array( __CLASS__, 'entry_workflow' ) );
 		add_action( 'wp_ajax_wlfp_revisions', array( __CLASS__, 'ajax_revisions' ) );
 		add_action( 'wp_ajax_wlfp_revision', array( __CLASS__, 'ajax_revision' ) );
 		add_action( 'admin_post_wlfp_entry_email', array( __CLASS__, 'entry_email' ) );
@@ -315,15 +316,17 @@ class WLFP_Admin {
 		$search  = isset( $_GET['s'] ) ? sanitize_text_field( wp_unslash( $_GET['s'] ) ) : ''; // phpcs:ignore
 		$from    = isset( $_GET['from'] ) ? sanitize_text_field( wp_unslash( $_GET['from'] ) ) : ''; // phpcs:ignore
 		$to      = isset( $_GET['to'] ) ? sanitize_text_field( wp_unslash( $_GET['to'] ) ) : ''; // phpcs:ignore
-		$paged   = max( 1, isset( $_GET['paged'] ) ? (int) $_GET['paged'] : 1 ); // phpcs:ignore
+		$paged    = max( 1, isset( $_GET['paged'] ) ? (int) $_GET['paged'] : 1 ); // phpcs:ignore
+		$stage    = isset( $_GET['stage'] ) ? sanitize_text_field( wp_unslash( $_GET['stage'] ) ) : ''; // phpcs:ignore
+		$assigned = isset( $_GET['assigned'] ) ? sanitize_text_field( wp_unslash( $_GET['assigned'] ) ) : ''; // phpcs:ignore
 		$starred = 'starred' === $status;
-		$q       = WLFP_Entries::query( array( 'form_id' => $form_id, 'status' => $starred ? 'all' : $status, 'starred' => $starred ? 1 : 0, 'search' => $search, 'from' => $from, 'to' => $to, 'page' => $paged, 'per_page' => 20 ) );
+		$q       = WLFP_Entries::query( array( 'form_id' => $form_id, 'status' => $starred ? 'all' : $status, 'starred' => $starred ? 1 : 0, 'search' => $search, 'from' => $from, 'to' => $to, 'page' => $paged, 'per_page' => 20, 'stage' => $stage, 'assigned' => $assigned ) );
 		$counts  = WLFP_Entries::counts( $form_id );
 		$forms   = WLFP_Forms::all();
 		$form    = $form_id ? WLFP_Forms::get( $form_id ) : null;
-		$base    = array( 'form_id' => $form_id, 's' => $search, 'from' => $from, 'to' => $to );
+		$base    = array( 'form_id' => $form_id, 's' => $search, 'from' => $from, 'to' => $to, 'stage' => $stage, 'assigned' => $assigned );
 
-		$exp = $form_id ? '<a class="page-title-action" href="' . esc_url( wp_nonce_url( add_query_arg( array( 'action' => 'wlfp_export_entries', 'form_id' => $form_id, 'status' => $status, 's' => $search, 'from' => $from, 'to' => $to ), admin_url( 'admin-post.php' ) ), 'wlfp_export' ) ) . '">' . esc_html__( 'Export CSV', 'weberslink-forms-pro' ) . '</a>' : '';
+		$exp = $form_id ? '<a class="page-title-action" href="' . esc_url( wp_nonce_url( add_query_arg( array( 'action' => 'wlfp_export_entries', 'form_id' => $form_id, 'status' => $status, 's' => $search, 'from' => $from, 'to' => $to ), admin_url( 'admin-post.php' ) ), 'wlfp_export' ) ) . '">' . esc_html__( 'Export CSV', 'weberslink-forms-pro' ) . '</a> <a class="page-title-action" href="' . esc_url( wp_nonce_url( add_query_arg( array( 'action' => 'wlfp_export_xlsx', 'form_id' => $form_id, 'status' => $status, 's' => $search, 'from' => $from, 'to' => $to, 'stage' => $stage, 'assigned' => $assigned ), admin_url( 'admin-post.php' ) ), 'wlfp_export' ) ) . '">' . esc_html__( 'Export Excel', 'weberslink-forms-pro' ) . '</a>' : '';
 		self::header( __( 'Entries', 'weberslink-forms-pro' ), $exp );
 		if ( isset( $_GET['msg'] ) ) { // phpcs:ignore
 			self::notice( esc_html( sanitize_text_field( wp_unslash( $_GET['msg'] ) ) ) ); // phpcs:ignore
@@ -338,16 +341,16 @@ class WLFP_Admin {
 		foreach ( $forms as $f ) {
 			echo '<option value="' . (int) $f['id'] . '"' . selected( $form_id, $f['id'], false ) . '>' . esc_html( $f['title'] ) . '</option>';
 		}
-		echo '</select> <input type="date" name="from" value="' . esc_attr( $from ) . '" /> – <input type="date" name="to" value="' . esc_attr( $to ) . '" /> <input type="search" name="s" value="' . esc_attr( $search ) . '" placeholder="' . esc_attr__( 'Search entries', 'weberslink-forms-pro' ) . '" /> <button class="button">' . esc_html__( 'Filter', 'weberslink-forms-pro' ) . '</button></form>';
+		echo '</select> ' . self::stage_filters( $stage, $assigned ) . ' <input type="date" name="from" value="' . esc_attr( $from ) . '" /> – <input type="date" name="to" value="' . esc_attr( $to ) . '" /> <input type="search" name="s" value="' . esc_attr( $search ) . '" placeholder="' . esc_attr__( 'Search entries', 'weberslink-forms-pro' ) . '" /> <button class="button">' . esc_html__( 'Filter', 'weberslink-forms-pro' ) . '</button></form>';
 
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
 		wp_nonce_field( 'wlfp_entries_bulk' );
 		echo '<input type="hidden" name="action" value="wlfp_entries_action" /><input type="hidden" name="return" value="' . esc_attr( add_query_arg( array_merge( $base, array( 'status' => $status, 'paged' => $paged ) ), admin_url( 'admin.php?page=wlfp-entries' ) ) ) . '" />';
-		echo '<div class="tablenav top"><select name="do"><option value="">' . esc_html__( 'Bulk actions', 'weberslink-forms-pro' ) . '</option><option value="read">' . esc_html__( 'Mark as read', 'weberslink-forms-pro' ) . '</option><option value="unread">' . esc_html__( 'Mark as unread', 'weberslink-forms-pro' ) . '</option><option value="star">' . esc_html__( 'Star', 'weberslink-forms-pro' ) . '</option><option value="unstar">' . esc_html__( 'Unstar', 'weberslink-forms-pro' ) . '</option><option value="spam">' . esc_html__( 'Mark as spam', 'weberslink-forms-pro' ) . '</option><option value="notspam">' . esc_html__( 'Not spam', 'weberslink-forms-pro' ) . '</option><option value="trash">' . esc_html__( 'Move to trash', 'weberslink-forms-pro' ) . '</option><option value="restore">' . esc_html__( 'Restore', 'weberslink-forms-pro' ) . '</option><option value="delete">' . esc_html__( 'Delete permanently', 'weberslink-forms-pro' ) . '</option></select> <button class="button">' . esc_html__( 'Apply', 'weberslink-forms-pro' ) . '</button></div>';
-		echo '<table class="wp-list-table widefat fixed striped wlfp-entries"><thead><tr><td class="check-column"><input type="checkbox" onclick="document.querySelectorAll(\'.wlfp-cb\').forEach(function(c){c.checked=this.checked}.bind(this))" /></td><th style="width:70px">#</th><th>' . esc_html__( 'Details', 'weberslink-forms-pro' ) . '</th><th>' . esc_html__( 'Form', 'weberslink-forms-pro' ) . '</th><th style="width:120px">' . esc_html__( 'Payment', 'weberslink-forms-pro' ) . '</th><th style="width:150px">' . esc_html__( 'Date', 'weberslink-forms-pro' ) . '</th></tr></thead><tbody>';
+		echo '<div class="tablenav top"><select name="do"><option value="">' . esc_html__( 'Bulk actions', 'weberslink-forms-pro' ) . '</option><option value="read">' . esc_html__( 'Mark as read', 'weberslink-forms-pro' ) . '</option><option value="unread">' . esc_html__( 'Mark as unread', 'weberslink-forms-pro' ) . '</option><option value="star">' . esc_html__( 'Star', 'weberslink-forms-pro' ) . '</option><option value="unstar">' . esc_html__( 'Unstar', 'weberslink-forms-pro' ) . '</option><option value="spam">' . esc_html__( 'Mark as spam', 'weberslink-forms-pro' ) . '</option><option value="notspam">' . esc_html__( 'Not spam', 'weberslink-forms-pro' ) . '</option><option value="trash">' . esc_html__( 'Move to trash', 'weberslink-forms-pro' ) . '</option><option value="restore">' . esc_html__( 'Restore', 'weberslink-forms-pro' ) . '</option>' . self::stage_bulk_options() . '<option value="delete">' . esc_html__( 'Delete permanently', 'weberslink-forms-pro' ) . '</option></select> <button class="button">' . esc_html__( 'Apply', 'weberslink-forms-pro' ) . '</button></div>';
+		echo '<table class="wp-list-table widefat fixed striped wlfp-entries"><thead><tr><td class="check-column"><input type="checkbox" onclick="document.querySelectorAll(\'.wlfp-cb\').forEach(function(c){c.checked=this.checked}.bind(this))" /></td><th style="width:70px">#</th><th>' . esc_html__( 'Details', 'weberslink-forms-pro' ) . '</th><th>' . esc_html__( 'Form', 'weberslink-forms-pro' ) . '</th><th style="width:140px">' . esc_html__( 'Stage', 'weberslink-forms-pro' ) . '</th><th style="width:120px">' . esc_html__( 'Payment', 'weberslink-forms-pro' ) . '</th><th style="width:150px">' . esc_html__( 'Date', 'weberslink-forms-pro' ) . '</th></tr></thead><tbody>';
 		$cache = array();
 		if ( ! $q['rows'] ) {
-			echo '<tr><td colspan="6">' . esc_html__( 'No entries found.', 'weberslink-forms-pro' ) . '</td></tr>';
+			echo '<tr><td colspan="7">' . esc_html__( 'No entries found.', 'weberslink-forms-pro' ) . '</td></tr>';
 		}
 		foreach ( $q['rows'] as $e ) {
 			if ( ! isset( $cache[ $e['form_id'] ] ) ) {
@@ -366,7 +369,7 @@ class WLFP_Admin {
 				}
 			}
 			$link = self::url( 'wlfp-entries', array( 'entry' => $e['id'] ) );
-			echo '<tr class="' . ( 'unread' === $e['status'] ? 'wlfp-unread' : '' ) . '"><th class="check-column"><input class="wlfp-cb" type="checkbox" name="ids[]" value="' . (int) $e['id'] . '" /></th><td><a href="' . esc_url( $link ) . '"><strong>#' . (int) $e['serial'] . '</strong></a>' . ( $e['starred'] ? ' <span class="wlfp-star">★</span>' : '' ) . '</td><td><a href="' . esc_url( $link ) . '">' . implode( ' · ', $sum ) . '</a></td><td>' . esc_html( $f ? $f['title'] : '#' . $e['form_id'] ) . '</td><td>' . ( $e['payment_total'] > 0 ? esc_html( WLFP_Helpers::money( $e['payment_total'], $e['currency'] ) ) . '<br><span class="wlfp-pill wlfp-pill-' . esc_attr( $e['payment_status'] ) . '">' . esc_html( $e['payment_status'] ) . '</span>' : '—' ) . '</td><td>' . esc_html( get_date_from_gmt( $e['created_at'], 'Y-m-d H:i' ) ) . '</td></tr>'; // phpcs:ignore
+			echo '<tr class="' . ( 'unread' === $e['status'] ? 'wlfp-unread' : '' ) . '"><th class="check-column"><input class="wlfp-cb" type="checkbox" name="ids[]" value="' . (int) $e['id'] . '" /></th><td><a href="' . esc_url( $link ) . '"><strong>#' . (int) $e['serial'] . '</strong></a>' . ( $e['starred'] ? ' <span class="wlfp-star">★</span>' : '' ) . '</td><td><a href="' . esc_url( $link ) . '">' . implode( ' · ', $sum ) . '</a></td><td>' . esc_html( $f ? $f['title'] : '#' . $e['form_id'] ) . '</td><td>' . self::stage_cell( $e ) . '</td><td>' . ( $e['payment_total'] > 0 ? esc_html( WLFP_Helpers::money( $e['payment_total'], $e['currency'] ) ) . '<br><span class="wlfp-pill wlfp-pill-' . esc_attr( $e['payment_status'] ) . '">' . esc_html( $e['payment_status'] ) . '</span>' : '—' ) . '</td><td>' . esc_html( get_date_from_gmt( $e['created_at'], 'Y-m-d H:i' ) ) . '</td></tr>'; // phpcs:ignore
 		}
 		echo '</tbody></table></form>';
 		$pages = (int) ceil( $q['total'] / 20 );
@@ -382,6 +385,18 @@ class WLFP_Admin {
 		$do  = isset( $_POST['do'] ) ? sanitize_key( $_POST['do'] ) : ''; // phpcs:ignore
 		$ret = isset( $_POST['return'] ) ? esc_url_raw( wp_unslash( $_POST['return'] ) ) : self::url( 'wlfp-entries' ); // phpcs:ignore
 		foreach ( $ids as $id ) {
+			if ( 0 === strpos( $do, 'stage_' ) ) {
+				$st = WLFP_Helpers::stages();
+				$ix = (int) substr( $do, 6 );
+				if ( isset( $st[ $ix ] ) ) {
+					WLFP_Entries::update( $id, array( 'stage' => $st[ $ix ] ) );
+				}
+				continue;
+			}
+			if ( 'assign_me' === $do || 'unassign' === $do ) {
+				WLFP_Entries::update( $id, array( 'assigned_to' => 'assign_me' === $do ? get_current_user_id() : 0 ) );
+				continue;
+			}
 			switch ( $do ) {
 				case 'read':
 				case 'unread':
@@ -492,6 +507,7 @@ class WLFP_Admin {
 			echo '<div class="wlfp-note"><strong>' . esc_html( $u ? $u->display_name : '—' ) . '</strong> <span class="description">' . esc_html( get_date_from_gmt( $n['created_at'], 'Y-m-d H:i' ) ) . '</span><br>' . nl2br( esc_html( $n['note'] ) ) . '</div>';
 		}
 		echo '</div><div class="wlfp-entry-side">';
+		self::workflow_box( $e );
 		$refno = WLFP_Merge::reference( $form, $e );
 		echo '<div class="postbox"><h2 class="hndle">' . esc_html__( 'Details', 'weberslink-forms-pro' ) . '</h2><div class="inside">' . ( $refno ? '<p><strong>' . esc_html__( 'Reference', 'weberslink-forms-pro' ) . ':</strong> <code>' . esc_html( $refno ) . '</code></p>' : '' ) . '<p><strong>' . esc_html__( 'Submitted', 'weberslink-forms-pro' ) . ':</strong><br>' . esc_html( get_date_from_gmt( $e['created_at'], get_option( 'date_format' ) . ' ' . get_option( 'time_format' ) ) ) . '</p>';
 		if ( $e['ip'] ) {
@@ -583,6 +599,102 @@ class WLFP_Admin {
 			WLFP_Integrations::run( $f, $e );
 		}
 		wp_safe_redirect( self::url( 'wlfp-entries', array( 'entry' => $id, 'msg' => rawurlencode( __( 'Integrations ran again. See the activity log.', 'weberslink-forms-pro' ) ) ) ) );
+		exit;
+	}
+
+	/* ---------------- Workflow (stages + assignment) ---------------- */
+
+	public static function stage_index( $label ) {
+		$i = array_search( $label, WLFP_Helpers::stages(), true );
+		return false === $i ? 0 : (int) $i;
+	}
+
+	public static function stage_cell( $e ) {
+		$label = WLFP_Helpers::entry_stage( $e );
+		$out   = '<span class="wlfp-stage wlfp-stage-' . ( self::stage_index( $label ) % 8 ) . '">' . esc_html( $label ) . '</span>';
+		if ( ! empty( $e['assigned_to'] ) ) {
+			$u    = get_userdata( (int) $e['assigned_to'] );
+			$out .= '<br><span class="description">→ ' . esc_html( $u ? $u->display_name : '#' . (int) $e['assigned_to'] ) . '</span>';
+		}
+		return $out;
+	}
+
+	public static function stage_filters( $stage, $assigned ) {
+		$o = '<select name="stage"><option value="">' . esc_html__( 'Any stage', 'weberslink-forms-pro' ) . '</option>';
+		foreach ( WLFP_Helpers::stages() as $st ) {
+			$o .= '<option value="' . esc_attr( $st ) . '"' . selected( $stage, $st, false ) . '>' . esc_html( $st ) . '</option>';
+		}
+		$o .= '</select> <select name="assigned"><option value="">' . esc_html__( 'Anyone', 'weberslink-forms-pro' ) . '</option><option value="me"' . selected( $assigned, 'me', false ) . '>' . esc_html__( 'Assigned to me', 'weberslink-forms-pro' ) . '</option><option value="none"' . selected( $assigned, 'none', false ) . '>' . esc_html__( 'Unassigned', 'weberslink-forms-pro' ) . '</option></select>';
+		return $o;
+	}
+
+	public static function stage_bulk_options() {
+		$o = '<optgroup label="' . esc_attr__( 'Set stage', 'weberslink-forms-pro' ) . '">';
+		foreach ( WLFP_Helpers::stages() as $i => $st ) {
+			$o .= '<option value="stage_' . (int) $i . '">' . esc_html( $st ) . '</option>';
+		}
+		return $o . '</optgroup><option value="assign_me">' . esc_html__( 'Assign to me', 'weberslink-forms-pro' ) . '</option><option value="unassign">' . esc_html__( 'Unassign', 'weberslink-forms-pro' ) . '</option>';
+	}
+
+	/** Users who may be assigned entries: anyone allowed to manage forms. */
+	public static function assignable_users() {
+		$out = array();
+		foreach ( get_users( array( 'role__in' => array( 'administrator', 'editor', 'shop_manager', 'author' ), 'number' => 200, 'orderby' => 'display_name' ) ) as $u ) {
+			if ( user_can( $u, WLFP_Helpers::cap() ) ) {
+				$out[ $u->ID ] = $u->display_name;
+			}
+		}
+		return $out;
+	}
+
+	private static function workflow_box( $e ) {
+		$id = (int) $e['id'];
+		echo '<div class="postbox"><h2 class="hndle">' . esc_html__( 'Workflow', 'weberslink-forms-pro' ) . '</h2><div class="inside"><form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+		wp_nonce_field( 'wlfp_entry_workflow_' . $id );
+		echo '<input type="hidden" name="action" value="wlfp_entry_workflow" /><input type="hidden" name="entry" value="' . $id . '" />';
+		echo '<p><label><strong>' . esc_html__( 'Stage', 'weberslink-forms-pro' ) . '</strong><br><select name="stage" style="width:100%">';
+		$cur = WLFP_Helpers::entry_stage( $e );
+		foreach ( WLFP_Helpers::stages() as $st ) {
+			echo '<option value="' . esc_attr( $st ) . '"' . selected( $cur, $st, false ) . '>' . esc_html( $st ) . '</option>';
+		}
+		echo '</select></label></p><p><label><strong>' . esc_html__( 'Assigned to', 'weberslink-forms-pro' ) . '</strong><br><select name="assigned_to" style="width:100%"><option value="0">' . esc_html__( 'Unassigned', 'weberslink-forms-pro' ) . '</option>';
+		foreach ( self::assignable_users() as $uid => $name ) {
+			echo '<option value="' . (int) $uid . '"' . selected( (int) $e['assigned_to'], $uid, false ) . '>' . esc_html( $name ) . '</option>';
+		}
+		echo '</select></label></p><p><button class="button button-primary">' . esc_html__( 'Update', 'weberslink-forms-pro' ) . '</button></p></form></div></div>';
+	}
+
+	public static function entry_workflow() {
+		$id = isset( $_POST['entry'] ) ? (int) $_POST['entry'] : 0; // phpcs:ignore
+		self::guard( 'wlfp_entry_workflow_' . $id );
+		$e = WLFP_Entries::get( $id );
+		if ( $e ) {
+			$old_stage = WLFP_Helpers::entry_stage( $e );
+			$new_stage = isset( $_POST['stage'] ) ? sanitize_text_field( wp_unslash( $_POST['stage'] ) ) : $old_stage; // phpcs:ignore
+			if ( ! in_array( $new_stage, WLFP_Helpers::stages(), true ) ) {
+				$new_stage = $old_stage;
+			}
+			$new_to = isset( $_POST['assigned_to'] ) ? (int) $_POST['assigned_to'] : 0; // phpcs:ignore
+			if ( $new_to && ( ! get_userdata( $new_to ) || ! user_can( $new_to, WLFP_Helpers::cap() ) ) ) {
+				$new_to = 0;
+			}
+			WLFP_Entries::update( $id, array( 'stage' => $new_stage, 'assigned_to' => $new_to ) );
+			if ( $new_stage !== $old_stage ) {
+				WLFP_Entries::add_note( $id, sprintf( /* translators: 1: old stage 2: new stage */ __( 'Stage changed: %1$s → %2$s', 'weberslink-forms-pro' ), $old_stage, $new_stage ) );
+				do_action( 'wlfp_entry_stage_changed', $e, $old_stage, $new_stage );
+			}
+			if ( $new_to !== (int) $e['assigned_to'] ) {
+				$u = $new_to ? get_userdata( $new_to ) : null;
+				WLFP_Entries::add_note( $id, $u ? sprintf( /* translators: %s: user */ __( 'Assigned to %s', 'weberslink-forms-pro' ), $u->display_name ) : __( 'Unassigned', 'weberslink-forms-pro' ) );
+				if ( $u && $new_to !== get_current_user_id() && is_email( $u->user_email ) ) {
+					$form = WLFP_Forms::get( $e['form_id'] );
+					$ref  = $form ? WLFP_Merge::reference( $form, $e ) : '';
+					$body = '<p>' . esc_html( sprintf( /* translators: 1: user 2: form */ __( '%1$s assigned a submission of "%2$s" to you.', 'weberslink-forms-pro' ), wp_get_current_user()->display_name, $form ? $form['title'] : '' ) ) . '</p><p><a href="' . esc_url( admin_url( 'admin.php?page=wlfp-entries&entry=' . $id ) ) . '">' . esc_html__( 'Open the entry', 'weberslink-forms-pro' ) . '</a></p>';
+					wp_mail( $u->user_email, sprintf( /* translators: 1: site 2: reference */ __( '[%1$s] Entry %2$s assigned to you', 'weberslink-forms-pro' ), wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ), $ref ? $ref : '#' . $e['serial'] ), WLFP_Notifications::wrap_html( $body ), array( 'Content-Type: text/html; charset=UTF-8' ) );
+				}
+			}
+		}
+		wp_safe_redirect( self::url( 'wlfp-entries', array( 'entry' => $id, 'msg' => rawurlencode( __( 'Workflow updated.', 'weberslink-forms-pro' ) ) ) ) );
 		exit;
 	}
 
@@ -902,6 +1014,10 @@ class WLFP_Admin {
 		foreach ( array( 'load_css', 'track_views' ) as $b ) {
 			$out[ $b ] = isset( $in[ $b ] ) ? 1 : 0;
 		}
+		$out['stages']       = isset( $in['stages'] ) ? sanitize_textarea_field( $in['stages'] ) : $old['stages'];
+		$out['email_color']  = preg_match( '/^#[0-9a-fA-F]{6}$/', (string) $out['email_color'] ) ? $out['email_color'] : '#1d2327';
+		$out['email_logo']   = esc_url_raw( $out['email_logo'] );
+		$out['email_brand']  = isset( $in['email_brand'] ) ? 1 : 0;
 		$out['digest_email'] = sanitize_email( $out['digest_email'] );
 		$out['from_email']   = sanitize_email( $out['from_email'] );
 		return $out;
@@ -936,11 +1052,18 @@ class WLFP_Admin {
 		echo '</select></td></tr>';
 		$f( 'from_name', __( 'Email "From" name', 'weberslink-forms-pro' ), 'text', __( 'Defaults to your site name.', 'weberslink-forms-pro' ) );
 		$f( 'from_email', __( 'Email "From" address', 'weberslink-forms-pro' ), 'email', __( 'Use an address on your own domain for best deliverability.', 'weberslink-forms-pro' ) );
+		echo '<tr><th scope="row"><label for="wlfp_stages">' . esc_html__( 'Entry stages (workflow)', 'weberslink-forms-pro' ) . '</label></th><td><textarea id="wlfp_stages" name="wlfp_settings[stages]" rows="5" class="regular-text">' . esc_textarea( $s['stages'] ) . '</textarea><p class="description">' . esc_html__( 'One stage per line (max 12). New entries start in the first stage. Use them to track follow-up: New → In progress → Done.', 'weberslink-forms-pro' ) . '</p></td></tr>';
 		$f( 'load_css', __( 'Plugin stylesheet', 'weberslink-forms-pro' ), 'checkbox', __( 'Load the front-end CSS (turn off to style forms entirely from your theme).', 'weberslink-forms-pro' ) );
 		$f( 'track_views', __( 'Form views', 'weberslink-forms-pro' ), 'checkbox', __( 'Count form views for conversion reports (no cookies, no personal data).', 'weberslink-forms-pro' ) );
 		$f( 'digest_email', __( 'Weekly digest email', 'weberslink-forms-pro' ), 'email', __( 'Receive a Monday summary of entries. Leave empty to disable.', 'weberslink-forms-pro' ) );
 		echo '</tbody></table>';
 
+		echo '<h2>' . esc_html__( 'Email design', 'weberslink-forms-pro' ) . '</h2><table class="form-table"><tbody>';
+		$f( 'email_brand', __( 'Branded layout', 'weberslink-forms-pro' ), 'checkbox', __( 'Wrap HTML emails in a clean branded layout with your logo, colour and footer (can be switched off per notification).', 'weberslink-forms-pro' ) );
+		$f( 'email_logo', __( 'Logo URL', 'weberslink-forms-pro' ), 'url', __( 'Shown in the email header (max height 44px). Leave empty to show your site name.', 'weberslink-forms-pro' ) );
+		echo '<tr><th scope="row"><label for="wlfp_email_color">' . esc_html__( 'Header colour', 'weberslink-forms-pro' ) . '</label></th><td><input type="color" id="wlfp_email_color" name="wlfp_settings[email_color]" value="' . esc_attr( $s['email_color'] ) . '" /></td></tr>';
+		$f( 'email_footer', __( 'Footer text', 'weberslink-forms-pro' ), 'text', __( 'For example your company name and address.', 'weberslink-forms-pro' ) );
+		echo '</tbody></table>';
 		echo '<h2>' . esc_html__( 'Privacy & data', 'weberslink-forms-pro' ) . '</h2><table class="form-table"><tbody>';
 		$f( 'disable_ip', __( 'Do not store IP addresses', 'weberslink-forms-pro' ), 'checkbox', __( 'Disables IP logging (also disables IP-based duplicate and rate-limit checks).', 'weberslink-forms-pro' ) );
 		$f( 'anonymize_ip', __( 'Anonymise IP addresses', 'weberslink-forms-pro' ), 'checkbox', __( 'Store IPs with the last part removed.', 'weberslink-forms-pro' ) );
@@ -968,7 +1091,11 @@ class WLFP_Admin {
 		echo '</tbody></table><h2>' . esc_html__( 'Integrations', 'weberslink-forms-pro' ) . '</h2><table class="form-table"><tbody>';
 		$f( 'mailchimp_key', 'Mailchimp API key', 'password', __( 'Looks like <code>abc123-us21</code>. Per-form audience settings are under Form settings → Integrations.', 'weberslink-forms-pro' ) );
 		echo '</tbody></table>';
+		WLFP_Api::settings_html();
 		submit_button();
+		echo '</form>';
+		echo '<form id="wlfp-api-form" method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '"><input type="hidden" name="action" value="wlfp_api_create" />';
+		wp_nonce_field( 'wlfp_api_create' );
 		echo '</form></div>';
 	}
 }

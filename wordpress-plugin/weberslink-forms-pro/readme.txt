@@ -4,7 +4,7 @@ Tags: form builder, contact form, multi step form, payment form, conditional log
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.3.0
+Stable tag: 1.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -20,6 +20,11 @@ Drag-and-drop form builder with conditional logic, multi-step forms, calculation
 * Text, paragraph, email, number, phone, URL, password, date/time/date-time, colour, hidden, dropdown, multi-select, radio, checkboxes (with "Other"), consent, name, address, country
 * File & image upload, star rating, net-promoter score, range slider, Likert matrix, signature pad, repeater rows, calculation, section, HTML, divider, shortcode, CAPTCHA
 * Multi-step forms with progress bar or step tabs
+* Live appointment booking: pick a date and a free time slot with capacity, closed days, blocked dates, notice period and a calendar invite (.ics) attached to the confirmation
+* Entry workflow: custom stages (New / In progress / Done…), assign entries to team members with an email alert, filter and bulk-update
+* Excel (.xlsx) and CSV export, branded email layout with your logo, colour and footer
+* Failed webhooks and chat posts retry automatically (5 min, 30 min, 2 h)
+* Read-only REST API with revocable API keys for dashboards and automations
 * Save & resume later: visitors get a private email link that restores their answers
 * Per-option limits (seats / stock) with live "sold out" and "n left" labels
 * PDF copy of every submission: download from the entry or attach to emails
@@ -80,6 +85,15 @@ Add a Webhook integration pointing at a Google Apps Script web app, Zapier, Make
 Yes: Form → Settings → Appearance, CSS variables (`.wlfp-wrap{--wlfp-primary:#e11d48}`) or the per-form custom CSS box.
 
 == Changelog ==
+
+= 1.4.0 =
+* New: appointment slot picker with per-slot capacity, closed weekdays, blocked dates, minimum notice and booking window; availability is enforced on the server. Optional .ics calendar invite attached to emails.
+* New: entry workflow stages and assignment (email alert to the assignee, stage filters, bulk actions, stage on exports and the API).
+* New: Excel (.xlsx) export alongside CSV.
+* New: branded HTML email layout (logo, header colour, footer) with a per-notification switch.
+* New: automatic retries for failed webhook, Slack, Discord, Teams, Telegram and Mailchimp feeds.
+* New: read-only REST API with API keys (Settings → REST API).
+* New templates: Appointment booking (live slots).
 
 = 1.3.0 =
 * New: save & resume by email link (drafts expire automatically).

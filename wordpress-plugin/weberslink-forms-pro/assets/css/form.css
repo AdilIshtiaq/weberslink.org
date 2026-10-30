@@ -335,3 +335,18 @@
 .wlfp-wrap .wlfp-resume-msg{margin:.6rem 0 0;font-size:.9em}
 .wlfp-wrap .wlfp-resume-msg:empty{display:none}
 .wlfp-wrap .wlfp-resume-msg.is-ok{color:#1a7f45}.wlfp-wrap .wlfp-resume-msg.is-err{color:var(--wlfp-err)}
+
+/* ---------- Appointment slots ---------- */
+.wlfp-wrap .wlfp-form .wlfp-slots input.wlfp-slot-date{max-width:240px}
+.wlfp-wrap .wlfp-slot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:.5rem;margin-top:.8rem}
+.wlfp-wrap .wlfp-slot-hint{grid-column:1/-1;margin:0;font-size:.9em;opacity:.7}
+.wlfp-wrap .wlfp-slot{margin:0;cursor:pointer;position:relative}
+.wlfp-wrap .wlfp-slot input{position:absolute;opacity:0;width:1px;height:1px}
+.wlfp-wrap .wlfp-slot span{display:block;text-align:center;padding:.6em .4em;border:1px solid var(--wlfp-b);border-radius:var(--wlfp-r);font-size:.92em;transition:all .12s;line-height:1.25}
+.wlfp-wrap .wlfp-slot:hover span{border-color:var(--wlfp-p)}
+.wlfp-wrap .wlfp-slot input:checked + span{background:var(--wlfp-p);border-color:var(--wlfp-p);color:#fff;font-weight:600}
+.wlfp-wrap .wlfp-slot input:focus-visible + span{outline:2px solid var(--wlfp-p);outline-offset:2px}
+.wlfp-wrap .wlfp-slot.is-full{cursor:not-allowed}
+.wlfp-wrap .wlfp-slot.is-full span{opacity:.4;text-decoration:line-through}
+.wlfp-wrap .wlfp-slot small{display:block;font-size:.78em;opacity:.75;font-weight:400;margin-top:.15em}
+.wlfp-wrap .wlfp-slot.is-full small{text-decoration:none}

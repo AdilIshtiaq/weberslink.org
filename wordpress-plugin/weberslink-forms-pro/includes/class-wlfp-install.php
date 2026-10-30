@@ -67,13 +67,17 @@ class WLFP_Install {
 			payment_total decimal(14,2) NOT NULL DEFAULT 0,
 			currency varchar(10) NOT NULL DEFAULT '',
 			transaction_id varchar(191) NOT NULL DEFAULT '',
+			stage varchar(40) NOT NULL DEFAULT '',
+			assigned_to bigint(20) unsigned NOT NULL DEFAULT 0,
 			data longtext,
 			created_at datetime NOT NULL,
 			PRIMARY KEY  (id),
 			KEY form_id (form_id),
 			KEY status (status),
 			KEY created_at (created_at),
-			KEY transaction_id (transaction_id)
+			KEY transaction_id (transaction_id),
+			KEY stage (stage),
+			KEY assigned_to (assigned_to)
 		) $c;" );
 
 		dbDelta( "CREATE TABLE {$p}wlfp_entry_notes (

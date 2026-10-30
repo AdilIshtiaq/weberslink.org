@@ -89,3 +89,7 @@
 .wlfpb-toast{position:fixed;inset-inline-end:20px;bottom:20px;background:#1d2327;color:#fff;padding:10px 16px;border-radius:6px;z-index:99999;box-shadow:0 4px 14px rgba(0,0,0,.25)}
 .wlfpb-toast.err{background:#b32d2e}
 .wlfpb-warn{background:#fff8e5;border:1px solid #f0c33c;border-radius:6px;padding:8px 10px;margin:0 0 10px;font-size:12px}
+
+.wlfp-stage{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:600;background:#e2e4e7;color:#1d2327}
+.wlfp-stage-0{background:#e6eaf0;color:#2c3a4b}.wlfp-stage-1{background:#dbeafe;color:#1e4fa3}.wlfp-stage-2{background:#fef3c7;color:#8a5a00}.wlfp-stage-3{background:#d7f5df;color:#0a5b25}
+.wlfp-stage-4{background:#f3e8ff;color:#6b21a8}.wlfp-stage-5{background:#ffe4e6;color:#9f1239}.wlfp-stage-6{background:#cffafe;color:#155e75}.wlfp-stage-7{background:#ececec;color:#444}

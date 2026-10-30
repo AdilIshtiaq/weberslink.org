@@ -51,9 +51,9 @@
    "description": "Free WordPress plugins from WebersLink. Download Weberslink Forms Pro, a drag-and-drop form builder with payments, conditional logic and 30+ templates.",
    "applicationCategory": "BusinessApplication",
    "operatingSystem": "WordPress 5.8+",
-   "softwareVersion": "1.3.0",
+   "softwareVersion": "1.4.0",
    "downloadUrl": "https://weberslink.org/downloads/weberslink-forms-pro.zip",
-   "fileSize": "138 KB",
+   "fileSize": "153 KB",
    "offers": {
     "@type": "Offer",
     "price": "0",
@@ -111,6 +111,22 @@
     },
     {
      "@type": "Question",
+     "name": "Can visitors book appointments?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Yes. The appointment-slots field lets people pick a date and a free time. You set opening hours, slot length, how many bookings per slot, closed weekdays, blocked dates and minimum notice. Booked times disappear for everyone else, and the confirmation email can include a calendar invite (.ics)."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Can I connect it to my own tools?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Yes. Use signed webhooks (Zapier, Make, n8n, Google Sheets via Apps Script), Slack, Discord, Teams, Telegram or Mailchimp, export entries to Excel or CSV, or read forms and entries through the REST API with revocable API keys. Failed webhooks retry automatically."
+     }
+    },
+    {
+     "@type": "Question",
      "name": "Where is my data stored?",
      "acceptedAnswer": {
       "@type": "Answer",
@@ -159,17 +175,20 @@
   <div class="wrap prose-wrap hub">
     <div class="prose">
 <div class="plugin-card">
-  <div class="plugin-head"><span class="plugin-badge">WordPress plugin</span><span class="plugin-ver">v1.3.0 · 138 KB · Free download</span></div>
+  <div class="plugin-head"><span class="plugin-badge">WordPress plugin</span><span class="plugin-ver">v1.4.0 · 153 KB · Free download</span></div>
   <h2>Weberslink Forms Pro</h2>
-  <p>A complete drag-and-drop form builder: 45+ field types, multi-step and conversational forms, conditional logic, payments, file uploads, PDFs, spam protection and integrations — styled to blend into any theme.</p>
+  <p>A complete drag-and-drop form builder: 50 field types, multi-step and conversational forms, conditional logic, payments, file uploads, PDFs, spam protection and integrations — styled to blend into any theme.</p>
   <ul class="plugin-feats">
-    <li>30+ ready-made templates</li>
+    <li>35+ ready-made templates</li>
     <li>Stripe, PayPal &amp; subscriptions</li>
     <li>Save &amp; resume by email link</li>
     <li>Seat / stock limits per option</li>
+    <li>Live appointment booking with calendar invites</li>
+    <li>Entry workflow, assignment &amp; Excel export</li>
     <li>Quizzes, calculations &amp; reports</li>
-    <li>Webhooks, Slack, Mailchimp &amp; more</li>
+    <li>REST API, webhooks, Slack, Mailchimp &amp; more</li>
   </ul>
+  <p class="plugin-new"><strong>New in v1.4.0:</strong> Live appointment slots with calendar invites · Entry workflow stages &amp; assignment · Excel export &amp; branded emails · REST API with keys · Auto-retry for failed webhooks</p>
   <div class="plugin-actions">
     <a class="btn btn-dark" href="/downloads/weberslink-forms-pro.zip" download data-track="Plugin download" data-loc="plugins-hub">Download ZIP ↓</a>
     <a class="btn btn-outline" href="/plugins/weberslink-forms-pro" data-track="Plugin details" data-loc="plugins-hub">Features &amp; install guide →</a>
@@ -197,6 +216,8 @@
       <details><summary>Which WordPress and PHP versions does it need?</summary><p>WordPress 5.8 or newer and PHP 7.4 or newer. It works with classic themes, block themes, Elementor and other page builders through a shortcode, a Gutenberg block, a widget and an Elementor widget.</p></details>
       <details><summary>How do I install it?</summary><p>In your WordPress admin go to Plugins → Add New → Upload Plugin, choose the ZIP you downloaded, install and activate. Then open Weberslink Forms → Add new and pick a template.</p></details>
       <details><summary>Can it take payments?</summary><p>Yes: Stripe Checkout (including subscriptions) and PayPal, with products, quantities, coupons and tax. Totals are always calculated on the server. You add your own Stripe or PayPal keys in the plugin settings.</p></details>
+      <details><summary>Can visitors book appointments?</summary><p>Yes. The appointment-slots field lets people pick a date and a free time. You set opening hours, slot length, how many bookings per slot, closed weekdays, blocked dates and minimum notice. Booked times disappear for everyone else, and the confirmation email can include a calendar invite (.ics).</p></details>
+      <details><summary>Can I connect it to my own tools?</summary><p>Yes. Use signed webhooks (Zapier, Make, n8n, Google Sheets via Apps Script), Slack, Discord, Teams, Telegram or Mailchimp, export entries to Excel or CSV, or read forms and entries through the REST API with revocable API keys. Failed webhooks retry automatically.</p></details>
       <details><summary>Where is my data stored?</summary><p>In your own WordPress database. Nothing is sent to us. You can anonymise or disable IP storage, auto-delete old entries, and the plugin hooks into WordPress's personal-data export and erase tools for GDPR requests.</p></details>
     </div>
   </div>

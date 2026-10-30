@@ -43,6 +43,7 @@ class WLFP_Entries {
 	public static function hydrate( $r ) {
 		$r['id']      = (int) $r['id'];
 		$r['form_id'] = (int) $r['form_id'];
+		$r['assigned_to'] = isset( $r['assigned_to'] ) ? (int) $r['assigned_to'] : 0;
 		$r['data']    = json_decode( (string) $r['data'], true );
 		$r['data']    = is_array( $r['data'] ) ? $r['data'] : array();
 		return $r;
@@ -60,7 +61,7 @@ class WLFP_Entries {
 
 	public static function query( $args ) {
 		global $wpdb;
-		$a = wp_parse_args( $args, array( 'form_id' => 0, 'status' => '', 'search' => '', 'from' => '', 'to' => '', 'starred' => 0, 'payment' => '', 'per_page' => 20, 'page' => 1, 'orderby' => 'id', 'order' => 'DESC', 'ids' => array(), 'user_id' => 0 ) );
+		$a = wp_parse_args( $args, array( 'form_id' => 0, 'status' => '', 'search' => '', 'from' => '', 'to' => '', 'starred' => 0, 'payment' => '', 'per_page' => 20, 'page' => 1, 'orderby' => 'id', 'order' => 'DESC', 'ids' => array(), 'user_id' => 0, 'stage' => '', 'assigned' => '' ) );
 		$where = array( '1=1' );
 		$vals  = array();
 		if ( $a['form_id'] ) {
@@ -72,6 +73,24 @@ class WLFP_Entries {
 			$vals[]  = $a['status'];
 		} elseif ( 'all' === $a['status'] || '' === $a['status'] ) {
 			$where[] = "status NOT IN ('trashed','spam')";
+		}
+		if ( '' !== $a['stage'] ) {
+			$stages = WLFP_Helpers::stages();
+			if ( $a['stage'] === $stages[0] ) {
+				$where[] = "(stage=%s OR stage='')";
+			} else {
+				$where[] = 'stage=%s';
+			}
+			$vals[] = $a['stage'];
+		}
+		if ( 'me' === $a['assigned'] ) {
+			$where[] = 'assigned_to=%d';
+			$vals[]  = get_current_user_id();
+		} elseif ( 'none' === $a['assigned'] ) {
+			$where[] = 'assigned_to=0';
+		} elseif ( is_numeric( $a['assigned'] ) && (int) $a['assigned'] > 0 ) {
+			$where[] = 'assigned_to=%d';
+			$vals[]  = (int) $a['assigned'];
 		}
 		if ( $a['user_id'] ) {
 			$where[] = 'user_id=%d';

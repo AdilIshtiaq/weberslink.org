@@ -7,8 +7,6 @@ defined( 'ABSPATH' ) || exit;
  */
 class WLFP_Integrations {
 
-	public static function init() {}
-
 	public static function types() {
 		return apply_filters( 'wlfp_feed_types', array(
 			'webhook'           => __( 'Webhook (Zapier, Make, n8n, Google Sheets, any URL)', 'weberslink-forms-pro' ),
@@ -22,50 +20,81 @@ class WLFP_Integrations {
 		) );
 	}
 
+	public static function init() {
+		add_action( 'wlfp_retry_feed', array( __CLASS__, 'retry' ), 10, 3 );
+	}
+
+	/** Feed types that are safe to run again after a failure (idempotent or notification-only). */
+	public static function retryable( $type ) {
+		return in_array( $type, array( 'webhook', 'slack', 'discord', 'teams', 'telegram', 'mailchimp' ), true );
+	}
+
 	public static function run( $form, $entry ) {
-		foreach ( (array) $form['settings']['feeds'] as $feed ) {
-			if ( empty( $feed['enabled'] ) || empty( $feed['type'] ) ) {
-				continue;
+		foreach ( array_values( (array) $form['settings']['feeds'] ) as $i => $feed ) {
+			self::run_one( $form, $entry, $feed, $i, 0 );
+		}
+	}
+
+	public static function retry( $entry_id, $index, $attempt ) {
+		$entry = WLFP_Entries::get( (int) $entry_id );
+		if ( ! $entry || in_array( $entry['status'], array( 'spam', 'trashed' ), true ) ) {
+			return;
+		}
+		$form  = WLFP_Forms::get( $entry['form_id'] );
+		$feeds = $form ? array_values( (array) $form['settings']['feeds'] ) : array();
+		if ( isset( $feeds[ (int) $index ] ) ) {
+			self::run_one( $form, $entry, $feeds[ (int) $index ], (int) $index, (int) $attempt );
+		}
+	}
+
+	private static function run_one( $form, $entry, $feed, $i, $attempt ) {
+		if ( empty( $feed['enabled'] ) || empty( $feed['type'] ) ) {
+			return;
+		}
+		if ( ! WLFP_Logic::passes( isset( $feed['conditional'] ) ? $feed['conditional'] : array(), $entry['data'] ) ) {
+			return;
+		}
+		$name = ! empty( $feed['name'] ) ? $feed['name'] : $feed['type'];
+		$res  = null;
+		try {
+			switch ( $feed['type'] ) {
+				case 'webhook':
+					$res = self::webhook( $feed, $form, $entry );
+					break;
+				case 'slack':
+				case 'discord':
+				case 'teams':
+					$res = self::chat( $feed, $form, $entry );
+					break;
+				case 'telegram':
+					$res = self::telegram( $feed, $form, $entry );
+					break;
+				case 'mailchimp':
+					$res = self::mailchimp( $feed, $form, $entry );
+					break;
+				case 'user_registration':
+					$res = self::register_user( $feed, $form, $entry );
+					break;
+				case 'create_post':
+					$res = self::create_post( $feed, $form, $entry );
+					break;
+				default:
+					do_action( 'wlfp_feed_' . $feed['type'], $feed, $form, $entry );
+					$res = true;
 			}
-			if ( ! WLFP_Logic::passes( isset( $feed['conditional'] ) ? $feed['conditional'] : array(), $entry['data'] ) ) {
-				continue;
+		} catch ( Exception $e ) {
+			$res = new WP_Error( 'wlfp_exception', $e->getMessage() );
+		}
+		if ( is_wp_error( $res ) ) {
+			$more = '';
+			$wait = array( 0 => 5 * MINUTE_IN_SECONDS, 1 => 30 * MINUTE_IN_SECONDS, 2 => 2 * HOUR_IN_SECONDS );
+			if ( self::retryable( $feed['type'] ) && isset( $wait[ $attempt ] ) && ! empty( $entry['id'] ) ) {
+				wp_schedule_single_event( time() + $wait[ $attempt ], 'wlfp_retry_feed', array( (int) $entry['id'], (int) $i, $attempt + 1 ) );
+				$more = ' — ' . sprintf( /* translators: 1: attempt 2: minutes */ __( 'retry %1$d of 3 in %2$d min', 'weberslink-forms-pro' ), $attempt + 1, (int) ( $wait[ $attempt ] / 60 ) );
 			}
-			$name = ! empty( $feed['name'] ) ? $feed['name'] : $feed['type'];
-			try {
-				$res = null;
-				switch ( $feed['type'] ) {
-					case 'webhook':
-						$res = self::webhook( $feed, $form, $entry );
-						break;
-					case 'slack':
-					case 'discord':
-					case 'teams':
-						$res = self::chat( $feed, $form, $entry );
-						break;
-					case 'telegram':
-						$res = self::telegram( $feed, $form, $entry );
-						break;
-					case 'mailchimp':
-						$res = self::mailchimp( $feed, $form, $entry );
-						break;
-					case 'user_registration':
-						$res = self::register_user( $feed, $form, $entry );
-						break;
-					case 'create_post':
-						$res = self::create_post( $feed, $form, $entry );
-						break;
-					default:
-						do_action( 'wlfp_feed_' . $feed['type'], $feed, $form, $entry );
-						$res = true;
-				}
-				if ( is_wp_error( $res ) ) {
-					WLFP_Install::log( $form['id'], $entry['id'], 'feed:' . $feed['type'], 'failed', $name . ' failed', $res->get_error_message() );
-				} else {
-					WLFP_Install::log( $form['id'], $entry['id'], 'feed:' . $feed['type'], 'success', $name . ' ran', is_scalar( $res ) ? (string) $res : '' );
-				}
-			} catch ( Exception $e ) {
-				WLFP_Install::log( $form['id'], $entry['id'], 'feed:' . $feed['type'], 'failed', $name . ' error', $e->getMessage() );
-			}
+			WLFP_Install::log( $form['id'], $entry['id'], 'feed:' . $feed['type'], 'failed', $name . ' failed' . ( $attempt ? ' (attempt ' . ( $attempt + 1 ) . ')' : '' ), $res->get_error_message() . $more );
+		} else {
+			WLFP_Install::log( $form['id'], $entry['id'], 'feed:' . $feed['type'], 'success', $name . ' ran' . ( $attempt ? ' (after ' . $attempt . ' retr' . ( 1 === $attempt ? 'y' : 'ies' ) . ')' : '' ), is_scalar( $res ) ? (string) $res : '' );
 		}
 	}
 
@@ -94,7 +123,7 @@ class WLFP_Integrations {
 			$v = $entry['data'][ $f['name'] ];
 			$out[ $f['name'] ] = in_array( $f['type'], array( 'name', 'address', 'checkbox', 'multiselect', 'repeater', 'likert' ), true ) ? $v : ( in_array( $f['type'], array( 'file', 'image' ), true ) ? wp_list_pluck( (array) $v, 'url' ) : ( 'password' === $f['type'] ? '' : $v ) );
 		}
-		return array( 'form_id' => $form['id'], 'form_title' => $form['title'], 'entry_id' => $entry['id'], 'submitted_at' => $entry['created_at'], 'ip' => $entry['ip'], 'source_url' => $entry['source_url'] ?? '', 'payment_status' => $entry['payment_status'], 'payment_total' => $entry['payment_total'], 'currency' => $entry['currency'], 'fields' => $out );
+		return array( 'form_id' => $form['id'], 'form_title' => $form['title'], 'entry_id' => $entry['id'], 'submitted_at' => $entry['created_at'], 'ip' => $entry['ip'], 'source_url' => $entry['source_url'] ?? '', 'stage' => WLFP_Helpers::entry_stage( $entry ), 'payment_status' => $entry['payment_status'], 'payment_total' => $entry['payment_total'], 'currency' => $entry['currency'], 'fields' => $out );
 	}
 
 	private static function webhook( $feed, $form, $entry ) {

@@ -6,6 +6,7 @@ class WLFP_Export {
 	public static function init() {
 		add_action( 'admin_post_wlfp_export_entries', array( __CLASS__, 'entries_csv' ) );
 		add_action( 'admin_post_wlfp_export_form', array( __CLASS__, 'form_json' ) );
+		add_action( 'admin_post_wlfp_export_xlsx', array( __CLASS__, 'entries_xlsx' ) );
 		add_action( 'admin_post_wlfp_import_form', array( __CLASS__, 'form_import' ) );
 		add_action( 'admin_post_wlfp_print_entry', array( __CLASS__, 'print_entry' ) );
 	}
@@ -26,7 +27,8 @@ class WLFP_Export {
 		return $v;
 	}
 
-	public static function entries_csv() {
+	/** Shared by CSV and XLSX: returns array( form, header[], rows[][] ) (raw values, not formula-escaped). */
+	private static function export_table() {
 		self::guard( 'wlfp_export' );
 		$form_id = isset( $_GET['form_id'] ) ? (int) $_GET['form_id'] : 0; // phpcs:ignore
 		$form    = WLFP_Forms::get( $form_id );
@@ -34,26 +36,53 @@ class WLFP_Export {
 			wp_die( esc_html__( 'Form not found.', 'weberslink-forms-pro' ) );
 		}
 		$ids = isset( $_GET['ids'] ) ? array_filter( array_map( 'intval', explode( ',', sanitize_text_field( wp_unslash( $_GET['ids'] ) ) ) ) ) : array(); // phpcs:ignore
-		$q   = WLFP_Entries::query( array( 'form_id' => $form_id, 'status' => isset( $_GET['status'] ) ? sanitize_key( $_GET['status'] ) : 'all', 'search' => isset( $_GET['s'] ) ? sanitize_text_field( wp_unslash( $_GET['s'] ) ) : '', 'from' => isset( $_GET['from'] ) ? sanitize_text_field( wp_unslash( $_GET['from'] ) ) : '', 'to' => isset( $_GET['to'] ) ? sanitize_text_field( wp_unslash( $_GET['to'] ) ) : '', 'per_page' => 0, 'ids' => $ids, 'order' => 'ASC' ) ); // phpcs:ignore
+		$q   = WLFP_Entries::query( array( 'form_id' => $form_id, 'status' => isset( $_GET['status'] ) ? sanitize_key( $_GET['status'] ) : 'all', 'search' => isset( $_GET['s'] ) ? sanitize_text_field( wp_unslash( $_GET['s'] ) ) : '', 'from' => isset( $_GET['from'] ) ? sanitize_text_field( wp_unslash( $_GET['from'] ) ) : '', 'to' => isset( $_GET['to'] ) ? sanitize_text_field( wp_unslash( $_GET['to'] ) ) : '', 'stage' => isset( $_GET['stage'] ) ? sanitize_text_field( wp_unslash( $_GET['stage'] ) ) : '', 'assigned' => isset( $_GET['assigned'] ) ? sanitize_text_field( wp_unslash( $_GET['assigned'] ) ) : '', 'per_page' => 0, 'ids' => $ids, 'order' => 'ASC' ) ); // phpcs:ignore
+		$fields = WLFP_Forms::value_fields( $form );
+		$head   = array( 'ID', 'Reference', 'Date (UTC)', 'Status', 'Stage', 'Assigned to', 'IP', 'Source URL', 'Payment status', 'Payment total', 'Currency', 'Transaction' );
+		foreach ( $fields as $f ) {
+			$head[] = $f['label'] ? $f['label'] : $f['name'];
+		}
+		$rows = array();
+		foreach ( $q['rows'] as $e ) {
+			$u   = $e['assigned_to'] ? get_userdata( (int) $e['assigned_to'] ) : null;
+			$row = array( $e['id'], WLFP_Merge::reference( $form, $e ), $e['created_at'], $e['status'], WLFP_Helpers::entry_stage( $e ), $u ? $u->display_name : '', $e['ip'], $e['source_url'], $e['payment_status'], $e['payment_total'], $e['currency'], $e['transaction_id'] );
+			foreach ( $fields as $f ) {
+				$row[] = isset( $e['data'][ $f['name'] ] ) ? WLFP_Fields::format_value( $f, $e['data'][ $f['name'] ], false ) : '';
+			}
+			$rows[] = $row;
+		}
+		return array( $form, $head, $rows );
+	}
+
+	public static function entries_csv() {
+		list( $form, $head, $rows ) = self::export_table();
 		nocache_headers();
 		header( 'Content-Type: text/csv; charset=utf-8' );
 		header( 'Content-Disposition: attachment; filename=' . sanitize_file_name( $form['title'] ) . '-entries-' . gmdate( 'Y-m-d' ) . '.csv' );
 		$out = fopen( 'php://output', 'w' ); // phpcs:ignore
 		fwrite( $out, "\xEF\xBB\xBF" ); // phpcs:ignore -- BOM for Excel.
-		$fields = WLFP_Forms::value_fields( $form );
-		$head   = array( 'ID', 'Serial', 'Date (UTC)', 'Status', 'IP', 'Source URL', 'Payment status', 'Payment total', 'Currency', 'Transaction' );
-		foreach ( $fields as $f ) {
-			$head[] = $f['label'] ? $f['label'] : $f['name'];
-		}
 		fputcsv( $out, $head );
-		foreach ( $q['rows'] as $e ) {
-			$row = array( $e['id'], $e['serial'], $e['created_at'], $e['status'], $e['ip'], $e['source_url'], $e['payment_status'], $e['payment_total'], $e['currency'], $e['transaction_id'] );
-			foreach ( $fields as $f ) {
-				$row[] = self::csv_cell( isset( $e['data'][ $f['name'] ] ) ? WLFP_Fields::format_value( $f, $e['data'][ $f['name'] ], false ) : '' );
-			}
-			fputcsv( $out, $row );
+		foreach ( $rows as $row ) {
+			fputcsv( $out, array_map( array( __CLASS__, 'csv_cell' ), $row ) );
 		}
 		fclose( $out ); // phpcs:ignore
+		exit;
+	}
+
+	public static function entries_xlsx() {
+		if ( ! WLFP_Xlsx::available() ) {
+			wp_die( esc_html__( 'Excel export needs the PHP zip extension on your server. Use the CSV export instead.', 'weberslink-forms-pro' ) );
+		}
+		list( $form, $head, $rows ) = self::export_table();
+		$bytes = WLFP_Xlsx::build( array_merge( array( $head ), $rows ), $form['title'] );
+		if ( '' === $bytes ) {
+			wp_die( esc_html__( 'Could not build the Excel file.', 'weberslink-forms-pro' ) );
+		}
+		nocache_headers();
+		header( 'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' );
+		header( 'Content-Disposition: attachment; filename=' . sanitize_file_name( $form['title'] ) . '-entries-' . gmdate( 'Y-m-d' ) . '.xlsx' );
+		header( 'Content-Length: ' . strlen( $bytes ) );
+		echo $bytes; // phpcs:ignore
 		exit;
 	}
 

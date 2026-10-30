@@ -9,6 +9,19 @@ class WLFP_Notifications {
 		add_action( 'wlfp_delayed_email', array( __CLASS__, 'run_delayed' ), 10, 2 );
 	}
 
+	/** Branded HTML email layout (logo / colour / footer from Settings → Email design). */
+	public static function wrap_html( $body ) {
+		$s = WLFP_Helpers::settings();
+		if ( empty( $s['email_brand'] ) ) {
+			return '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#222">' . $body . '</div>';
+		}
+		$color = preg_match( '/^#[0-9a-fA-F]{6}$/', (string) $s['email_color'] ) ? $s['email_color'] : '#1d2327';
+		$site  = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+		$head  = ! empty( $s['email_logo'] ) ? '<img src="' . esc_url( $s['email_logo'] ) . '" alt="' . esc_attr( $site ) . '" style="max-height:44px;width:auto;border:0;display:block" />' : '<span style="font-size:20px;font-weight:bold;color:#ffffff">' . esc_html( $site ) . '</span>';
+		$foot  = ! empty( $s['email_footer'] ) ? '<tr><td style="padding:14px 24px;background:#fafafa;color:#777;font-size:12px;line-height:1.5;font-family:Arial,Helvetica,sans-serif">' . esc_html( $s['email_footer'] ) . '</td></tr>' : '';
+		return '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f4f5"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="600" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:8px;overflow:hidden"><tr><td style="background:' . $color . ';padding:18px 24px;font-family:Arial,Helvetica,sans-serif">' . $head . '</td></tr><tr><td style="padding:24px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#222222">' . $body . '</td></tr>' . $foot . '</table></td></tr></table>';
+	}
+
 	public static function delay_seconds( $n ) {
 		$d = isset( $n['delay'] ) ? (float) $n['delay'] : 0;
 		if ( $d <= 0 ) {
@@ -112,7 +125,7 @@ class WLFP_Notifications {
 				$body = nl2br( esc_html( $body ) );
 			}
 			$body = wpautop_if_needed( $body );
-			$body = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#222">' . $body . '</div>';
+			$body = ( ! isset( $n['branded'] ) || $n['branded'] ) ? self::wrap_html( $body ) : '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#222">' . $body . '</div>';
 		} else {
 			$body = wp_strip_all_tags( $body );
 		}
@@ -136,6 +149,17 @@ class WLFP_Notifications {
 			if ( false !== file_put_contents( $tmp, $pdf_bytes ) ) { // phpcs:ignore
 				$attach[]    = $tmp;
 				$tmp_files[] = $tmp;
+			}
+		}
+		if ( ! empty( $n['attach_ics'] ) ) {
+			list( $ics_name, $ics ) = WLFP_Slots::ics( $form, $entry );
+			if ( $ics ) {
+				$dir = trailingslashit( get_temp_dir() );
+				$tmp = $dir . wp_unique_filename( $dir, $ics_name );
+				if ( false !== file_put_contents( $tmp, $ics ) ) { // phpcs:ignore
+					$attach[]    = $tmp;
+					$tmp_files[] = $tmp;
+				}
 			}
 		}
 		$ok = wp_mail( $to, $subject, $body, $headers, $attach );

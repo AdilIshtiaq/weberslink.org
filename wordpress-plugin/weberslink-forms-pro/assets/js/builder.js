@@ -333,6 +333,7 @@
 			case 'page_break': add( m, h( 'div', { text: '⇥ Step break' + ( f.step_title ? ': ' + f.step_title : '' ), style: 'text-align:center;border:1px dashed #8c8f94;padding:6px;border-radius:4px' } ) ); break;
 			case 'captcha': add( m, box( '🛡 CAPTCHA' ) ); break;
 			case 'shortcode': add( m, box( f.shortcode || '[shortcode]' ) ); break;
+			case 'slot_picker': add( m, h( 'div', { class: 'g' }, box( 'Date' ), box( '9:00 · 9:30 · 10:00 …' ) ) ); break;
 			case 'toggle': add( m, h( 'div', { class: 'c' }, h( 'b', { style: 'width:28px;border-radius:99px' } ), f.toggle_text || '' ) ); break;
 			case 'image_choice': add( m, h( 'div', { class: 'g' }, ( f.options || [] ).slice( 0, 4 ).map( function ( o ) { return box( '▣ ' + o.label ); } ) ) ); break;
 			case 'ranking': add( m, ( f.options || [] ).slice( 0, 4 ).map( function ( o, i ) { return box( ( i + 1 ) + '. ' + o.label ); } ) ); break;
@@ -377,7 +378,7 @@
 		if ( f.type === 'page_break' ) { gen.appendChild( text( f, 'step_title', { label: 'Title of the step that ends here', help: 'Shown in the progress bar. The first step is named in Settings → Steps.' } ) ); }
 		if ( f.type === 'shortcode' ) { gen.appendChild( text( f, 'shortcode', { label: 'Shortcode', ph: '[my_shortcode]', on: refresh } ) ); }
 		if ( ! isLayout && f.type !== 'hidden' && f.type !== 'consent' ) { gen.appendChild( text( f, 'help', { label: 'Help text' } ) ); }
-		if ( ! isLayout && [ 'file', 'image', 'signature', 'repeater', 'calculation', 'rating', 'nps', 'likert', 'payment_item', 'quantity', 'coupon', 'ranking', 'image_choice', 'date_range', 'emoji_rating', 'terms', 'post_select', 'us_state' ].indexOf( f.type ) === -1 ) {
+		if ( ! isLayout && [ 'file', 'image', 'signature', 'repeater', 'calculation', 'rating', 'nps', 'likert', 'payment_item', 'quantity', 'coupon', 'ranking', 'image_choice', 'date_range', 'emoji_rating', 'terms', 'post_select', 'us_state', 'slot_picker' ].indexOf( f.type ) === -1 ) {
 			var dv = text( f, 'default', { label: 'Default value', help: 'Merge tags work: {user_email}, {get:param}…' } );
 			gen.appendChild( dv );
 		}
@@ -519,6 +520,26 @@
 				w.appendChild( text( f, 'min', { label: 'Min', type: 'number' } ) ); w.appendChild( text( f, 'max', { label: 'Max', type: 'number' } ) ); break;
 			}
 			case 'coupon': w.appendChild( h( 'p', { class: 'description', text: 'Create coupon codes under Payments.' } ) ); break;
+			case 'slot_picker': {
+				w.appendChild( h( 'p', { class: 'description', text: 'Visitors pick a date, then a free time. Booked slots disappear for everyone else (enforced on the server).' } ) );
+				w.appendChild( text( f, 'start_time', { label: 'First slot starts at', type: 'time' } ) );
+				w.appendChild( text( f, 'end_time', { label: 'Last slot ends by', type: 'time' } ) );
+				w.appendChild( text( f, 'interval', { label: 'Slot length (minutes)', type: 'number', min: 5, max: 480 } ) );
+				w.appendChild( text( f, 'capacity', { label: 'Bookings allowed per slot', type: 'number', min: 1 } ) );
+				var cd = f.closed_days = Array.isArray( f.closed_days ) ? f.closed_days.map( String ) : [ '0', '6' ];
+				w.appendChild( h( 'div', { class: 'lb', text: 'Closed on', style: 'font-weight:600;margin:8px 0 4px' } ) );
+				[ [ '1', 'Mon' ], [ '2', 'Tue' ], [ '3', 'Wed' ], [ '4', 'Thu' ], [ '5', 'Fri' ], [ '6', 'Sat' ], [ '0', 'Sun' ] ].forEach( function ( d ) {
+					var cb = h( 'input', { type: 'checkbox', checked: cd.indexOf( d[ 0 ] ) !== -1 } );
+					cb.addEventListener( 'change', function () { var i = cd.indexOf( d[ 0 ] ); if ( cb.checked && i === -1 ) { cd.push( d[ 0 ] ); } else if ( ! cb.checked && i !== -1 ) { cd.splice( i, 1 ); } touch(); } );
+					w.appendChild( h( 'label', { class: 'wlfpb-ck', style: 'display:inline-flex;margin-right:10px' }, cb, h( 'span', { text: d[ 1 ] } ) ) );
+				} );
+				w.appendChild( text( f, 'min_notice', { label: 'Minimum notice (days from today)', type: 'number', min: 0 } ) );
+				w.appendChild( text( f, 'max_ahead', { label: 'Bookable up to (days ahead)', type: 'number', min: 1, max: 730 } ) );
+				w.appendChild( area( f, 'blocked_dates', { label: 'Blocked dates (holidays), one per line', rows: 3, ph: '2026-12-25' } ) );
+				w.appendChild( text( f, 'duration', { label: 'Calendar invite length (minutes, empty = slot length)', type: 'number' } ) );
+				w.appendChild( text( f, 'event_title', { label: 'Calendar invite title (empty = form title)' } ) );
+				break;
+			}
 			case 'toggle': w.appendChild( text( f, 'toggle_text', { label: 'Text next to the switch' } ) ); break;
 			case 'image_choice':
 				w.appendChild( optionsEditor( f, { image: true, score: quizOn(), limit: true, on: refresh } ) );
@@ -743,6 +764,7 @@
 		list.forEach( function ( n, i ) {
 			n.conditional = n.conditional || { enabled: 0, match: 'all', rules: [] };
 			n.delay_unit = n.delay_unit || 'hours';
+			if ( n.branded === undefined ) { n.branded = 1; }
 			var item = h( 'div', { class: 'wlfpb-list-item' } );
 			item.appendChild( h( 'header', null, check( n, 'enabled', '' ), h( 'span', { text: n.name || 'Notification' } ),
 				h( 'button', { type: 'button', class: 'button button-small', text: 'Duplicate', onclick: function () { list.splice( i + 1, 0, clone( n ) ); touch(); renderTab(); } } ),
@@ -750,11 +772,11 @@
 			var d = h( 'div' );
 			d.appendChild( text( n, 'name', { label: 'Internal name' } ) ); d.appendChild( text( n, 'to', { label: 'Send to', help: 'Comma-separated. Merge tags allowed.' } ) );
 			d.appendChild( text( n, 'subject', { label: 'Subject' } ) ); d.appendChild( area( n, 'message', { label: 'Message', rows: 8, help: 'HTML allowed. {all_data} prints a table of every answer.' } ) );
-			d.appendChild( h( 'details', null, h( 'summary', { text: 'More options' } ), text( n, 'reply_to', { label: 'Reply-To' } ), text( n, 'cc', { label: 'CC' } ), text( n, 'bcc', { label: 'BCC' } ), text( n, 'from_name', { label: 'From name' } ), text( n, 'from_email', { label: 'From email' } ), sel( n, 'format', [ [ 'html', 'HTML' ], [ 'plain', 'Plain text' ] ], { label: 'Format' } ), check( n, 'attach', 'Attach uploaded files' ), check( n, 'attach_pdf', 'Attach a PDF copy of the submission' ), h( 'div', { class: 'wlfpb-f' }, h( 'label', { text: 'Send later (follow-up / reminder)' } ), h( 'div', { style: 'display:flex;gap:6px' }, text( n, 'delay', { label: false, type: 'number', min: 0, ph: '0 = immediately' } ), sel( n, 'delay_unit', [ [ 'minutes', 'minutes' ], [ 'hours', 'hours' ], [ 'days', 'days' ] ], { label: false } ) ), h( 'div', { class: 'd', text: 'Delayed emails use WP-Cron (runs when your site gets visits). Spam and trashed entries are skipped.' } ) ) ) );
+			d.appendChild( h( 'details', null, h( 'summary', { text: 'More options' } ), text( n, 'reply_to', { label: 'Reply-To' } ), text( n, 'cc', { label: 'CC' } ), text( n, 'bcc', { label: 'BCC' } ), text( n, 'from_name', { label: 'From name' } ), text( n, 'from_email', { label: 'From email' } ), sel( n, 'format', [ [ 'html', 'HTML' ], [ 'plain', 'Plain text' ] ], { label: 'Format' } ), check( n, 'attach', 'Attach uploaded files' ), check( n, 'attach_pdf', 'Attach a PDF copy of the submission' ), check( n, 'attach_ics', 'Attach a calendar invite (.ics) for the appointment slot' ), check( n, 'branded', 'Use the branded email layout (Settings → Email design)' ), h( 'div', { class: 'wlfpb-f' }, h( 'label', { text: 'Send later (follow-up / reminder)' } ), h( 'div', { style: 'display:flex;gap:6px' }, text( n, 'delay', { label: false, type: 'number', min: 0, ph: '0 = immediately' } ), sel( n, 'delay_unit', [ [ 'minutes', 'minutes' ], [ 'hours', 'hours' ], [ 'days', 'days' ] ], { label: false } ) ), h( 'div', { class: 'd', text: 'Delayed emails use WP-Cron (runs when your site gets visits). Spam and trashed entries are skipped.' } ) ) ) );
 			d.appendChild( h( 'details', { open: !! Number( n.conditional.enabled ) }, h( 'summary', { text: 'Send only if…' } ), condEditor( n.conditional, null ) ) );
 			item.appendChild( d ); wrap.appendChild( item );
 		} );
-		wrap.appendChild( h( 'button', { type: 'button', class: 'button', text: '+ Add notification', onclick: function () { list.push( { name: 'Notification ' + ( list.length + 1 ), enabled: 1, to: '{admin_email}', cc: '', bcc: '', reply_to: '', from_name: '', from_email: '', subject: 'New submission: {form_title}', message: '{all_data}', format: 'html', attach: 0, attach_pdf: 0, delay: 0, delay_unit: 'hours', conditional: { enabled: 0, match: 'all', rules: [] } } ); touch(); renderTab(); } } ) );
+		wrap.appendChild( h( 'button', { type: 'button', class: 'button', text: '+ Add notification', onclick: function () { list.push( { name: 'Notification ' + ( list.length + 1 ), enabled: 1, to: '{admin_email}', cc: '', bcc: '', reply_to: '', from_name: '', from_email: '', subject: 'New submission: {form_title}', message: '{all_data}', format: 'html', attach: 0, attach_pdf: 0, attach_ics: 0, branded: 1, delay: 0, delay_unit: 'hours', conditional: { enabled: 0, match: 'all', rules: [] } } ); touch(); renderTab(); } } ) );
 		wrap.appendChild( h( 'div', { class: 'wlfpb-panel', style: 'margin-top:16px' }, h( 'strong', { text: 'Merge tags' } ), tagChips() ) );
 		body.appendChild( wrap );
 	}

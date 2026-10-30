@@ -124,6 +124,11 @@
 		var name = w.getAttribute( 'data-name' );
 		var els = $$( '[name="' + name + '"],[name="' + name + '[]"],[name^="' + name + '["]', w ).filter( function ( e ) { return ! e.disabled; } );
 		if ( ! els.length ) { return ''; }
+		if ( type === 'slot_picker' ) {
+			var sd = $( 'input[type=date]', w );
+			var sr = els.filter( function ( e ) { return e.type === 'radio' && e.checked; } )[ 0 ];
+			return ( sd && sd.value ? sd.value : '' ) + ( sr ? ' ' + sr.value : '' );
+		}
 		if ( type === 'toggle' ) { return els[ 0 ].checked ? 'yes' : 'no'; }
 		if ( type === 'terms' ) { return els[ 0 ].checked ? 'yes' : ''; }
 		if ( type === 'ranking' ) { return els.map( function ( e ) { return e.value; } ); }
@@ -167,6 +172,7 @@
 		this.bindRepeaters();
 		this.bindSignatures();
 		this.bindCoupon();
+		this.bindSlots();
 		this.bindResume();
 		this.bindRanking();
 		this.bindTerms();
@@ -377,6 +383,12 @@
 		if ( ! name ) { return ''; }
 		var req = w.hasAttribute( 'data-required' );
 		var v = this.valueOf( w );
+		if ( type === 'slot_picker' ) {
+			var sdv = $( 'input[type=date]', w ).value;
+			var ssl = $( 'input[type=radio]:checked', w );
+			if ( req && ( ! sdv || ! ssl ) ) { return w.getAttribute( 'data-req-msg' ) || T.required || 'Required'; }
+			return sdv && ! ssl ? ( T.slotPick || 'Please choose a time.' ) : '';
+		}
 		if ( type === 'toggle' ) { return req && v !== 'yes' ? ( w.getAttribute( 'data-req-msg' ) || T.required || 'Required' ) : ''; }
 		var empty = Array.isArray( v ) ? v.length === 0 : String( v ).trim() === '';
 		if ( type === 'name' && req ) { var parts = $$( 'input', w ); if ( parts.some( function ( p ) { return p.name.match( /\[(first|last)\]/ ) && ! p.value.trim(); } ) ) { empty = true; } }
@@ -657,6 +669,54 @@
 	Form.prototype.convReset = function () {
 		if ( this.welcomeEl ) { this.welcomeEl.hidden = false; this.cslide = -1; this.slides.forEach( function ( s ) { s.els.forEach( function ( w ) { w.classList.remove( 'wlfp-slide-on' ); } ); } ); this.convRefresh(); }
 		else { this.convShow( this.convVisible()[ 0 ] || 0, 'fwd', true ); }
+	};
+
+	/* ---------- appointment slots ---------- */
+	Form.prototype.bindSlots = function () {
+		var self = this;
+		$$( '.wlfp-slots', this.f ).forEach( function ( box ) {
+			var field = box.getAttribute( 'data-field' );
+			var date = $( '.wlfp-slot-date', box );
+			var grid = $( '.wlfp-slot-grid', box );
+			var closed = [];
+			var blocked = [];
+			try { closed = JSON.parse( box.getAttribute( 'data-closed' ) || '[]' ); blocked = JSON.parse( box.getAttribute( 'data-blocked' ) || '[]' ); } catch ( e ) {}
+			var init = $( '.wlfp-slot-init', box );
+			var want = init ? init.value : '';
+			var note = function ( t ) { grid.textContent = ''; var p = document.createElement( 'p' ); p.className = 'wlfp-slot-hint'; p.textContent = t; grid.appendChild( p ); };
+			var token = 0;
+			var load = function () {
+				var d = date.value;
+				if ( ! d ) { note( T.slotHint || '' ); return; }
+				var dow = new Date( d + 'T12:00:00' ).getDay();
+				if ( closed.indexOf( String( dow ) ) !== -1 || blocked.indexOf( d ) !== -1 ) { note( T.slotNone || '' ); return; }
+				var me = ++token;
+				var fd = new FormData();
+				fd.append( 'action', 'wlfp_slots' ); fd.append( 'form_id', self.id ); fd.append( 'field', field ); fd.append( 'date', d );
+				fetch( G.ajax, { method: 'POST', body: fd, credentials: 'same-origin' } ).then( function ( r ) { return r.json(); } ).then( function ( j ) {
+					if ( me !== token ) { return; }
+					if ( ! j || ! j.success || j.data.closed || ! j.data.slots.length ) { note( ( j && j.data && j.data.message ) || T.slotNone || '' ); return; }
+					grid.textContent = '';
+					j.data.slots.forEach( function ( s, i ) {
+						var lab = document.createElement( 'label' );
+						lab.className = 'wlfp-slot' + ( s.full ? ' is-full' : '' );
+						var inp = document.createElement( 'input' );
+						inp.type = 'radio'; inp.name = field + '[slot]'; inp.value = s.value; inp.disabled = s.full;
+						inp.setAttribute( 'data-wlfp-field', field );
+						if ( want && want === s.value && ! s.full ) { inp.checked = true; }
+						var sp = document.createElement( 'span' );
+						sp.appendChild( document.createTextNode( s.label ) );
+						var note2 = s.full ? ( T.slotFull || 'full' ) : ( j.data.capacity > 1 && s.left <= 3 ? fmt( T.slotLeft || '%s left', s.left ) : '' );
+						if ( note2 ) { var sm = document.createElement( 'small' ); sm.textContent = note2; sp.appendChild( sm ); }
+						lab.appendChild( inp ); lab.appendChild( sp ); grid.appendChild( lab );
+					} );
+					want = '';
+					self.evaluate();
+				} ).catch( function () { note( T.error || '' ); } );
+			};
+			date.addEventListener( 'change', load );
+			if ( date.value ) { load(); } else { note( T.slotHint || '' ); }
+		} );
 	};
 
 	/* ---------- save & resume later ---------- */

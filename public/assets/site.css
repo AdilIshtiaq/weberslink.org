@@ -542,3 +542,9 @@ form.sent .form-fields{display:none}
 .prose .btn-outline{color:var(--ink)}
 .plugin-note{padding:16px 18px;border:1px solid var(--line-l);border-radius:12px;background:var(--paper)}
 @media(max-width:560px){.plugin-feats{grid-template-columns:1fr}}
+
+.plugin-new{margin:18px 0 0;padding:12px 14px;border-radius:10px;background:var(--paper);border:1px solid var(--line-l);font-size:14px;line-height:1.6}
+.plugin-new-box{margin:22px 0}
+.plugin-new-box ul{margin:8px 0 0;padding-left:20px}
+.plugin-new-box li{margin:3px 0}
+.plugin-card .plugin-new{margin:0 0 20px}

@@ -31,6 +31,8 @@ class WLFP_Forms {
 					'format'     => 'html',
 					'attach'     => 0,
 					'attach_pdf' => 0,
+					'attach_ics' => 0,
+					'branded'    => 1,
 					'delay'      => 0,
 					'delay_unit' => 'hours',
 					'conditional' => array( 'enabled' => 0, 'match' => 'all', 'rules' => array() ),

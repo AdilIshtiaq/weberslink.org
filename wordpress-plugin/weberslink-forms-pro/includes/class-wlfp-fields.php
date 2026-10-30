@@ -50,6 +50,7 @@ class WLFP_Fields {
 			'quantity'        => array( 'label' => __( 'Quantity', 'weberslink-forms-pro' ), 'group' => 'payment', 'icon' => '×' ),
 			'payment_summary' => array( 'label' => __( 'Order summary', 'weberslink-forms-pro' ), 'group' => 'payment', 'icon' => '∑$' ),
 			'coupon'          => array( 'label' => __( 'Coupon code', 'weberslink-forms-pro' ), 'group' => 'payment', 'icon' => '%' ),
+			'slot_picker' => array( 'label' => __( 'Appointment slots (date + time)', 'weberslink-forms-pro' ), 'group' => 'advanced', 'icon' => '📆' ),
 			'toggle'      => array( 'label' => __( 'Toggle switch (yes / no)', 'weberslink-forms-pro' ), 'group' => 'advanced', 'icon' => '⏽' ),
 			'image_choice' => array( 'label' => __( 'Image choice', 'weberslink-forms-pro' ), 'group' => 'advanced', 'icon' => '▣' ),
 			'ranking'     => array( 'label' => __( 'Ranking (order the options)', 'weberslink-forms-pro' ), 'group' => 'advanced', 'icon' => '⇅' ),
@@ -163,6 +164,19 @@ class WLFP_Fields {
 				$base['max'] = 99;
 				$base['default'] = 1;
 				$base['item'] = '';
+				break;
+			case 'slot_picker':
+				$base['label']         = 'Pick a date & time';
+				$base['start_time']    = '09:00';
+				$base['end_time']      = '17:00';
+				$base['interval']      = 30;
+				$base['capacity']      = 1;
+				$base['closed_days']   = array( '0', '6' );
+				$base['min_notice']    = 1;
+				$base['max_ahead']     = 60;
+				$base['blocked_dates'] = '';
+				$base['duration']      = '';
+				$base['event_title']   = '';
 				break;
 			case 'toggle':
 				$base['toggle_text'] = 'Yes';
@@ -463,6 +477,17 @@ class WLFP_Fields {
 			case 'coupon':
 				$o = '<div class="wlfp-coupon"><input type="text" class="wlfp-input" id="' . esc_attr( $fid ) . '" name="' . esc_attr( $name ) . '" data-wlfp-field="' . esc_attr( $name ) . '" /><button type="button" class="wlfp-coupon-apply">' . esc_html__( 'Apply', 'weberslink-forms-pro' ) . '</button><span class="wlfp-coupon-msg" aria-live="polite"></span></div>';
 				break;
+			case 'slot_picker':
+				list( $smin, $smax ) = WLFP_Slots::window( $f, WLFP_Slots::today() );
+				$dv = is_array( $val ) ? $val : array();
+				$o  = '<div class="wlfp-slots" data-field="' . esc_attr( $name ) . '" data-closed="' . esc_attr( wp_json_encode( WLFP_Slots::closed_days( $f ) ) ) . '" data-blocked="' . esc_attr( wp_json_encode( WLFP_Slots::blocked_dates( $f ) ) ) . '" data-wlfp-field="' . esc_attr( $name ) . '">';
+				$o .= '<input type="date" class="wlfp-input wlfp-slot-date" id="' . esc_attr( $fid ) . '" name="' . esc_attr( $name ) . '[date]" min="' . esc_attr( $smin ) . '" max="' . esc_attr( $smax ) . '" value="' . esc_attr( isset( $dv['date'] ) ? $dv['date'] : '' ) . '" data-wlfp-field="' . esc_attr( $name ) . '"' . ( $req ? ' aria-required="true"' : '' ) . ' />';
+				$o .= '<div class="wlfp-slot-grid" role="radiogroup" aria-live="polite" aria-label="' . esc_attr__( 'Available times', 'weberslink-forms-pro' ) . '"><p class="wlfp-slot-hint">' . esc_html__( 'Choose a date to see the available times.', 'weberslink-forms-pro' ) . '</p></div>';
+				if ( ! empty( $dv['slot'] ) ) {
+					$o .= '<input type="hidden" class="wlfp-slot-init" value="' . esc_attr( $dv['slot'] ) . '" />';
+				}
+				$o .= '</div>';
+				break;
 			case 'toggle':
 				$on = in_array( (string) $val, array( 'yes', '1', 'on', 'true' ), true );
 				$o  = '<label class="wlfp-toggle" for="' . esc_attr( $fid ) . '"><input type="checkbox" role="switch" id="' . esc_attr( $fid ) . '" name="' . esc_attr( $name ) . '" value="yes" data-wlfp-field="' . esc_attr( $name ) . '"' . checked( $on, true, false ) . ( $req ? ' aria-required="true"' : '' ) . ' /><span class="wlfp-switch" aria-hidden="true"></span><span class="wlfp-toggle-text">' . esc_html( $f['toggle_text'] ?? '' ) . '</span></label>';
@@ -685,6 +710,10 @@ class WLFP_Fields {
 					$v = isset( $post[ $name . '__other' ] ) ? sanitize_text_field( wp_unslash( $post[ $name . '__other' ] ) ) : '';
 				}
 				return $v;
+			case 'slot_picker':
+				$sd = is_array( $raw ) && isset( $raw['date'] ) && is_scalar( $raw['date'] ) ? sanitize_text_field( (string) $raw['date'] ) : '';
+				$ss = is_array( $raw ) && isset( $raw['slot'] ) && is_scalar( $raw['slot'] ) ? sanitize_text_field( (string) $raw['slot'] ) : '';
+				return array_filter( array( 'date' => $sd, 'slot' => $ss ), 'strlen' );
 			case 'name':
 			case 'address':
 			case 'date_range':
@@ -812,6 +841,12 @@ class WLFP_Fields {
 			case 'datetime':
 				if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/', $v ) ) {
 					return __( 'Please enter a valid date and time.', 'weberslink-forms-pro' );
+				}
+				break;
+			case 'slot_picker':
+				$serr = WLFP_Slots::validate( $f, (array) $v, isset( $form['id'] ) ? $form['id'] : 0 );
+				if ( $serr ) {
+					return $serr;
 				}
 				break;
 			case 'ranking':
@@ -945,6 +980,9 @@ class WLFP_Fields {
 		$f   = self::alias( $f );
 		$out = '';
 		switch ( $f['type'] ) {
+			case 'slot_picker':
+				$out = WLFP_Slots::format_value( $f, (array) $v );
+				break;
 			case 'toggle':
 				$out = 'yes' === $v ? __( 'Yes', 'weberslink-forms-pro' ) : __( 'No', 'weberslink-forms-pro' );
 				break;

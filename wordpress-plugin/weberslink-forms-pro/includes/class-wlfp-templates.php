@@ -342,6 +342,15 @@ class WLFP_Templates {
 			),
 		) );
 
+		$T['slots'] = array( 'title' => __( 'Appointment booking (live slots)', 'weberslink-forms-pro' ), 'desc' => __( 'Real availability: pick a date and a free time, calendar invite attached.', 'weberslink-forms-pro' ), 'fields' => array(
+			self::f( 'name', 'name', 'Your name', array( 'required' => 1 ) ),
+			self::f( 'email', 'email', 'Email', array( 'required' => 1, 'width' => 'half' ) ),
+			self::f( 'phone', 'phone', 'Phone', array( 'width' => 'half' ) ),
+			self::f( 'select', 'service', 'Service', array( 'required' => 1, 'options' => self::opts( array( 'Consultation', 'Follow-up', 'Other' ) ) ) ),
+			self::f( 'slot_picker', 'appointment', 'Pick a date & time', array( 'required' => 1, 'event_title' => 'Appointment' ) ),
+			self::f( 'textarea', 'notes', 'Anything we should know?' ),
+		), 'settings' => array( 'reference' => array( 'prefix' => 'APT-', 'pad' => 4, 'suffix' => '' ), 'confirmation' => array( 'message' => '<h3>You are booked!</h3><p>Your reference is <strong>{reference}</strong>. We emailed a confirmation with a calendar invite to {field:email}.</p>' ), 'notifications' => array( array_merge( self::notify( '{field:email}' ), array( 'name' => 'Admin alert' ) ), array_merge( self::autoreply( 'Your appointment: {reference}' ), array( 'attach_ics' => 1 ) ) ), 'button' => array( 'text' => 'Book appointment' ) ) );
+
 		$T['simple'] = array( 'title' => __( 'Simple contact (3 fields)', 'weberslink-forms-pro' ), 'desc' => __( 'Name, email, message. Nothing else.', 'weberslink-forms-pro' ), 'fields' => array(
 			self::f( 'text', 'name', 'Name', array( 'required' => 1 ) ),
 			self::f( 'email', 'email', 'Email', array( 'required' => 1 ) ),
@@ -376,7 +385,7 @@ class WLFP_Templates {
 			'appointment' => 'booking', 'tour' => 'booking', 'rsvp' => 'booking', 'reservation' => 'booking', 'tickets' => 'payment',
 			'order' => 'payment', 'donation' => 'payment', 'service_order' => 'payment',
 			'feedback' => 'survey', 'survey' => 'survey', 'nps' => 'survey', 'testimonial' => 'survey', 'quiz' => 'survey',
-			'event_seats' => 'booking', 'conv_lead' => 'contact', 'stay' => 'booking', 'priorities' => 'survey', 'registration' => 'signup', 'job' => 'signup', 'course' => 'signup', 'membership' => 'signup', 'volunteer' => 'signup', 'contest' => 'signup',
+			'slots' => 'booking', 'event_seats' => 'booking', 'conv_lead' => 'contact', 'stay' => 'booking', 'priorities' => 'survey', 'registration' => 'signup', 'job' => 'signup', 'course' => 'signup', 'membership' => 'signup', 'volunteer' => 'signup', 'contest' => 'signup',
 			'support' => 'support', 'bug' => 'support', 'refund' => 'support', 'gdpr' => 'support',
 		);
 	}
