@@ -172,3 +172,44 @@
     if (document.readyState === 'complete') idle(); else window.addEventListener('load', idle);
   }
 })();
+
+
+/* Plugin workflow walkthrough: tabs, phases, arrows, keyboard and gentle autoplay */
+(function () {
+  document.querySelectorAll('[data-wf]').forEach(function (wf) {
+    var steps = [].slice.call(wf.querySelectorAll('.wf-step'));
+    var tabs = [].slice.call(wf.querySelectorAll('.wf-tab'));
+    var phases = [].slice.call(wf.querySelectorAll('.wf-phase-btn'));
+    var ctrl = wf.querySelector('.wf-ctrl'), bar = wf.querySelector('.wf-prog span'), count = wf.querySelector('.wf-count');
+    if (!steps.length) { return; }
+    wf.classList.add('wf-js'); ctrl.hidden = false;
+    var cur = 0, timer = null, started = 0, DUR = 6500, stopped = false, visible = false;
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    function show(i, user) {
+      cur = (i + steps.length) % steps.length;
+      steps.forEach(function (s, k) { s.classList.toggle('on', k === cur); });
+      tabs.forEach(function (t, k) { t.setAttribute('aria-selected', k === cur ? 'true' : 'false'); t.tabIndex = k === cur ? 0 : -1; });
+      var ph = steps[cur].getAttribute('data-phase');
+      phases.forEach(function (p) { p.classList.toggle('on', p.getAttribute('data-phase') === ph); });
+      count.textContent = (cur + 1) + ' / ' + steps.length;
+      var t = tabs[cur]; if (t && t.scrollIntoView && user !== 'auto') { var box = t.parentNode; box.scrollTo && box.scrollTo({ left: t.offsetLeft - 20, behavior: 'smooth' }); }
+      restart();
+    }
+    function restart() {
+      clearInterval(timer); bar.style.transition = 'none'; bar.style.width = '0';
+      if (stopped || reduce || !visible) { return; }
+      void bar.offsetWidth; bar.style.transition = 'width ' + DUR + 'ms linear'; bar.style.width = '100%';
+      timer = setTimeout(function () { show(cur + 1, 'auto'); }, DUR);
+    }
+    function user(i) { stopped = true; clearTimeout(timer); bar.style.transition = 'none'; bar.style.width = '100%'; show(i, true); bar.style.width = '100%'; }
+    tabs.forEach(function (t, i) { t.addEventListener('click', function () { user(i); }); t.addEventListener('keydown', function (e) { if (e.key === 'ArrowRight') { user(cur + 1); tabs[cur].focus(); e.preventDefault(); } if (e.key === 'ArrowLeft') { user(cur - 1); tabs[cur].focus(); e.preventDefault(); } }); });
+    phases.forEach(function (p) { p.addEventListener('click', function () { user(+p.getAttribute('data-go')); }); });
+    [].forEach.call(wf.querySelectorAll('.wf-arrow'), function (b) { b.addEventListener('click', function () { user(cur + (+b.getAttribute('data-dir'))); }); });
+    wf.addEventListener('mouseenter', function () { clearTimeout(timer); bar.style.transition = 'none'; });
+    wf.addEventListener('mouseleave', function () { if (!stopped) { restart(); } });
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(function (en) { visible = en[0].isIntersecting; if (visible) { restart(); } else { clearTimeout(timer); } }, { threshold: 0.35 }).observe(wf);
+    } else { visible = true; }
+    show(0, 'auto');
+  });
+}());

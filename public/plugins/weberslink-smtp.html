@@ -195,38 +195,55 @@
   <li><strong>Test tool:</strong> sends a real test message and shows the full SMTP conversation with your credentials hidden, so you can see exactly where a connection breaks.</li>
   <li><strong>Deliverability check:</strong> looks up your domain's SPF (including the 10-lookup limit), DKIM and DMARC and explains what to fix in plain English.</li>
 </ul>
-<h2>Screen by screen</h2>
-<p>What you see in WordPress once the plugin is active. Click any screen to enlarge it.</p>
-<div class="shots">
-  <figure class="shot">
-    <a href="/assets/plugins/smtp-1-log.webp" target="_blank" rel="noopener"><img src="/assets/plugins/smtp-1-log.webp" width="1200" height="794" alt="Email log." loading="lazy"></a>
-    <figcaption><span class="shot-n">1</span><strong>Email log.</strong> Every email with status, recipient, subject, the plugin or theme that sent it, how it was delivered and opens/clicks, plus a 14-day sent and failed chart.</figcaption>
-  </figure>
-  <figure class="shot">
-    <a href="/assets/plugins/smtp-2-email.webp" target="_blank" rel="noopener"><img src="/assets/plugins/smtp-2-email.webp" width="1200" height="794" alt="Preview any email." loading="lazy"></a>
-    <figcaption><span class="shot-n">2</span><strong>Preview any email.</strong> A safe, sandboxed preview of exactly what was sent, with full details and one-click resend.</figcaption>
-  </figure>
-  <figure class="shot">
-    <a href="/assets/plugins/smtp-3-settings.webp" target="_blank" rel="noopener"><img src="/assets/plugins/smtp-3-settings.webp" width="1200" height="882" alt="Connect your provider." loading="lazy"></a>
-    <figcaption><span class="shot-n">3</span><strong>Connect your provider.</strong> Pick SMTP with one-click presets, or send over the SendGrid, Brevo, Mailgun or Postmark API. Passwords and keys are stored encrypted.</figcaption>
-  </figure>
-  <figure class="shot">
-    <a href="/assets/plugins/smtp-4-backup.webp" target="_blank" rel="noopener"><img src="/assets/plugins/smtp-4-backup.webp" width="1200" height="794" alt="Add a backup connection." loading="lazy"></a>
-    <figcaption><span class="shot-n">4</span><strong>Add a backup connection.</strong> If the primary connection fails, the email is re-sent through the backup straight away and the log shows which one delivered it.</figcaption>
-  </figure>
-  <figure class="shot">
-    <a href="/assets/plugins/smtp-5-routing.webp" target="_blank" rel="noopener"><img src="/assets/plugins/smtp-5-routing.webp" width="1200" height="794" alt="Route emails smartly." loading="lazy"></a>
-    <figcaption><span class="shot-n">5</span><strong>Route emails smartly.</strong> Send some emails another way, for example shop receipts through a transactional service, based on plugin, subject, recipient domain or sender.</figcaption>
-  </figure>
-  <figure class="shot">
-    <a href="/assets/plugins/smtp-6-controls.webp" target="_blank" rel="noopener"><img src="/assets/plugins/smtp-6-controls.webp" width="1200" height="794" alt="Alerts, reports and controls." loading="lazy"></a>
-    <figcaption><span class="shot-n">6</span><strong>Alerts, reports and controls.</strong> Slack or Discord failure alerts, a weekly summary email, and switches to turn off WordPress notification emails you do not want.</figcaption>
-  </figure>
-  <figure class="shot">
-    <a href="/assets/plugins/smtp-7-tools.webp" target="_blank" rel="noopener"><img src="/assets/plugins/smtp-7-tools.webp" width="1200" height="1015" alt="Test and check deliverability." loading="lazy"></a>
-    <figcaption><span class="shot-n">7</span><strong>Test and check deliverability.</strong> Send a test through the primary or backup connection and see the SMTP conversation with credentials hidden, then check SPF, DKIM and DMARC with plain-English advice.</figcaption>
-  </figure>
-</div>
+<h2>See how it works, screen by screen</h2>
+<p>From connecting a provider to knowing every email arrived. Pick a step, or let it play. Click a screen to open it full size.</p>
+<section class="wf" data-wf aria-label="See how it works, screen by screen">
+  <ol class="wf-phases">
+    <li><button type="button" class="wf-phase-btn" data-go="0" data-phase="0"><span class="wf-pn">1</span><span><strong>Connect</strong><em>Provider, backup and routing</em></span></button></li>
+    <li><button type="button" class="wf-phase-btn" data-go="3" data-phase="1"><span class="wf-pn">2</span><span><strong>Send &amp; track</strong><em>Log, preview, resend</em></span></button></li>
+    <li><button type="button" class="wf-phase-btn" data-go="5" data-phase="2"><span class="wf-pn">3</span><span><strong>Protect</strong><em>Alerts and deliverability</em></span></button></li>
+  </ol>
+  <div class="wf-tabs" role="tablist" aria-label="Screens">
+    <button type="button" class="wf-tab" role="tab" data-i="0" data-phase="0"><span class="wf-n">1</span>Provider</button>
+    <button type="button" class="wf-tab" role="tab" data-i="1" data-phase="0"><span class="wf-n">2</span>Backup</button>
+    <button type="button" class="wf-tab" role="tab" data-i="2" data-phase="0"><span class="wf-n">3</span>Routing</button>
+    <button type="button" class="wf-tab" role="tab" data-i="3" data-phase="1"><span class="wf-n">4</span>Email log</button>
+    <button type="button" class="wf-tab" role="tab" data-i="4" data-phase="1"><span class="wf-n">5</span>Preview</button>
+    <button type="button" class="wf-tab" role="tab" data-i="5" data-phase="2"><span class="wf-n">6</span>Alerts</button>
+    <button type="button" class="wf-tab" role="tab" data-i="6" data-phase="2"><span class="wf-n">7</span>Test &amp; check</button>
+  </div>
+  <div class="wf-stage">
+    <figure class="wf-step" data-i="0" data-phase="0">
+      <div class="wf-frame"><div class="wf-bar"><i></i><i></i><i></i><span class="wf-url">yoursite.com/wp-admin · Mail settings</span></div><a href="/assets/plugins/smtp-3-settings.webp" target="_blank" rel="noopener" title="Open full size"><img src="/assets/plugins/smtp-3-settings.webp" width="1200" height="882" alt="Connect your provider" loading="lazy"></a></div>
+      <figcaption><span class="wf-kick">Step 1 · Connect</span><strong>Connect your provider</strong><span>Pick SMTP with one-click presets, or send over the SendGrid, Brevo, Mailgun or Postmark API. Passwords and keys are stored encrypted.</span></figcaption>
+    </figure>
+    <figure class="wf-step" data-i="1" data-phase="0">
+      <div class="wf-frame"><div class="wf-bar"><i></i><i></i><i></i><span class="wf-url">yoursite.com/wp-admin · Mail settings</span></div><a href="/assets/plugins/smtp-4-backup.webp" target="_blank" rel="noopener" title="Open full size"><img src="/assets/plugins/smtp-4-backup.webp" width="1200" height="794" alt="Add a backup connection" loading="lazy"></a></div>
+      <figcaption><span class="wf-kick">Step 2 · Connect</span><strong>Add a backup connection</strong><span>If the primary connection fails, the email is re-sent through the backup straight away and the log shows which one delivered it.</span></figcaption>
+    </figure>
+    <figure class="wf-step" data-i="2" data-phase="0">
+      <div class="wf-frame"><div class="wf-bar"><i></i><i></i><i></i><span class="wf-url">yoursite.com/wp-admin · Mail settings</span></div><a href="/assets/plugins/smtp-5-routing.webp" target="_blank" rel="noopener" title="Open full size"><img src="/assets/plugins/smtp-5-routing.webp" width="1200" height="794" alt="Route emails smartly" loading="lazy"></a></div>
+      <figcaption><span class="wf-kick">Step 3 · Connect</span><strong>Route emails smartly</strong><span>Send some emails another way, for example shop receipts through a transactional service, based on plugin, subject, recipient domain or sender.</span></figcaption>
+    </figure>
+    <figure class="wf-step" data-i="3" data-phase="1">
+      <div class="wf-frame"><div class="wf-bar"><i></i><i></i><i></i><span class="wf-url">yoursite.com/wp-admin · Email log</span></div><a href="/assets/plugins/smtp-1-log.webp" target="_blank" rel="noopener" title="Open full size"><img src="/assets/plugins/smtp-1-log.webp" width="1200" height="794" alt="See every email" loading="lazy"></a></div>
+      <figcaption><span class="wf-kick">Step 4 · Send &amp; track</span><strong>See every email</strong><span>Status, recipient, subject, the plugin or theme that sent it, how it was delivered and opens/clicks, with a 14-day sent and failed chart.</span></figcaption>
+    </figure>
+    <figure class="wf-step" data-i="4" data-phase="1">
+      <div class="wf-frame"><div class="wf-bar"><i></i><i></i><i></i><span class="wf-url">yoursite.com/wp-admin · Email log</span></div><a href="/assets/plugins/smtp-2-email.webp" target="_blank" rel="noopener" title="Open full size"><img src="/assets/plugins/smtp-2-email.webp" width="1200" height="794" alt="Preview and resend" loading="lazy"></a></div>
+      <figcaption><span class="wf-kick">Step 5 · Send &amp; track</span><strong>Preview and resend</strong><span>A safe, sandboxed preview of exactly what was sent, with full details and one-click resend.</span></figcaption>
+    </figure>
+    <figure class="wf-step" data-i="5" data-phase="2">
+      <div class="wf-frame"><div class="wf-bar"><i></i><i></i><i></i><span class="wf-url">yoursite.com/wp-admin · Mail settings</span></div><a href="/assets/plugins/smtp-6-controls.webp" target="_blank" rel="noopener" title="Open full size"><img src="/assets/plugins/smtp-6-controls.webp" width="1200" height="794" alt="Get alerts and reports" loading="lazy"></a></div>
+      <figcaption><span class="wf-kick">Step 6 · Protect</span><strong>Get alerts and reports</strong><span>Slack or Discord failure alerts, a weekly summary email, and switches to turn off WordPress notification emails you do not want.</span></figcaption>
+    </figure>
+    <figure class="wf-step" data-i="6" data-phase="2">
+      <div class="wf-frame"><div class="wf-bar"><i></i><i></i><i></i><span class="wf-url">yoursite.com/wp-admin · Tools</span></div><a href="/assets/plugins/smtp-7-tools.webp" target="_blank" rel="noopener" title="Open full size"><img src="/assets/plugins/smtp-7-tools.webp" width="1200" height="1015" alt="Test and check deliverability" loading="lazy"></a></div>
+      <figcaption><span class="wf-kick">Step 7 · Protect</span><strong>Test and check deliverability</strong><span>Send a test through the primary or backup connection and see the SMTP conversation with credentials hidden, then check SPF, DKIM and DMARC with plain-English advice.</span></figcaption>
+    </figure>
+  </div>
+  <div class="wf-ctrl" hidden><button type="button" class="wf-arrow" data-dir="-1" aria-label="Previous screen">←</button><div class="wf-prog" aria-hidden="true"><span></span></div><span class="wf-count" aria-live="polite"></span><button type="button" class="wf-arrow" data-dir="1" aria-label="Next screen">→</button></div>
+</section>
 <h2>Install in 3 steps</h2>
 <ol>
   <li>Download the ZIP above.</li>

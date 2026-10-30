@@ -339,38 +339,55 @@ const pluginFaqs = [
 
 
 
-// ---------- Screen-by-screen walkthroughs (screenshots rendered from the plugins' real admin and front-end UI) ----------
+// ---------- Screen-by-screen workflow (screenshots rendered from the plugins' real admin and front-end UI) ----------
 const SHOT_DIMS = JSON.parse(fs.readFileSync(path.join(__dirname, "shots.json"), "utf8"));
-const shotsSection = (heading, intro, list) => `<h2>${heading}</h2>
+// phases: [name, blurb]; steps: [id, tab label, title, text, phase index, address-bar text]
+const workflow = (heading, intro, phases, steps) => {
+  const firstOf = phases.map((_, pi) => steps.findIndex((st) => st[4] === pi));
+  return `<h2>${heading}</h2>
 <p>${intro}</p>
-<div class="shots">
-${list.map(([id, title, text], i) => { const d = SHOT_DIMS[id]; return `  <figure class="shot${d[0] < 1000 ? " shot-narrow" : ""}">
-    <a href="/assets/plugins/${id}.webp" target="_blank" rel="noopener"><img src="/assets/plugins/${id}.webp" width="${d[0]}" height="${d[1]}" alt="${esc(title)}" loading="lazy"></a>
-    <figcaption><span class="shot-n">${i + 1}</span><strong>${esc(title)}</strong> ${esc(text)}</figcaption>
-  </figure>`; }).join("\n")}
-</div>`;
-const FORMS_SHOTS = shotsSection("Screen by screen", "How building and publishing a form works, from the editor to what your visitors see. Click any screen to enlarge it.", [
-  ["forms-1-builder", "Build the form.", "Click or drag any of 50 field types into the canvas. Fields can sit side by side (half or third width) and be reordered with the arrows or by dragging."],
-  ["forms-2-field-logic", "Fine-tune each field.", "Select a field to set its label, placeholder, required message, width and options. Conditional logic shows or hides a field based on earlier answers, here the phone number only appears when the visitor prefers a call."],
-  ["forms-3-emails", "Send the right emails.", "Unlimited notifications and auto-responders with merge tags such as {field:name}, optional PDF attachment, and a \"send only if\" rule per email."],
-  ["forms-4-integrations", "Connect your tools.", "Feeds run after each submission: signed webhooks with automatic retries (Zapier, Make, n8n, Google Sheets), Slack, Mailchimp and more."],
-  ["forms-5-payments", "Take payments.", "Add product fields, then choose Stripe Checkout, PayPal or offline. Set currency, tax, coupons and run emails only after payment succeeds."],
-  ["forms-6-settings", "Control the details.", "Confirmation message or redirect, button text, multi-step, styling, entry limits and schedule, spam protection and more."],
-  ["forms-7-form-step1", "Visitors fill it in.", "A clean, theme-proof front end with a progress bar, inline validation, live calculations and fields that appear only when needed."],
-  ["forms-8-form-payment", "Pay as part of the form.", "Package choice, tax and total update live before the visitor submits."],
-  ["forms-9-conv-welcome", "Or one question at a time.", "Conversational mode turns any form into a full-screen, one-question-per-slide flow with an optional welcome screen."],
-  ["forms-10-conv-question", "Keyboard friendly.", "Enter moves to the next question, a progress bar shows how far along the visitor is, and conditional questions are skipped automatically."],
-  ["forms-11-booking", "Take bookings.", "The slot picker shows only open times, respects capacity and closed days, and sends a calendar invite with the confirmation."],
-]);
-const SMTP_SHOTS = shotsSection("Screen by screen", "What you see in WordPress once the plugin is active. Click any screen to enlarge it.", [
-  ["smtp-1-log", "Email log.", "Every email with status, recipient, subject, the plugin or theme that sent it, how it was delivered and opens/clicks, plus a 14-day sent and failed chart."],
-  ["smtp-2-email", "Preview any email.", "A safe, sandboxed preview of exactly what was sent, with full details and one-click resend."],
-  ["smtp-3-settings", "Connect your provider.", "Pick SMTP with one-click presets, or send over the SendGrid, Brevo, Mailgun or Postmark API. Passwords and keys are stored encrypted."],
-  ["smtp-4-backup", "Add a backup connection.", "If the primary connection fails, the email is re-sent through the backup straight away and the log shows which one delivered it."],
-  ["smtp-5-routing", "Route emails smartly.", "Send some emails another way, for example shop receipts through a transactional service, based on plugin, subject, recipient domain or sender."],
-  ["smtp-6-controls", "Alerts, reports and controls.", "Slack or Discord failure alerts, a weekly summary email, and switches to turn off WordPress notification emails you do not want."],
-  ["smtp-7-tools", "Test and check deliverability.", "Send a test through the primary or backup connection and see the SMTP conversation with credentials hidden, then check SPF, DKIM and DMARC with plain-English advice."],
-]);
+<section class="wf" data-wf aria-label="${esc(heading)}">
+  <ol class="wf-phases">
+${phases.map((ph, pi) => `    <li><button type="button" class="wf-phase-btn" data-go="${firstOf[pi]}" data-phase="${pi}"><span class="wf-pn">${pi + 1}</span><span><strong>${esc(ph[0])}</strong><em>${esc(ph[1])}</em></span></button></li>`).join("\n")}
+  </ol>
+  <div class="wf-tabs" role="tablist" aria-label="Screens">
+${steps.map((st, i) => `    <button type="button" class="wf-tab" role="tab" data-i="${i}" data-phase="${st[4]}"><span class="wf-n">${i + 1}</span>${esc(st[1])}</button>`).join("\n")}
+  </div>
+  <div class="wf-stage">
+${steps.map((st, i) => { const d = SHOT_DIMS[st[0]]; return `    <figure class="wf-step${d[0] < 1000 ? " wf-narrow" : ""}" data-i="${i}" data-phase="${st[4]}">
+      <div class="wf-frame"><div class="wf-bar"><i></i><i></i><i></i><span class="wf-url">${esc(st[5])}</span></div><a href="/assets/plugins/${st[0]}.webp" target="_blank" rel="noopener" title="Open full size"><img src="/assets/plugins/${st[0]}.webp" width="${d[0]}" height="${d[1]}" alt="${esc(st[2])}" loading="lazy"></a></div>
+      <figcaption><span class="wf-kick">Step ${i + 1} · ${esc(phases[st[4]][0])}</span><strong>${esc(st[2])}</strong><span>${esc(st[3])}</span></figcaption>
+    </figure>`; }).join("\n")}
+  </div>
+  <div class="wf-ctrl" hidden><button type="button" class="wf-arrow" data-dir="-1" aria-label="Previous screen">←</button><div class="wf-prog" aria-hidden="true"><span></span></div><span class="wf-count" aria-live="polite"></span><button type="button" class="wf-arrow" data-dir="1" aria-label="Next screen">→</button></div>
+</section>`;
+};
+const FORMS_SHOTS = workflow("See how it works, screen by screen", "From a blank form to money and entries in your inbox. Pick a step, or let it play. Click a screen to open it full size.",
+  [["Build", "Drag in fields, set the rules"], ["Connect", "Emails, tools and payments"], ["Go live", "What your visitors get"]],
+  [
+    ["forms-1-builder", "Build", "Build the form", "Click or drag any of 50 field types into the canvas. Put fields side by side (half or third width) and reorder with the arrows or by dragging.", 0, "yoursite.com/wp-admin · Weberslink Forms"],
+    ["forms-2-field-logic", "Field rules", "Fine-tune each field", "Set label, placeholder, width and options. Conditional logic shows or hides a field from earlier answers: here the phone number only appears when the visitor prefers a call.", 0, "yoursite.com/wp-admin · Form builder"],
+    ["forms-3-emails", "Emails", "Send the right emails", "Unlimited notifications and auto-responders with merge tags like {field:name}, optional PDF attachment, and a “send only if” rule per email.", 1, "yoursite.com/wp-admin · Emails"],
+    ["forms-4-integrations", "Integrations", "Connect your tools", "Signed webhooks with automatic retries (Zapier, Make, n8n, Google Sheets), Slack, Mailchimp and more run after every submission.", 1, "yoursite.com/wp-admin · Integrations"],
+    ["forms-5-payments", "Payments", "Take payments", "Add product fields, then choose Stripe Checkout, PayPal or offline. Set currency, tax and coupons, and run emails only after payment succeeds.", 1, "yoursite.com/wp-admin · Payments"],
+    ["forms-6-settings", "Settings", "Control the details", "Confirmation message or redirect, button text, multi-step, styling, entry limits and schedule, spam protection and more.", 1, "yoursite.com/wp-admin · Settings"],
+    ["forms-7-form-step1", "Visitor form", "Visitors fill it in", "A clean, theme-proof front end with a progress bar, inline validation, live calculations and fields that appear only when needed.", 2, "yoursite.com/request-a-quote"],
+    ["forms-8-form-payment", "Checkout", "Pay as part of the form", "Package choice, tax and total update live before the visitor submits.", 2, "yoursite.com/request-a-quote"],
+    ["forms-9-conv-welcome", "Conversational", "Or one question at a time", "Conversational mode turns any form into a full-screen, one-question-per-slide flow with an optional welcome screen.", 2, "yoursite.com/quote"],
+    ["forms-10-conv-question", "Keyboard flow", "Fast to answer", "Enter moves to the next question, a progress bar shows how far along the visitor is, and conditional questions are skipped automatically.", 2, "yoursite.com/quote"],
+    ["forms-11-booking", "Bookings", "Take bookings", "The slot picker shows only open times, respects capacity and closed days, and sends a calendar invite with the confirmation.", 2, "yoursite.com/book"],
+  ]);
+const SMTP_SHOTS = workflow("See how it works, screen by screen", "From connecting a provider to knowing every email arrived. Pick a step, or let it play. Click a screen to open it full size.",
+  [["Connect", "Provider, backup and routing"], ["Send & track", "Log, preview, resend"], ["Protect", "Alerts and deliverability"]],
+  [
+    ["smtp-3-settings", "Provider", "Connect your provider", "Pick SMTP with one-click presets, or send over the SendGrid, Brevo, Mailgun or Postmark API. Passwords and keys are stored encrypted.", 0, "yoursite.com/wp-admin · Mail settings"],
+    ["smtp-4-backup", "Backup", "Add a backup connection", "If the primary connection fails, the email is re-sent through the backup straight away and the log shows which one delivered it.", 0, "yoursite.com/wp-admin · Mail settings"],
+    ["smtp-5-routing", "Routing", "Route emails smartly", "Send some emails another way, for example shop receipts through a transactional service, based on plugin, subject, recipient domain or sender.", 0, "yoursite.com/wp-admin · Mail settings"],
+    ["smtp-1-log", "Email log", "See every email", "Status, recipient, subject, the plugin or theme that sent it, how it was delivered and opens/clicks, with a 14-day sent and failed chart.", 1, "yoursite.com/wp-admin · Email log"],
+    ["smtp-2-email", "Preview", "Preview and resend", "A safe, sandboxed preview of exactly what was sent, with full details and one-click resend.", 1, "yoursite.com/wp-admin · Email log"],
+    ["smtp-6-controls", "Alerts", "Get alerts and reports", "Slack or Discord failure alerts, a weekly summary email, and switches to turn off WordPress notification emails you do not want.", 2, "yoursite.com/wp-admin · Mail settings"],
+    ["smtp-7-tools", "Test & check", "Test and check deliverability", "Send a test through the primary or backup connection and see the SMTP conversation with credentials hidden, then check SPF, DKIM and DMARC with plain-English advice.", 2, "yoursite.com/wp-admin · Tools"],
+  ]);
 
 // ---------- Second plugin: Weberslink SMTP & Email Log ----------
 const SMTP_DIR = path.join(__dirname, "..", "wordpress-plugin", "weberslink-smtp");
