@@ -337,6 +337,48 @@ const pluginFaqs = [
   ["Where is my data stored?", "In your own WordPress database. Nothing is sent to us. You can anonymise or disable IP storage, auto-delete old entries, and the plugin hooks into WordPress's personal-data export and erase tools for GDPR requests."],
 ];
 
+
+// ---------- Second plugin: Weberslink SMTP & Email Log ----------
+const SMTP_DIR = path.join(__dirname, "..", "wordpress-plugin", "weberslink-smtp");
+const SMTP_ZIP = "/downloads/weberslink-smtp.zip";
+const smtpVersion = (fs.readFileSync(path.join(SMTP_DIR, "weberslink-smtp.php"), "utf8").match(/^\s*\*\s*Version:\s*([\d.]+)/m) || [])[1] || "1.0.0";
+const smtpZipFile = path.join(PUBLIC, SMTP_ZIP);
+const smtpBytes = fs.existsSync(smtpZipFile) ? fs.statSync(smtpZipFile).size : 0;
+const smtpSize = smtpBytes ? (smtpBytes < 1048576 ? Math.round(smtpBytes / 1024) + " KB" : (smtpBytes / 1048576).toFixed(1) + " MB") : "";
+const SMTP_SOFTWARE = { name: "Weberslink SMTP & Email Log", version: smtpVersion, download: SMTP_ZIP, size: smtpSize };
+const smtpChangelog = [];
+{
+  const sec = (fs.readFileSync(path.join(SMTP_DIR, "readme.txt"), "utf8").split(/==\s*Changelog\s*==/)[1] || "").trim();
+  sec.split(/^=\s*([\d.]+)\s*=\s*$/m).slice(1).forEach((part, i, arr) => {
+    if (i % 2 === 0) smtpChangelog.push({ version: part, items: (arr[i + 1] || "").split("\n").map((l) => l.replace(/^\*\s*/, "").trim()).filter((l) => l && !l.startsWith("=")) });
+  });
+}
+const smtpFaqs = [
+  ["Is Weberslink SMTP & Email Log free?", "Yes. It is a free download under the GPL and works on as many of your own WordPress sites as you like."],
+  ["Which email providers does it support?", "Any SMTP server. One-click presets are included for Gmail / Google Workspace, Microsoft 365, SendGrid, Mailgun, Amazon SES, Brevo, Postmark, Zoho and Mailtrap."],
+  ["Is my SMTP password safe?", "It is stored encrypted using libsodium with keys derived from your site's secret salts, and it is never shown again after saving. For the strongest setup, define the password as a constant in wp-config.php and nothing is stored in the database."],
+  ["Does it store the content of my emails?", "You choose: everything (enables preview, resend and retries), recipients and subject only, or nothing. Password-reset keys and one-time tokens are replaced with [redacted] in stored messages, and old entries are deleted automatically after the number of days you set."],
+  ["What happens when an email fails?", "The failure is logged with the exact error, the email is retried automatically (after 5 minutes, 30 minutes and 2 hours), you see a warning in the dashboard, and an alert can be sent to Slack or Discord."],
+  ["Which WordPress and PHP versions does it need?", "WordPress 5.9 or newer and PHP 7.4 or newer."],
+];
+const smtpCard = (loc) => `<div class="plugin-card">
+  <div class="plugin-head"><span class="plugin-badge">WordPress plugin</span><span class="plugin-ver">v${smtpVersion}${smtpSize ? " · " + smtpSize : ""} · Free download</span></div>
+  <h2>Weberslink SMTP &amp; Email Log</h2>
+  <p>Make WordPress email reliable and visible: send through any SMTP provider, keep a searchable log of every email with preview and resend, retry failures and check your SPF, DKIM and DMARC.</p>
+  <ul class="plugin-feats">
+    <li>Presets for Gmail, Microsoft 365, SendGrid, SES &amp; more</li>
+    <li>Searchable email log with safe preview</li>
+    <li>Resend &amp; automatic retries</li>
+    <li>Slack / Discord failure alerts</li>
+    <li>Test tool with SMTP conversation</li>
+    <li>SPF, DKIM &amp; DMARC deliverability check</li>
+  </ul>
+  <div class="plugin-actions">
+    <a class="btn btn-dark" href="${SMTP_ZIP}" download data-track="Plugin download" data-loc="${loc}-smtp">Download ZIP ↓</a>
+    <a class="btn btn-outline" href="/plugins/weberslink-smtp" data-track="Plugin details" data-loc="${loc}-smtp">Features &amp; install guide →</a>
+  </div>
+</div>`;
+
 const pluginCard = (loc) => `<div class="plugin-card">
   <div class="plugin-head"><span class="plugin-badge">WordPress plugin</span><span class="plugin-ver">v${pluginVersion}${zipSize ? " · " + zipSize : ""} · Free download</span></div>
   <h2>Weberslink Forms Pro</h2>
@@ -361,17 +403,17 @@ const pluginCard = (loc) => `<div class="plugin-card">
 write("/plugins/", render({
   path: "/plugins/", type: "hub", kicker: "Plugins",
   title: "Free WordPress Plugins | WebersLink",
-  description: "Free WordPress plugins from WebersLink. Download Weberslink Forms Pro, a drag-and-drop form builder with payments, conditional logic and 30+ templates.",
+  description: "Free WordPress plugins from WebersLink: Weberslink Forms Pro (drag-and-drop form builder with payments and 35+ templates) and Weberslink SMTP & Email Log (reliable email with a searchable log).",
   h1: "Free WordPress plugins <em>you can download.</em>",
   lead: "Tools we build and use for our own client sites, packaged so you can install them in a minute.",
   card: { title: "Plugins" },
   software: SOFTWARE,
   heroCta: `<div class="hero-cta">
-      <a href="${PLUGIN_ZIP}" class="btn btn-light" download data-track="Plugin download" data-loc="hero">Download Weberslink Forms Pro ↓</a>
-      <a href="/plugins/weberslink-forms-pro" class="btn btn-ghost" data-track="Plugin details" data-loc="hero">See features</a>
+      <a href="${PLUGIN_ZIP}" class="btn btn-light" download data-track="Plugin download" data-loc="hero">Download Forms Pro ↓</a>
+      <a href="${SMTP_ZIP}" class="btn btn-ghost" download data-track="Plugin download" data-loc="hero-smtp">Download SMTP &amp; Email Log ↓</a>
     </div>`,
   faqs: pluginFaqs,
-  body: pluginCard("plugins-hub"),
+  body: pluginCard("plugins-hub") + "\n" + smtpCard("plugins-hub"),
 }).replace('<div class="wrap prose-wrap">', '<div class="wrap prose-wrap hub">'));
 
 write("/plugins/weberslink-forms-pro", render({
@@ -415,6 +457,44 @@ ${changelogHtml}
 <p class="plugin-note">Need a custom form setup, payments wired up or a site built around it? <a href="/#book">Book a free call</a> and we'll sort it for you.</p>`,
 }));
 
+
+write("/plugins/weberslink-smtp", render({
+  path: "/plugins/weberslink-smtp", type: "plugin", kicker: "WordPress plugin",
+  title: "Weberslink SMTP & Email Log: Free WordPress SMTP Plugin | WebersLink",
+  description: "Download Weberslink SMTP & Email Log: a free WordPress plugin to send email through any SMTP provider, log every email with preview and resend, retry failures and check SPF, DKIM and DMARC.",
+  h1: "Weberslink SMTP &amp; Email Log — <em>email that just works.</em>",
+  lead: "Stop losing contact-form and WooCommerce emails. Send through a real mail server, see every message, and fix failures fast.",
+  crumbs: [["Plugins", "/plugins/"]],
+  card: { title: "Weberslink SMTP & Email Log" },
+  software: SMTP_SOFTWARE,
+  heroCta: `<div class="hero-cta">
+      <a href="${SMTP_ZIP}" class="btn btn-light" download data-track="Plugin download" data-loc="hero-smtp">Download SMTP &amp; Email Log ↓</a>
+      <a href="/plugins/" class="btn btn-ghost" data-track="Plugin details" data-loc="hero-smtp">All plugins</a>
+    </div>`,
+  faqs: smtpFaqs,
+  related: ["/services/ecommerce", "/services/automation"],
+  body: `<p><a class="btn btn-dark" href="${SMTP_ZIP}" download data-track="Plugin download" data-loc="smtp-detail-top">Download ZIP ↓</a> <span class="plugin-ver">Version ${smtpVersion}${smtpSize ? " · " + smtpSize : ""} · WordPress 5.9+ · PHP 7.4+ · GPL-2.0-or-later</span></p>
+<h2>What's inside</h2>
+<ul>
+  <li><strong>Send through any SMTP server:</strong> one-click presets for Gmail / Google Workspace, Microsoft 365, SendGrid, Mailgun, Amazon SES, Brevo, Postmark, Zoho and Mailtrap; STARTTLS or SSL/TLS; force the From email and name; set the return path.</li>
+  <li><strong>Searchable email log:</strong> recipient, subject, status, the plugin or theme that sent it, number of attempts and date, with a sandboxed preview (no scripts, no remote images) and a plain-text view. CSV export.</li>
+  <li><strong>Privacy first:</strong> log everything, only recipients and subject, or nothing. Password-reset keys and tokens are redacted, old entries are deleted automatically, and your password is stored encrypted (or kept out of the database with a wp-config.php constant).</li>
+  <li><strong>Fix problems fast:</strong> resend any email, automatic retries for failures, a dashboard widget and warning banner, and Slack or Discord alerts, because a failed email cannot email you.</li>
+  <li><strong>Test tool:</strong> sends a real test message and shows the full SMTP conversation with your credentials hidden, so you can see exactly where a connection breaks.</li>
+  <li><strong>Deliverability check:</strong> looks up your domain's SPF (including the 10-lookup limit), DKIM and DMARC and explains what to fix in plain English.</li>
+</ul>
+<h2>Install in 3 steps</h2>
+<ol>
+  <li>Download the ZIP above.</li>
+  <li>In WordPress go to <em>Plugins → Add New → Upload Plugin</em>, choose the ZIP, install and activate.</li>
+  <li>Open <em>Weberslink Mail → SMTP settings</em>, pick your provider, enter the details and save. Then run <em>Tools → Send test</em>.</li>
+</ol>
+<p><a class="btn btn-dark" href="${SMTP_ZIP}" download data-track="Plugin download" data-loc="smtp-detail-bottom">Download ZIP ↓</a></p>
+<h2>Changelog</h2>
+${smtpChangelog.slice(0, 4).map((c) => `<h3>Version ${esc(c.version)}</h3>\n<ul>\n${c.items.map((i) => `  <li>${esc(i)}</li>`).join("\n")}\n</ul>`).join("\n")}
+<p class="plugin-note">Emails still not arriving, or need transactional email set up properly for a WooCommerce store? <a href="/#book">Book a free call</a> and we'll sort it for you.</p>`,
+}));
+
 // ---------- Shared footer on the homepage ----------
 const homeFile = path.join(PUBLIC, "index.html");
 const home = fs.readFileSync(homeFile, "utf8");
@@ -428,7 +508,7 @@ const urls = [
   ...SERVICES.map((p) => [p.path, "0.9"]),
   ...INDUSTRIES.map((p) => [p.path, "0.8"]),
   ...GUIDES.map((p) => [p.path, "0.7"]),
-  ["/plugins/", "0.7"], ["/plugins/weberslink-forms-pro", "0.7"],
+  ["/plugins/", "0.7"], ["/plugins/weberslink-forms-pro", "0.7"], ["/plugins/weberslink-smtp", "0.7"],
   ["/privacy", "0.2"],
 ];
 fs.writeFileSync(path.join(PUBLIC, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>
@@ -437,4 +517,4 @@ ${urls.map(([u, pr]) => `  <url><loc>${SITE}${u}</loc><lastmod>${(byPath[u] && (
 </urlset>
 `);
 
-console.log(`Built ${pages.length + 5} pages and sitemap.xml (${urls.length} URLs).`);
+console.log(`Built ${pages.length + 6} pages and sitemap.xml (${urls.length} URLs).`);
