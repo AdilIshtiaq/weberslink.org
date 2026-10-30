@@ -57,9 +57,9 @@
    "description": "Download Weberslink SMTP & Email Log: a free WordPress plugin to send email through any SMTP provider, log every email with preview and resend, retry failures and check SPF, DKIM and DMARC.",
    "applicationCategory": "BusinessApplication",
    "operatingSystem": "WordPress 5.8+",
-   "softwareVersion": "1.0.0",
+   "softwareVersion": "1.1.0",
    "downloadUrl": "https://weberslink.org/downloads/weberslink-smtp.zip",
-   "fileSize": "24 KB",
+   "fileSize": "40 KB",
    "offers": {
     "@type": "Offer",
     "price": "0",
@@ -88,7 +88,7 @@
      "name": "Which email providers does it support?",
      "acceptedAnswer": {
       "@type": "Answer",
-      "text": "Any SMTP server. One-click presets are included for Gmail / Google Workspace, Microsoft 365, SendGrid, Mailgun, Amazon SES, Brevo, Postmark, Zoho and Mailtrap."
+      "text": "Any SMTP server, with one-click presets for Gmail / Google Workspace, Microsoft 365, SendGrid, Mailgun, Amazon SES, Brevo, Postmark, Zoho and Mailtrap. If your host blocks SMTP ports you can instead send over HTTPS through the SendGrid, Brevo, Mailgun or Postmark API."
      }
     },
     {
@@ -113,6 +113,22 @@
      "acceptedAnswer": {
       "@type": "Answer",
       "text": "The failure is logged with the exact error, the email is retried automatically (after 5 minutes, 30 minutes and 2 hours), you see a warning in the dashboard, and an alert can be sent to Slack or Discord."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "What is the backup connection?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "A second connection (SMTP or an API) that takes over instantly when the primary one fails, so a provider outage does not lose email. Each email that fails over is re-sent once and the log shows which connection delivered it."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Is open and click tracking on by default?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "No. It is opt-in, signed so links cannot be abused as open redirects, and never touches emails with login or password-reset links. Tell your recipients if you enable it."
      }
     },
     {
@@ -164,10 +180,15 @@
 <article class="white page-body">
   <div class="wrap prose-wrap">
     <div class="prose">
-<p><a class="btn btn-dark" href="/downloads/weberslink-smtp.zip" download data-track="Plugin download" data-loc="smtp-detail-top">Download ZIP ↓</a> <span class="plugin-ver">Version 1.0.0 · 24 KB · WordPress 5.9+ · PHP 7.4+ · GPL-2.0-or-later</span></p>
+<p><a class="btn btn-dark" href="/downloads/weberslink-smtp.zip" download data-track="Plugin download" data-loc="smtp-detail-top">Download ZIP ↓</a> <span class="plugin-ver">Version 1.1.0 · 40 KB · WordPress 5.9+ · PHP 7.4+ · GPL-2.0-or-later</span></p>
 <h2>What's inside</h2>
 <ul>
   <li><strong>Send through any SMTP server:</strong> one-click presets for Gmail / Google Workspace, Microsoft 365, SendGrid, Mailgun, Amazon SES, Brevo, Postmark, Zoho and Mailtrap; STARTTLS or SSL/TLS; force the From email and name; set the return path.</li>
+  <li><strong>API mailers for blocked ports:</strong> send over HTTPS with SendGrid, Brevo, Mailgun (US/EU) or Postmark: attachments, Cc/Bcc and Reply-To included. API keys are stored encrypted or set with a wp-config.php constant.</li>
+  <li><strong>Backup connection &amp; failover:</strong> if the primary connection fails, the email is re-sent through your backup straight away, and the log records which one delivered it.</li>
+  <li><strong>Smart routing:</strong> send some emails another way based on the sending plugin, subject, recipient domain or From address, for example WooCommerce receipts through a transactional service.</li>
+  <li><strong>Open &amp; click tracking (opt-in):</strong> signed tracking links and a 1×1 image, never added to login or reset emails, with opens and clicks shown in the log.</li>
+  <li><strong>Weekly report &amp; email controls:</strong> a Monday summary of sent, failed, delivery rate and failure sources, a 14-day chart in the log, and switches to stop WordPress notification emails you do not want.</li>
   <li><strong>Searchable email log:</strong> recipient, subject, status, the plugin or theme that sent it, number of attempts and date, with a sandboxed preview (no scripts, no remote images) and a plain-text view. CSV export.</li>
   <li><strong>Privacy first:</strong> log everything, only recipients and subject, or nothing. Password-reset keys and tokens are redacted, old entries are deleted automatically, and your password is stored encrypted (or kept out of the database with a wp-config.php constant).</li>
   <li><strong>Fix problems fast:</strong> resend any email, automatic retries for failures, a dashboard widget and warning banner, and Slack or Discord alerts, because a failed email cannot email you.</li>
@@ -182,6 +203,17 @@
 </ol>
 <p><a class="btn btn-dark" href="/downloads/weberslink-smtp.zip" download data-track="Plugin download" data-loc="smtp-detail-bottom">Download ZIP ↓</a></p>
 <h2>Changelog</h2>
+<h3>Version 1.1.0</h3>
+<ul>
+  <li>New: SendGrid, Brevo, Mailgun and Postmark API mailers (HTTPS) next to SMTP.</li>
+  <li>New: backup connection with automatic failover.</li>
+  <li>New: smart routing rules (plugin/theme, subject, recipient domain, From).</li>
+  <li>New: opt-in open and click tracking with signed links.</li>
+  <li>New: weekly email report and a 14-day chart in the email log.</li>
+  <li>New: email controls to disable WordPress notification emails.</li>
+  <li>New: test email can be sent via the primary or backup connection; WLSMTP_API_KEY constant.</li>
+  <li>Fix: Cc, Bcc and Reply-To headers with several comma-separated addresses are parsed correctly.</li>
+</ul>
 <h3>Version 1.0.0</h3>
 <ul>
   <li>Initial release: SMTP with provider presets, email log with preview, resend, retries, alerts, test tool and deliverability check.</li>
@@ -205,10 +237,12 @@
     <div><div class="kicker">FAQ</div><h2 class="h2">Common <em>questions.</em></h2></div>
     <div class="faq">
       <details open><summary>Is Weberslink SMTP &amp; Email Log free?</summary><p>Yes. It is a free download under the GPL and works on as many of your own WordPress sites as you like.</p></details>
-      <details><summary>Which email providers does it support?</summary><p>Any SMTP server. One-click presets are included for Gmail / Google Workspace, Microsoft 365, SendGrid, Mailgun, Amazon SES, Brevo, Postmark, Zoho and Mailtrap.</p></details>
+      <details><summary>Which email providers does it support?</summary><p>Any SMTP server, with one-click presets for Gmail / Google Workspace, Microsoft 365, SendGrid, Mailgun, Amazon SES, Brevo, Postmark, Zoho and Mailtrap. If your host blocks SMTP ports you can instead send over HTTPS through the SendGrid, Brevo, Mailgun or Postmark API.</p></details>
       <details><summary>Is my SMTP password safe?</summary><p>It is stored encrypted using libsodium with keys derived from your site's secret salts, and it is never shown again after saving. For the strongest setup, define the password as a constant in wp-config.php and nothing is stored in the database.</p></details>
       <details><summary>Does it store the content of my emails?</summary><p>You choose: everything (enables preview, resend and retries), recipients and subject only, or nothing. Password-reset keys and one-time tokens are replaced with [redacted] in stored messages, and old entries are deleted automatically after the number of days you set.</p></details>
       <details><summary>What happens when an email fails?</summary><p>The failure is logged with the exact error, the email is retried automatically (after 5 minutes, 30 minutes and 2 hours), you see a warning in the dashboard, and an alert can be sent to Slack or Discord.</p></details>
+      <details><summary>What is the backup connection?</summary><p>A second connection (SMTP or an API) that takes over instantly when the primary one fails, so a provider outage does not lose email. Each email that fails over is re-sent once and the log shows which connection delivered it.</p></details>
+      <details><summary>Is open and click tracking on by default?</summary><p>No. It is opt-in, signed so links cannot be abused as open redirects, and never touches emails with login or password-reset links. Tell your recipients if you enable it.</p></details>
       <details><summary>Which WordPress and PHP versions does it need?</summary><p>WordPress 5.9 or newer and PHP 7.4 or newer.</p></details>
     </div>
   </div>

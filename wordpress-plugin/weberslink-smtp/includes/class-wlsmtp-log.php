@@ -3,7 +3,7 @@ defined( 'ABSPATH' ) || exit;
 
 class WLSMTP_Log {
 
-	const DB_VERSION = '1';
+	const DB_VERSION = '2';
 
 	public static function table() {
 		global $wpdb;
@@ -47,7 +47,10 @@ class WLSMTP_Log {
 			debug_log text,
 			attempts tinyint(3) unsigned NOT NULL DEFAULT 1,
 			source varchar(120) NOT NULL DEFAULT '',
-			transport varchar(10) NOT NULL DEFAULT '',
+			transport varchar(24) NOT NULL DEFAULT '',
+			opens int(10) unsigned NOT NULL DEFAULT 0,
+			clicks int(10) unsigned NOT NULL DEFAULT 0,
+			opened_at datetime DEFAULT NULL,
 			PRIMARY KEY  (id),
 			KEY status (status),
 			KEY created_at (created_at)
@@ -114,7 +117,7 @@ class WLSMTP_Log {
 		$w     = implode( ' AND ', $where );
 		$cq    = 'SELECT COUNT(*) FROM ' . self::table() . " WHERE $w"; // phpcs:ignore
 		$total = (int) ( $vals ? $wpdb->get_var( $wpdb->prepare( $cq, $vals ) ) : $wpdb->get_var( $cq ) ); // phpcs:ignore
-		$sql   = 'SELECT id, created_at, to_addr, subject, status, error, attempts, source, transport, attachments FROM ' . self::table() . " WHERE $w ORDER BY id DESC"; // phpcs:ignore
+		$sql   = 'SELECT id, created_at, to_addr, subject, status, error, attempts, source, transport, attachments, opens, clicks FROM ' . self::table() . " WHERE $w ORDER BY id DESC"; // phpcs:ignore
 		$pv    = $vals;
 		if ( (int) $a['per_page'] > 0 ) {
 			$sql .= ' LIMIT %d OFFSET %d';
@@ -135,6 +138,50 @@ class WLSMTP_Log {
 		return $out;
 	}
 
+	/** Increment a tracking counter (opens | clicks). */
+	public static function bump( $id, $col ) {
+		global $wpdb;
+		if ( ! in_array( $col, array( 'opens', 'clicks' ), true ) ) {
+			return;
+		}
+		$extra = 'opens' === $col ? ', opened_at = COALESCE(opened_at, %s)' : '';
+		$sql   = 'UPDATE ' . self::table() . " SET $col = $col + 1" . $extra . ' WHERE id = %d'; // phpcs:ignore
+		$wpdb->query( 'opens' === $col ? $wpdb->prepare( $sql, current_time( 'mysql', true ), (int) $id ) : $wpdb->prepare( $sql, (int) $id ) ); // phpcs:ignore
+	}
+
+	/** Sent / failed per day for the last $days days (oldest first), for the chart. */
+	public static function daily_series( $days = 14 ) {
+		global $wpdb;
+		$since = gmdate( 'Y-m-d 00:00:00', time() - ( $days - 1 ) * DAY_IN_SECONDS );
+		$rows  = $wpdb->get_results( $wpdb->prepare( 'SELECT DATE(created_at) d, status, COUNT(*) c FROM ' . self::table() . ' WHERE created_at >= %s GROUP BY DATE(created_at), status', $since ), ARRAY_A ); // phpcs:ignore
+		$out   = array();
+		for ( $i = $days - 1; $i >= 0; $i-- ) {
+			$out[ gmdate( 'Y-m-d', time() - $i * DAY_IN_SECONDS ) ] = array( 'sent' => 0, 'failed' => 0 );
+		}
+		foreach ( (array) $rows as $r ) {
+			if ( isset( $out[ $r['d'] ] ) && isset( $out[ $r['d'] ][ $r['status'] ] ) ) {
+				$out[ $r['d'] ][ $r['status'] ] += (int) $r['c'];
+			}
+		}
+		return $out;
+	}
+
+	/** Numbers for the weekly report. */
+	public static function report_data( $days = 7 ) {
+		global $wpdb;
+		$since = gmdate( 'Y-m-d H:i:s', time() - $days * DAY_IN_SECONDS );
+		$t     = self::table();
+		$data  = array( 'counts' => self::counts( $days ), 'opens' => 0, 'clicks' => 0, 'failed_sources' => array(), 'recent_failures' => array() );
+		$oc    = $wpdb->get_row( $wpdb->prepare( "SELECT SUM(opens>0) o, SUM(clicks>0) c FROM $t WHERE created_at >= %s", $since ), ARRAY_A ); // phpcs:ignore
+		if ( $oc ) {
+			$data['opens']  = (int) $oc['o'];
+			$data['clicks'] = (int) $oc['c'];
+		}
+		$data['failed_sources']  = (array) $wpdb->get_results( $wpdb->prepare( "SELECT source, COUNT(*) c FROM $t WHERE status='failed' AND created_at >= %s GROUP BY source ORDER BY c DESC LIMIT 5", $since ), ARRAY_A ); // phpcs:ignore
+		$data['recent_failures'] = (array) $wpdb->get_results( $wpdb->prepare( "SELECT subject, to_addr, error FROM $t WHERE status='failed' AND created_at >= %s ORDER BY id DESC LIMIT 5", $since ), ARRAY_A ); // phpcs:ignore
+		return $data;
+	}
+
 	/* ---------- housekeeping ---------- */
 
 	public static function daily() {
@@ -143,6 +190,7 @@ class WLSMTP_Log {
 		if ( $days > 0 ) {
 			$wpdb->query( $wpdb->prepare( 'DELETE FROM ' . self::table() . ' WHERE created_at < %s', gmdate( 'Y-m-d H:i:s', time() - $days * DAY_IN_SECONDS ) ) ); // phpcs:ignore
 		}
+		WLSMTP_Report::maybe_send();
 	}
 
 	/** WP-Cron callback: send a failed email again (same log row, attempts + 1). */

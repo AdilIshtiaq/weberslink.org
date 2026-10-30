@@ -29,6 +29,34 @@ class WLSMTP_Settings {
 			'retry_max'           => 3,
 			'alert_webhook'       => '',
 			'delete_on_uninstall' => 0,
+			// mailer type of the primary connection: smtp | sendgrid | brevo | mailgun | postmark
+			'mailer'              => 'smtp',
+			'api_key_enc'         => '',
+			'mailgun_domain'      => '',
+			'mailgun_region'      => 'us',
+			// backup connection (automatic failover)
+			'bk_enabled'          => 0,
+			'bk_mailer'           => 'smtp',
+			'bk_host'             => '',
+			'bk_port'             => 587,
+			'bk_encryption'       => 'tls',
+			'bk_auth'             => 1,
+			'bk_user'             => '',
+			'bk_pass_enc'         => '',
+			'bk_api_key_enc'      => '',
+			'bk_mailgun_domain'   => '',
+			'bk_mailgun_region'   => 'us',
+			'bk_from_email'       => '',
+			// routing: array of array( match, value, via )
+			'routes'              => array(),
+			// weekly report
+			'report_enabled'      => 0,
+			'report_email'        => '',
+			// disabled WordPress emails
+			'disable'             => array(),
+			// tracking (opt-in)
+			'track_opens'         => 0,
+			'track_clicks'        => 0,
 		);
 	}
 
@@ -110,6 +138,102 @@ class WLSMTP_Settings {
 		return array_merge( self::all(), self::constant_overrides() );
 	}
 
+	public static function mailers() {
+		return array(
+			'smtp'     => 'SMTP',
+			'sendgrid' => 'SendGrid API',
+			'brevo'    => 'Brevo API',
+			'mailgun'  => 'Mailgun API',
+			'postmark' => 'Postmark API',
+		);
+	}
+
+	/** Which WordPress emails can be switched off (setting key => label). */
+	public static function disable_options() {
+		return array(
+			'new_user_admin'     => __( 'New user registration notice to the admin', 'weberslink-smtp' ),
+			'new_user_user'      => __( 'New user welcome email to the user', 'weberslink-smtp' ),
+			'password_changed'   => __( 'Password changed notice to the user', 'weberslink-smtp' ),
+			'email_changed'      => __( 'Email address changed notice to the user', 'weberslink-smtp' ),
+			'comment_author'     => __( 'New comment notice to the post author', 'weberslink-smtp' ),
+			'comment_moderator'  => __( 'Comment moderation notice to the admin', 'weberslink-smtp' ),
+			'core_updates'       => __( 'Automatic WordPress core update emails', 'weberslink-smtp' ),
+			'plugin_updates'     => __( 'Automatic plugin update emails', 'weberslink-smtp' ),
+			'theme_updates'      => __( 'Automatic theme update emails', 'weberslink-smtp' ),
+		);
+	}
+
+	public static function route_matches() {
+		return array(
+			'source'    => __( 'Sent by plugin / theme (name contains)', 'weberslink-smtp' ),
+			'subject'   => __( 'Subject contains', 'weberslink-smtp' ),
+			'to_domain' => __( 'Recipient domain is', 'weberslink-smtp' ),
+			'from'      => __( 'From address contains', 'weberslink-smtp' ),
+		);
+	}
+
+	/**
+	 * Normalised connection: which = 'primary' | 'backup'. Constants in wp-config.php override stored values.
+	 * Returns array( mailer, host, port, encryption, auth, user, pass, api_key, domain, region, from_email ).
+	 */
+	public static function connection( $which = 'primary' ) {
+		$s  = self::effective();
+		$bk = 'backup' === $which;
+		$p  = $bk ? 'bk_' : '';
+		$c  = array(
+			'mailer'     => isset( self::mailers()[ $s[ $p . 'mailer' ] ] ) ? $s[ $p . 'mailer' ] : 'smtp',
+			'host'       => (string) $s[ $p . 'host' ],
+			'port'       => (int) $s[ $p . 'port' ],
+			'encryption' => $s[ $p . 'encryption' ],
+			'auth'       => ! empty( $s[ $p . 'auth' ] ),
+			'user'       => (string) $s[ $p . 'user' ],
+			'pass'       => $bk ? self::decrypt( (string) $s['bk_pass_enc'] ) : self::password(),
+			'api_key'    => self::decrypt( (string) $s[ $p . 'api_key_enc' ] ),
+			'domain'     => (string) $s[ $p . 'mailgun_domain' ],
+			'region'     => 'eu' === $s[ $p . 'mailgun_region' ] ? 'eu' : 'us',
+			'from_email' => (string) ( ! empty( $s[ $p . 'from_email' ] ) ? $s[ $p . 'from_email' ] : $s['from_email'] ),
+		);
+		if ( ! $bk && defined( 'WLSMTP_API_KEY' ) && '' !== WLSMTP_API_KEY ) {
+			$c['api_key'] = (string) WLSMTP_API_KEY;
+		}
+		return $c;
+	}
+
+	/** True when the connection has what it needs to send. */
+	public static function connection_ready( $c ) {
+		if ( 'smtp' === $c['mailer'] ) {
+			return '' !== $c['host'];
+		}
+		if ( '' === $c['api_key'] ) {
+			return false;
+		}
+		return 'mailgun' !== $c['mailer'] || '' !== $c['domain'];
+	}
+
+	/** Shared sanitiser for one connection ($p = '' or 'bk_'). */
+	private static function sanitize_connection( $in, $old, $p ) {
+		$out               = array();
+		$out[ $p . 'mailer' ] = isset( $in[ $p . 'mailer' ], self::mailers()[ $in[ $p . 'mailer' ] ] ) ? $in[ $p . 'mailer' ] : 'smtp';
+		$out[ $p . 'host' ]   = isset( $in[ $p . 'host' ] ) ? preg_replace( '/[^A-Za-z0-9.\-:\[\]]/', '', trim( $in[ $p . 'host' ] ) ) : '';
+		$out[ $p . 'port' ]   = isset( $in[ $p . 'port' ] ) ? max( 1, min( 65535, (int) $in[ $p . 'port' ] ) ) : 587;
+		$out[ $p . 'encryption' ] = isset( $in[ $p . 'encryption' ] ) && in_array( $in[ $p . 'encryption' ], array( 'none', 'ssl', 'tls' ), true ) ? $in[ $p . 'encryption' ] : 'tls';
+		$out[ $p . 'auth' ]   = isset( $in[ $p . 'auth' ] ) ? 1 : 0;
+		$out[ $p . 'user' ]   = isset( $in[ $p . 'user' ] ) ? sanitize_text_field( $in[ $p . 'user' ] ) : '';
+		$out[ $p . 'mailgun_domain' ] = isset( $in[ $p . 'mailgun_domain' ] ) ? preg_replace( '/[^A-Za-z0-9.\-]/', '', trim( $in[ $p . 'mailgun_domain' ] ) ) : '';
+		$out[ $p . 'mailgun_region' ] = isset( $in[ $p . 'mailgun_region' ] ) && 'eu' === $in[ $p . 'mailgun_region' ] ? 'eu' : 'us';
+		foreach ( array( 'pass' => $p . 'pass_enc', 'api_key' => $p . 'api_key_enc' ) as $field => $store ) {
+			$raw = isset( $in[ $p . $field ] ) ? (string) $in[ $p . $field ] : '';
+			if ( '' === $raw ) {
+				$out[ $store ] = isset( $old[ $store ] ) ? $old[ $store ] : '';
+			} elseif ( '-' === $raw ) {
+				$out[ $store ] = '';
+			} else {
+				$out[ $store ] = self::encrypt( trim( $raw ) );
+			}
+		}
+		return $out;
+	}
+
 	public static function sanitize( $in, $old ) {
 		$d = self::defaults();
 		// WordPress sanitises a brand-new option twice (update_option → add_option); make that idempotent.
@@ -142,6 +266,34 @@ class WLSMTP_Settings {
 		} else {
 			$out['pass_enc'] = self::encrypt( $pw );
 		}
+		// Primary connection (SMTP host/port/etc. fields were handled above; add the API-mailer ones).
+		$pc = self::sanitize_connection( $in, $old, '' );
+		foreach ( array( 'mailer', 'api_key_enc', 'mailgun_domain', 'mailgun_region' ) as $k ) {
+			$out[ $k ] = $pc[ $k ];
+		}
+		// Backup connection.
+		$out['bk_enabled']    = isset( $in['bk_enabled'] ) ? 1 : 0;
+		$out['bk_from_email'] = isset( $in['bk_from_email'] ) ? sanitize_email( $in['bk_from_email'] ) : '';
+		$out                  = array_merge( $out, self::sanitize_connection( $in, $old, 'bk_' ) );
+		// Routing rules.
+		$routes = array();
+		foreach ( (array) ( isset( $in['routes'] ) ? $in['routes'] : array() ) as $r ) {
+			if ( ! is_array( $r ) || empty( $r['value'] ) ) {
+				continue;
+			}
+			$routes[] = array(
+				'match' => isset( $r['match'], self::route_matches()[ $r['match'] ] ) ? $r['match'] : 'source',
+				'value' => mb_substr( sanitize_text_field( $r['value'] ), 0, 120 ),
+				'via'   => isset( $r['via'] ) && in_array( $r['via'], array( 'primary', 'backup', 'default' ), true ) ? $r['via'] : 'backup',
+			);
+		}
+		$out['routes'] = array_slice( $routes, 0, 10 );
+		// Weekly report, email controls, tracking.
+		$out['report_enabled'] = isset( $in['report_enabled'] ) ? 1 : 0;
+		$out['report_email']   = isset( $in['report_email'] ) ? sanitize_email( $in['report_email'] ) : '';
+		$out['disable']        = array_values( array_intersect( array_keys( self::disable_options() ), array_map( 'sanitize_key', (array) ( isset( $in['disable'] ) ? $in['disable'] : array() ) ) ) );
+		$out['track_opens']    = isset( $in['track_opens'] ) ? 1 : 0;
+		$out['track_clicks']   = isset( $in['track_clicks'] ) ? 1 : 0;
 		return array_merge( $d, $out );
 	}
 }
