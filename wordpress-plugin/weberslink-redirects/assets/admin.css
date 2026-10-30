@@ -1,0 +1,10 @@
+.wlr-card{background:#fff;border:1px solid #dcdcde;border-radius:6px;padding:4px 20px 14px;margin:14px 0;max-width:900px}
+.wlr-row label{margin-right:14px}
+.wlr-filters{margin:14px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.wlr-off td{opacity:.55}
+.wlr-pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11px;font-weight:700;background:#e2e4e7;color:#1d2327}
+.wlr-c301,.wlr-c308{background:#d7f5df;color:#0a5b25}.wlr-c302,.wlr-c303,.wlr-c307{background:#fff3cd;color:#6b4e00}.wlr-c410,.wlr-c451{background:#fbd9da;color:#8a1f21}
+.wlr-inline input[type=text]{width:58%;max-width:340px}
+.wlr-sug{font-size:12px;color:#1a7f45;font-weight:600}
+.wlr-chain{max-width:760px;padding-left:20px}.wlr-chain li{margin:6px 0}
+.wlr-bad{color:#b32d2e;font-weight:600}

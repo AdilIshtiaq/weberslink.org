@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weberslink Security Shield: Free WordPress Security &amp; 2FA Plugin | WebersLink</title>
+<meta name="description" content="Download Weberslink Security Shield: a free WordPress security plugin with login attempt limiting, two-factor authentication (authenticator app and recovery codes), one-click hardening, an activity log and a security check-up.">
+<link rel="canonical" href="https://weberslink.org/plugins/weberslink-security">
+<meta name="theme-color" content="#0a0a0a">
+<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48"><link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="WebersLink">
+<meta property="og:url" content="https://weberslink.org/plugins/weberslink-security">
+<meta property="og:title" content="Weberslink Security Shield: Free WordPress Security &amp; 2FA Plugin | WebersLink">
+<meta property="og:description" content="Download Weberslink Security Shield: a free WordPress security plugin with login attempt limiting, two-factor authentication (authenticator app and recovery codes), one-click hardening, an activity log and a security check-up.">
+<meta property="og:image" content="https://weberslink.org/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Weberslink Security Shield: Free WordPress Security &amp; 2FA Plugin | WebersLink">
+<meta name="twitter:description" content="Download Weberslink Security Shield: a free WordPress security plugin with login attempt limiting, two-factor authentication (authenticator app and recovery codes), one-click hardening, an activity log and a security check-up.">
+<meta name="twitter:image" content="https://weberslink.org/og.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400&display=swap"></noscript>
+<link rel="stylesheet" href="/assets/site.css">
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@graph": [
+  {
+   "@type": "BreadcrumbList",
+   "itemListElement": [
+    {
+     "@type": "ListItem",
+     "position": 1,
+     "name": "Home",
+     "item": "https://weberslink.org/"
+    },
+    {
+     "@type": "ListItem",
+     "position": 2,
+     "name": "Plugins",
+     "item": "https://weberslink.org/plugins/"
+    },
+    {
+     "@type": "ListItem",
+     "position": 3,
+     "name": "Weberslink Security Shield",
+     "item": "https://weberslink.org/plugins/weberslink-security"
+    }
+   ]
+  },
+  {
+   "@type": "SoftwareApplication",
+   "name": "Weberslink Security Shield",
+   "description": "Download Weberslink Security Shield: a free WordPress security plugin with login attempt limiting, two-factor authentication (authenticator app and recovery codes), one-click hardening, an activity log and a security check-up.",
+   "applicationCategory": "BusinessApplication",
+   "operatingSystem": "WordPress 5.8+",
+   "softwareVersion": "1.0.0",
+   "downloadUrl": "https://weberslink.org/downloads/weberslink-security.zip",
+   "fileSize": "26 KB",
+   "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+   },
+   "publisher": {
+    "@type": "Organization",
+    "name": "WebersLink",
+    "url": "https://weberslink.org/",
+    "logo": "https://weberslink.org/apple-touch-icon.png"
+   }
+  },
+  {
+   "@type": "FAQPage",
+   "mainEntity": [
+    {
+     "@type": "Question",
+     "name": "Is Weberslink Security Shield free?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Yes. It is a free download under the GPL and works on as many of your own WordPress sites as you like."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Which authenticator apps work?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Any app that supports time-based one-time passwords (TOTP, RFC 6238): Google Authenticator, Authy, 1Password, Microsoft Authenticator, Bitwarden and others."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "What if I lose my phone?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Use one of your eight recovery codes. If you have none left, another administrator can reset your two-factor login from your user page, and as a last resort you can rename the plugin folder over FTP."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Can it lock me out?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Lockouts are temporary, you can add your own address to the always-allow list, and two-factor login is never forced on anyone. Application passwords and the WordPress mobile app keep working."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "My site is behind Cloudflare. Does the limiter still work?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Yes. Choose the CF-Connecting-IP header under Visitor address from, so the plugin sees the real visitor instead of the proxy."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Which WordPress and PHP versions does it need?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "WordPress 5.9 or newer and PHP 7.4 or newer."
+     }
+    }
+   ]
+  }
+ ]
+}
+</script>
+</head>
+<body>
+<header class="nav scrolled" id="nav">
+  <div class="wrap">
+    <a href="/" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="187" height="33"></a>
+    <nav class="nav-links" id="navLinks" aria-label="Main">
+      <a href="/services/">Services</a>
+      <a href="/industries/">Industries</a>
+      <a href="/#work">Work</a>
+      <a href="/#pricing">Pricing</a>
+      <a href="/blog/">Guides</a>
+      <a href="/plugins/">Plugins</a>
+    </nav>
+    <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="nav">Book a free call</a>
+    <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false"><span></span><span></span></button>
+  </div>
+</header>
+<main>
+<section class="page-hero">
+  <div class="hero-grid" aria-hidden="true"></div>
+  <div class="wrap">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a><span>/</span><a href="/plugins/">Plugins</a><span>/</span><span aria-current="page">Weberslink Security Shield</span></nav>
+    <div class="kicker">WordPress plugin</div>
+    <h1>Weberslink Security Shield — <em>lock the front door properly.</em></h1>
+    <p class="lead">Stop password guessing, add two-factor login, harden WordPress in one click and see a plain-English security score.</p>
+    
+    <div class="hero-cta">
+      <a href="/downloads/weberslink-security.zip" class="btn btn-light" download data-track="Plugin download" data-loc="hero-weberslink-security">Download Security Shield ↓</a>
+      <a href="/plugins/" class="btn btn-ghost" data-track="Plugin details" data-loc="hero-weberslink-security">All plugins</a>
+    </div>
+  </div>
+</section>
+
+<article class="white page-body">
+  <div class="wrap prose-wrap">
+    <div class="prose">
+<p><a class="btn btn-dark" href="/downloads/weberslink-security.zip" download data-track="Plugin download" data-loc="weberslink-security-detail-top">Download ZIP ↓</a> <span class="plugin-ver">Version 1.0.0 · 26 KB · WordPress 5.9+ · PHP 7.4+ · GPL-2.0-or-later</span></p>
+<h2>What's inside</h2>
+<ul>
+  <li><strong>Login protection:</strong> Lock an address out after repeated failures, with longer locks for repeat offenders (up to 24 hours). A locked address is refused even with the correct password. Always-allow and always-block lists accept ranges (203.0.113.0/24, IPv6 too). Email alert on lockouts.</li>
+  <li><strong>Two-factor authentication:</strong> Works with Google Authenticator, Authy, 1Password, Microsoft Authenticator and any TOTP app. Eight one-time recovery codes, codes that work only once, secrets stored encrypted. Each user switches it on from their own profile, so nobody is forced and nobody is locked out.</li>
+  <li><strong>One-click hardening:</strong> Strong password policy, disable XML-RPC, hide the WordPress version, block username scans (?author=1, the REST users list, the users sitemap), disable the code editors, send security headers and optional HSTS.</li>
+  <li><strong>Security check-up:</strong> A 0–100 score with plain-English advice, worst problems first: HTTPS, PHP version, an “admin” username, two-factor coverage, pending updates and more.</li>
+  <li><strong>Activity log:</strong> Logins, failures, lockouts, 2FA changes, password resets, new and deleted users, role changes and plugin or theme changes, with the address and details. Old entries clean themselves up.</li>
+  <li><strong>Careful with your users:</strong> Application passwords and the mobile app keep working, login errors never reveal whether a username exists, and a proxy header is only trusted when you choose it.</li>
+</ul>
+<h2>See how it works, screen by screen</h2>
+<p>Pick a step, or let it play. Click a screen to open it full size.</p>
+<section class="wf" data-wf aria-label="See how it works, screen by screen">
+  <ol class="wf-phases">
+    <li><button type="button" class="wf-phase-btn" data-go="0" data-phase="0"><span class="wf-pn">1</span><span><strong>Protect</strong><em>Limit logins, add 2FA</em></span></button></li>
+    <li><button type="button" class="wf-phase-btn" data-go="3" data-phase="1"><span class="wf-pn">2</span><span><strong>Harden</strong><em>Lock down WordPress</em></span></button></li>
+    <li><button type="button" class="wf-phase-btn" data-go="5" data-phase="2"><span class="wf-pn">3</span><span><strong>Watch</strong><em>Score and activity log</em></span></button></li>
+  </ol>
+  <div class="wf-tabs" role="tablist" aria-label="Screens">
+    <button type="button" class="wf-tab" role="tab" data-i="0" data-phase="0"><span class="wf-n">1</span>Login</button>
+    <button type="button" class="wf-tab" role="tab" data-i="1" data-phase="0"><span class="wf-n">2</span>2FA setup</button>
+    <button type="button" class="wf-tab" role="tab" data-i="2" data-phase="0"><span class="wf-n">3</span>Recovery codes</button>
+    <button type="button" class="wf-tab" role="tab" data-i="3" data-phase="1"><span class="wf-n">4</span>Login rules</button>
+    <button type="button" class="wf-tab" role="tab" data-i="4" data-phase="1"><span class="wf-n">5</span>Hardening</button>
+    <button type="button" class="wf-tab" role="tab" data-i="5" data-phase="2"><span class="wf-n">6</span>Check-up</button>
+    <button type="button" class="wf-tab" role="tab" data-i="6" data-phase="2"><span class="wf-n">7</span>Activity log</button>
+  </div>
+  <div class="wf-stage">
+    <figure class="wf-step" data-i="0" data-phase="0">
+      <div class="wf-frame"><div class="wf-bar"><i></i><i></i><i></i><span class="wf-url">yoursite.com/wp-login.php</span></div><a href="/assets/plugins/sec-7-login.webp" target="_blank" rel="noopener" title="Open full size"><img src="/assets/plugins/sec-7-login.webp" width="1000" height="700" alt="A second step at login" loading="lazy"></a></div>
+      <figcaption><span class="wf-kick">Step 1 · Protect</span><strong>A second step at login</strong><span>Users who turned on two-factor enter the 6-digit code from their phone, or a recovery code. Everyone else logs in as usual.</span></figcaption>
+    </figure>
+    <figure class="wf-step" data-i="1" data-phase="0">
+      <div class="wf-frame"><div class="wf-bar"><i></i><i></i><i></i><span class="wf-url">yoursite.com/wp-admin · Profile</span></div><a href="/assets/plugins/sec-5-2fa-setup.webp" target="_blank" rel="noopener" title="Open full size"><img src="/assets/plugins/sec-5-2fa-setup.webp" width="1200" height="688" alt="Set up in a minute" loading="lazy"></a></div>
+      <figcaption><span class="wf-kick">Step 2 · Protect</span><strong>Set up in a minute</strong><span>Add the key to any authenticator app (or tap the link on your phone), enter a code to confirm, and you are protected.</span></figcaption>
+    </figure>
+    <figure class="wf-step" data-i="2" data-phase="0">
+      <div class="wf-frame"><div class="wf-bar"><i></i><i></i><i></i><span class="wf-url">yoursite.com/wp-admin · Profile</span></div><a href="/assets/plugins/sec-6-recovery.webp" target="_blank" rel="noopener" title="Open full size"><img src="/assets/plugins/sec-6-recovery.webp" width="1200" height="688" alt="Never get locked out" loading="lazy"></a></div>
+      <figcaption><span class="wf-kick">Step 3 · Protect</span><strong>Never get locked out</strong><span>Eight one-time recovery codes are shown once at setup, for the day a phone is lost. An administrator can also reset someone's two-factor login.</span></figcaption>
+    </figure>
+    <figure class="wf-step" data-i="3" data-phase="1">
+      <div class="wf-frame"><div class="wf-bar"><i></i><i></i><i></i><span class="wf-url">yoursite.com/wp-admin · Settings</span></div><a href="/assets/plugins/sec-3-settings.webp" target="_blank" rel="noopener" title="Open full size"><img src="/assets/plugins/sec-3-settings.webp" width="1200" height="794" alt="Tune the login rules" loading="lazy"></a></div>
+      <figcaption><span class="wf-kick">Step 4 · Harden</span><strong>Tune the login rules</strong><span>Attempts allowed, time window, lockout length and escalation, always-allow and always-block lists, and email alerts.</span></figcaption>
+    </figure>
+    <figure class="wf-step" data-i="4" data-phase="1">
+      <div class="wf-frame"><div class="wf-bar"><i></i><i></i><i></i><span class="wf-url">yoursite.com/wp-admin · Settings</span></div><a href="/assets/plugins/sec-4-hardening.webp" target="_blank" rel="noopener" title="Open full size"><img src="/assets/plugins/sec-4-hardening.webp" width="1200" height="794" alt="Harden with switches" loading="lazy"></a></div>
+      <figcaption><span class="wf-kick">Step 5 · Harden</span><strong>Harden with switches</strong><span>Two-factor options and hardening in plain language: password policy, XML-RPC, username protection, code editors, security headers and more.</span></figcaption>
+    </figure>
+    <figure class="wf-step" data-i="5" data-phase="2">
+      <div class="wf-frame"><div class="wf-bar"><i></i><i></i><i></i><span class="wf-url">yoursite.com/wp-admin · Check-up</span></div><a href="/assets/plugins/sec-1-checkup.webp" target="_blank" rel="noopener" title="Open full size"><img src="/assets/plugins/sec-1-checkup.webp" width="1200" height="794" alt="See where you stand" loading="lazy"></a></div>
+      <figcaption><span class="wf-kick">Step 6 · Watch</span><strong>See where you stand</strong><span>A 0–100 score and a prioritised list of what to fix, with the last seven days of logins, failures and lockouts.</span></figcaption>
+    </figure>
+    <figure class="wf-step" data-i="6" data-phase="2">
+      <div class="wf-frame"><div class="wf-bar"><i></i><i></i><i></i><span class="wf-url">yoursite.com/wp-admin · Activity log</span></div><a href="/assets/plugins/sec-2-log.webp" target="_blank" rel="noopener" title="Open full size"><img src="/assets/plugins/sec-2-log.webp" width="1200" height="759" alt="Know what happened" loading="lazy"></a></div>
+      <figcaption><span class="wf-kick">Step 7 · Watch</span><strong>Know what happened</strong><span>Every login, failed attempt, lockout, role change and plugin change, filterable by event, user or address.</span></figcaption>
+    </figure>
+  </div>
+  <div class="wf-ctrl" hidden><button type="button" class="wf-arrow" data-dir="-1" aria-label="Previous screen">←</button><div class="wf-prog" aria-hidden="true"><span></span></div><span class="wf-count" aria-live="polite"></span><button type="button" class="wf-arrow" data-dir="1" aria-label="Next screen">→</button></div>
+</section>
+<h2>Install in 3 steps</h2>
+<ol>
+  <li>Download the ZIP above.</li>
+  <li>In WordPress go to <em>Plugins → Add New → Upload Plugin</em>, choose the ZIP, install and activate.</li>
+  <li>Open <em>Security Shield → Check-up</em> and follow the advice, then open your <em>Profile</em> to set up two-factor login.</li>
+</ol>
+<p><a class="btn btn-dark" href="/downloads/weberslink-security.zip" download data-track="Plugin download" data-loc="weberslink-security-detail-bottom">Download ZIP ↓</a></p>
+<h2>Changelog</h2>
+<h3>Version 1.0.0</h3>
+<ul>
+  <li>Initial release: login limiting, allow/block lists, two-factor login with recovery codes, password policy, hardening switches, security check-up and activity log.</li>
+</ul>
+<p class="plugin-note">Need this set up properly, or want something built for your site? <a href="/#book">Book a free call</a> and we'll help.</p>
+    </div>
+    <aside class="side-cta" aria-label="Get started">
+      <div class="side-card">
+        <p class="side-k">Free for new clients</p>
+        <h2>Get a free website audit</h2>
+        <p>We'll record a short video showing what's costing you enquiries — within 48 hours.</p>
+        <a href="/#audit" class="btn btn-light" data-track="Audit CTA" data-loc="sidebar">Get my audit →</a>
+        <a href="/#book" class="side-link" data-track="Book CTA" data-loc="sidebar">or book a 20-min call</a>
+      </div>
+    </aside>
+  </div>
+</article>
+
+<section class="light pad-sm">
+  <div class="wrap faq-grid">
+    <div><div class="kicker">FAQ</div><h2 class="h2">Common <em>questions.</em></h2></div>
+    <div class="faq">
+      <details open><summary>Is Weberslink Security Shield free?</summary><p>Yes. It is a free download under the GPL and works on as many of your own WordPress sites as you like.</p></details>
+      <details><summary>Which authenticator apps work?</summary><p>Any app that supports time-based one-time passwords (TOTP, RFC 6238): Google Authenticator, Authy, 1Password, Microsoft Authenticator, Bitwarden and others.</p></details>
+      <details><summary>What if I lose my phone?</summary><p>Use one of your eight recovery codes. If you have none left, another administrator can reset your two-factor login from your user page, and as a last resort you can rename the plugin folder over FTP.</p></details>
+      <details><summary>Can it lock me out?</summary><p>Lockouts are temporary, you can add your own address to the always-allow list, and two-factor login is never forced on anyone. Application passwords and the WordPress mobile app keep working.</p></details>
+      <details><summary>My site is behind Cloudflare. Does the limiter still work?</summary><p>Yes. Choose the CF-Connecting-IP header under Visitor address from, so the plugin sees the real visitor instead of the proxy.</p></details>
+      <details><summary>Which WordPress and PHP versions does it need?</summary><p>WordPress 5.9 or newer and PHP 7.4 or newer.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="white pad-sm">
+  <div class="wrap">
+    <div class="kicker">Keep reading</div>
+    <h2 class="h2" style="margin-bottom:32px">Related <em>services & guides.</em></h2>
+    <div class="rel-grid">
+      <a class="rel" href="/services/ecommerce"><span class="rel-k">Service</span><h3>WooCommerce &amp; E-commerce</h3><p>WooCommerce stores with fast checkout, product variations and WhatsApp ordering.</p><span class="rel-go">Read more →</span></a>
+      <a class="rel" href="/services/automation"><span class="rel-k">Service</span><h3>Lead Follow-Up Automation</h3><p>Instant replies, follow-up sequences and CRM updates that run themselves.</p><span class="rel-go">Read more →</span></a>
+    </div>
+  </div>
+</section>
+<section class="dark pad-sm cta-band">
+  <div class="wrap">
+    <h2 class="h2">Ready for more <em>booked jobs?</em></h2>
+    <p class="sub">Book a free 20-minute call. We'll show you how to answer every lead in 60 seconds — no obligation.</p>
+    <div class="hero-cta" style="margin-top:28px">
+      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="band">Book a free strategy call →</a>
+      <a href="/#pricing" class="btn btn-ghost">See pricing</a>
+    </div>
+  </div>
+</section>
+</main>
+<footer>
+  <div class="wrap">
+    <div class="foot-cols">
+      <div class="fcol fcol-brand">
+        <a href="/" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="187" height="33"></a>
+        <p>Done-for-you lead systems — websites, AI that answers every lead in 60 seconds, and automatic follow-up — for contractors and service businesses in the US &amp; Europe.</p>
+        <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="footer">Book a free call</a>
+      </div>
+      <div class="fcol"><h2>Services</h2><a href="/services/web-design">Small Business Web Design</a><a href="/services/ai-chatbots">AI Chatbots for Small Business</a><a href="/services/automation">Lead Follow-Up Automation</a><a href="/services/seo">SEO for Service Businesses</a><a href="/services/ecommerce">WooCommerce &amp; E-commerce</a><a href="/services/website-redesign">Website Redesign</a><a href="/woocommerce">WooCommerce Sales Recovery Pilot</a></div>
+      <div class="fcol"><h2>Industries</h2><a href="/industries/contractors">Contractors &amp; Home Services</a><a href="/industries/home-builders">Home Builders &amp; Construction</a><a href="/industries/professional-services">Accounting &amp; Professional Services</a><a href="/industries/manufacturers">Manufacturers &amp; B2B Suppliers</a></div>
+      <div class="fcol"><h2>Guides</h2><a href="/blog/small-business-website-cost">How Much Does a Small Business Website Cost in 2026?</a><a href="/blog/ai-chatbot-cost">How Much Does an AI Chatbot Cost?</a><a href="/blog/speed-to-lead">Speed to Lead: Why 5 Minutes Matters</a><a href="/blog/wordpress-vs-custom-website">WordPress vs Custom Website</a><a href="/blog/contractor-website-checklist">Contractor Website Checklist: 15 Must-Haves</a></div>
+    </div>
+    <div class="foot-big" aria-hidden="true">WebersLink</div>
+    <div class="copy"><span>© <span id="yr">2026</span> WebersLink · Lahore, Pakistan · Serving clients in the US &amp; Europe</span><span><a href="/plugins/">Plugins</a> · <a href="/privacy">Privacy</a> · <a href="mailto:hassan@weberslink.org">hassan@weberslink.org</a></span></div>
+  </div>
+</footer>
+<aside aria-label="Quick contact">
+<div class="sticky-cta" id="stickyCta">
+  <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="sticky">Book a free call</a>
+  <a href="https://wa.me/message/2MT2JFO63P3LA1" class="btn btn-ghost" data-wa data-track="WhatsApp click" data-loc="sticky" target="_blank" rel="noopener">WhatsApp</a>
+</div>
+</aside>
+<script src="/config.js"></script>
+<script src="/assets/site.js" defer></script>
+<script src="/assets/chat-widget.js" defer></script>
+</body>
+</html>

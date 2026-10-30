@@ -454,20 +454,123 @@ const pluginCard = (loc) => `<div class="plugin-card">
   </div>
 </div>`;
 
+
+// ---------- More plugins (data-driven): Redirects & 404 Monitor, Security Shield ----------
+const readChangelog = (dir) => {
+  const out = [];
+  const sec = (fs.readFileSync(path.join(__dirname, "..", "wordpress-plugin", dir, "readme.txt"), "utf8").split(/==\s*Changelog\s*==/)[1] || "").trim();
+  sec.split(/^=\s*([\d.]+)\s*=\s*$/m).forEach((part, i, arr) => {
+    if (i % 2 === 1) out.push({ version: part, items: (arr[i + 1] || "").split("\n").map((l) => l.replace(/^\*\s*/, "").trim()).filter(Boolean) });
+  });
+  return out;
+};
+const pluginVer = (dir, file) => (fs.readFileSync(path.join(__dirname, "..", "wordpress-plugin", dir, file), "utf8").match(/^\s*\*\s*Version:\s*([\d.]+)/m) || [])[1] || "1.0.0";
+const extraZipSize = (zip) => { const f = path.join(PUBLIC, zip); if (!fs.existsSync(f)) return ""; const b = fs.statSync(f).size; return b < 1048576 ? Math.round(b / 1024) + " KB" : (b / 1048576).toFixed(1) + " MB"; };
+const EXTRA = [
+  {
+    slug: "weberslink-redirects", dir: "weberslink-redirects", file: "weberslink-redirects.php", name: "Weberslink Redirects & 404 Monitor", short: "Redirects & 404 Monitor", menu: "Redirects",
+    title: "Weberslink Redirects & 404 Monitor: Free WordPress Redirect Plugin | WebersLink",
+    description: "Download Weberslink Redirects & 404 Monitor: a free WordPress plugin for 301 redirects (exact, folder or regex), a 404 monitor with smart suggestions, automatic redirects when a URL changes, a URL tester and CSV import/export.",
+    h1: "Weberslink Redirects &amp; 404 Monitor — <em>never lose a visitor to a dead link.</em>",
+    lead: "Fix broken links in one click, keep SEO value when pages move, and see exactly where every address goes.",
+    cardText: "Keep every old link working: 301/302/410 redirects (exact, folder or regex), a 404 monitor that suggests the right page, and automatic redirects when a post URL changes.",
+    feats: ["Exact, folder & regex redirects", "404 monitor with smart suggestions", "Auto-redirect when a URL changes", "Test any URL, spot loops & chains", "CSV import and export", "Hit counts, bulk edit, 410 Gone"],
+    inside: [
+      ["Every kind of redirect", "301, 302, 303, 307, 308 plus 410 Gone and 451 for removed content. Match an exact URL, a whole folder (/blog/x → /news/{rest}) or a regular expression with $1, $2 in the target. Choose what happens to the query string."],
+      ["404 monitor with smart suggestions", "See the addresses visitors asked for that do not exist, most requested first, with the page that linked to them. The plugin finds the closest published page (typos, renamed slugs) so one click fixes it. Bots and image requests are ignored."],
+      ["Automatic redirects", "When a published post or page gets a new URL, a 301 from the old address is created for you, so shared links and search rankings keep working."],
+      ["Safe by design", "Loops, unsafe targets such as javascript: links and broken regular expressions are rejected when you save. The URL tester shows the whole chain and warns about loops and chains that are too long."],
+      ["Fast", "Active rules are compiled into one cached lookup that runs before WordPress loads the page. Thousands of redirects cost almost nothing."],
+      ["Import, export, tidy up", "CSV import with line-by-line error reporting, CSV export (spreadsheet formulas neutralised), hit counts, enable/disable and bulk actions, automatic clean-up of old 404 entries."],
+    ],
+    phases: [["Fix", "Redirect old and broken URLs"], ["Catch", "Find 404s before visitors do"], ["Verify", "Test, import, export"]],
+    steps: [
+      ["redir-1-rules", "Redirects", "Manage every redirect", "Exact, folder and regex rules with status, hit counts, notes and bulk enable, disable or delete. Add one in seconds from the form at the top.", 0, "yoursite.com/wp-admin · Redirects"],
+      ["redir-2-404", "404 monitor", "Fix 404s in one click", "The most requested missing addresses with where visitors came from. The closest published page is suggested, so Redirect is one click. Or answer 410 Gone, or ignore.", 1, "yoursite.com/wp-admin · 404 monitor"],
+      ["redir-3-test", "URL tester", "Test before visitors do", "Trace any address through your rules: see each hop, and get warned about loops and long chains. Import and export CSV from the same page.", 2, "yoursite.com/wp-admin · Tools"],
+    ],
+    install: "Open <em>Redirects</em> in the admin menu and add your first redirect, or check <em>404 monitor</em> after a few days.",
+    faqs: [
+      ["Is Weberslink Redirects & 404 Monitor free?", "Yes. It is a free download under the GPL and works on as many of your own WordPress sites as you like."],
+      ["Will it slow my site down?", "No. Rules are compiled into one cached structure and exact redirects are a single array lookup, run before WordPress loads the page."],
+      ["How does the 404 monitor choose a suggestion?", "It compares the last part of the missing address with the slugs of your published pages and posts and offers the closest one when it is a confident match (for example /pricing-plan → /pricing-plans/). You always confirm before anything is created."],
+      ["Does it create redirects when I change a page URL?", "Yes, for published posts, pages and other public content. A 301 from the old address to the new one is added automatically, and you can switch this off in Settings."],
+      ["Can I move my redirects from another plugin?", "Export them from the old plugin as CSV with columns source and target (optionally code, match, query, enabled, note) and import the file under Redirects → Tools. Invalid rows are skipped and listed."],
+      ["Which WordPress and PHP versions does it need?", "WordPress 5.9 or newer and PHP 7.4 or newer."],
+    ],
+  },
+  {
+    slug: "weberslink-security", dir: "weberslink-security", file: "weberslink-security.php", name: "Weberslink Security Shield", short: "Security Shield", menu: "Security Shield",
+    title: "Weberslink Security Shield: Free WordPress Security & 2FA Plugin | WebersLink",
+    description: "Download Weberslink Security Shield: a free WordPress security plugin with login attempt limiting, two-factor authentication (authenticator app and recovery codes), one-click hardening, an activity log and a security check-up.",
+    h1: "Weberslink Security Shield — <em>lock the front door properly.</em>",
+    lead: "Stop password guessing, add two-factor login, harden WordPress in one click and see a plain-English security score.",
+    cardText: "Stop brute-force attacks and stolen passwords: login limiting, two-factor login with an authenticator app, one-click hardening, an activity log and a 0–100 security check-up.",
+    feats: ["Login limiting with escalating lockouts", "Two-factor login + recovery codes", "Allow & block lists (CIDR, IPv6)", "One-click hardening switches", "Strong password policy", "Security check-up & activity log"],
+    inside: [
+      ["Login protection", "Lock an address out after repeated failures, with longer locks for repeat offenders (up to 24 hours). A locked address is refused even with the correct password. Always-allow and always-block lists accept ranges (203.0.113.0/24, IPv6 too). Email alert on lockouts."],
+      ["Two-factor authentication", "Works with Google Authenticator, Authy, 1Password, Microsoft Authenticator and any TOTP app. Eight one-time recovery codes, codes that work only once, secrets stored encrypted. Each user switches it on from their own profile, so nobody is forced and nobody is locked out."],
+      ["One-click hardening", "Strong password policy, disable XML-RPC, hide the WordPress version, block username scans (?author=1, the REST users list, the users sitemap), disable the code editors, send security headers and optional HSTS."],
+      ["Security check-up", "A 0–100 score with plain-English advice, worst problems first: HTTPS, PHP version, an “admin” username, two-factor coverage, pending updates and more."],
+      ["Activity log", "Logins, failures, lockouts, 2FA changes, password resets, new and deleted users, role changes and plugin or theme changes, with the address and details. Old entries clean themselves up."],
+      ["Careful with your users", "Application passwords and the mobile app keep working, login errors never reveal whether a username exists, and a proxy header is only trusted when you choose it."],
+    ],
+    phases: [["Protect", "Limit logins, add 2FA"], ["Harden", "Lock down WordPress"], ["Watch", "Score and activity log"]],
+    steps: [
+      ["sec-7-login", "Login", "A second step at login", "Users who turned on two-factor enter the 6-digit code from their phone, or a recovery code. Everyone else logs in as usual.", 0, "yoursite.com/wp-login.php"],
+      ["sec-5-2fa-setup", "2FA setup", "Set up in a minute", "Add the key to any authenticator app (or tap the link on your phone), enter a code to confirm, and you are protected.", 0, "yoursite.com/wp-admin · Profile"],
+      ["sec-6-recovery", "Recovery codes", "Never get locked out", "Eight one-time recovery codes are shown once at setup, for the day a phone is lost. An administrator can also reset someone's two-factor login.", 0, "yoursite.com/wp-admin · Profile"],
+      ["sec-3-settings", "Login rules", "Tune the login rules", "Attempts allowed, time window, lockout length and escalation, always-allow and always-block lists, and email alerts.", 1, "yoursite.com/wp-admin · Settings"],
+      ["sec-4-hardening", "Hardening", "Harden with switches", "Two-factor options and hardening in plain language: password policy, XML-RPC, username protection, code editors, security headers and more.", 1, "yoursite.com/wp-admin · Settings"],
+      ["sec-1-checkup", "Check-up", "See where you stand", "A 0–100 score and a prioritised list of what to fix, with the last seven days of logins, failures and lockouts.", 2, "yoursite.com/wp-admin · Check-up"],
+      ["sec-2-log", "Activity log", "Know what happened", "Every login, failed attempt, lockout, role change and plugin change, filterable by event, user or address.", 2, "yoursite.com/wp-admin · Activity log"],
+    ],
+    install: "Open <em>Security Shield → Check-up</em> and follow the advice, then open your <em>Profile</em> to set up two-factor login.",
+    faqs: [
+      ["Is Weberslink Security Shield free?", "Yes. It is a free download under the GPL and works on as many of your own WordPress sites as you like."],
+      ["Which authenticator apps work?", "Any app that supports time-based one-time passwords (TOTP, RFC 6238): Google Authenticator, Authy, 1Password, Microsoft Authenticator, Bitwarden and others."],
+      ["What if I lose my phone?", "Use one of your eight recovery codes. If you have none left, another administrator can reset your two-factor login from your user page, and as a last resort you can rename the plugin folder over FTP."],
+      ["Can it lock me out?", "Lockouts are temporary, you can add your own address to the always-allow list, and two-factor login is never forced on anyone. Application passwords and the WordPress mobile app keep working."],
+      ["My site is behind Cloudflare. Does the limiter still work?", "Yes. Choose the CF-Connecting-IP header under Visitor address from, so the plugin sees the real visitor instead of the proxy."],
+      ["Which WordPress and PHP versions does it need?", "WordPress 5.9 or newer and PHP 7.4 or newer."],
+    ],
+  },
+];
+for (const x of EXTRA) {
+  x.zip = `/downloads/${x.slug}.zip`;
+  x.version = pluginVer(x.dir, x.file);
+  x.size = extraZipSize(x.zip);
+  x.changelog = readChangelog(x.dir);
+  x.software = { name: x.name, version: x.version, download: x.zip, size: x.size };
+  x.shots = workflow("See how it works, screen by screen", `Pick a step, or let it play. Click a screen to open it full size.`, x.phases, x.steps);
+  x.card = (loc) => `<div class="plugin-card">
+  <div class="plugin-head"><span class="plugin-badge">WordPress plugin</span><span class="plugin-ver">v${x.version}${x.size ? " · " + x.size : ""} · Free download</span></div>
+  <h2>${esc(x.name).replace("&amp;", "&amp;")}</h2>
+  <p>${esc(x.cardText)}</p>
+  <ul class="plugin-feats">
+${x.feats.map((f) => `    <li>${esc(f)}</li>`).join("\n")}
+  </ul>
+  <div class="plugin-actions">
+    <a class="btn btn-dark" href="${x.zip}" download data-track="Plugin download" data-loc="${loc}-${x.slug}">Download ZIP ↓</a>
+    <a class="btn btn-outline" href="/plugins/${x.slug}" data-track="Plugin details" data-loc="${loc}-${x.slug}">Features &amp; install guide →</a>
+  </div>
+</div>`;
+}
+
 write("/plugins/", render({
   path: "/plugins/", type: "hub", kicker: "Plugins",
   title: "Free WordPress Plugins | WebersLink",
-  description: "Free WordPress plugins from WebersLink: Weberslink Forms Pro (drag-and-drop form builder with payments and 35+ templates) and Weberslink SMTP & Email Log (reliable email with a searchable log).",
+  description: "Free WordPress plugins from WebersLink: Forms Pro (form builder with payments), SMTP & Email Log, Redirects & 404 Monitor and Security Shield (login limiting and two-factor).",
   h1: "Free WordPress plugins <em>you can download.</em>",
   lead: "Tools we build and use for our own client sites, packaged so you can install them in a minute.",
   card: { title: "Plugins" },
   software: SOFTWARE,
   heroCta: `<div class="hero-cta">
       <a href="${PLUGIN_ZIP}" class="btn btn-light" download data-track="Plugin download" data-loc="hero">Download Forms Pro ↓</a>
-      <a href="${SMTP_ZIP}" class="btn btn-ghost" download data-track="Plugin download" data-loc="hero-smtp">Download SMTP &amp; Email Log ↓</a>
+      <a href="/plugins/weberslink-smtp" class="btn btn-ghost" data-track="Plugin details" data-loc="hero-all">Browse all 4 plugins</a>
     </div>`,
   faqs: pluginFaqs,
-  body: pluginCard("plugins-hub") + "\n" + smtpCard("plugins-hub"),
+  body: pluginCard("plugins-hub") + "\n" + smtpCard("plugins-hub") + "\n" + EXTRA.map((x) => x.card("plugins-hub")).join("\n"),
 }).replace('<div class="wrap prose-wrap">', '<div class="wrap prose-wrap hub">'));
 
 write("/plugins/weberslink-forms-pro", render({
@@ -556,6 +659,36 @@ ${smtpChangelog.slice(0, 4).map((c) => `<h3>Version ${esc(c.version)}</h3>\n<ul>
 <p class="plugin-note">Emails still not arriving, or need transactional email set up properly for a WooCommerce store? <a href="/#book">Book a free call</a> and we'll sort it for you.</p>`,
 }));
 
+for (const x of EXTRA) {
+  write(`/plugins/${x.slug}`, render({
+    path: `/plugins/${x.slug}`, type: "plugin", kicker: "WordPress plugin",
+    title: x.title, description: x.description, h1: x.h1, lead: x.lead,
+    crumbs: [["Plugins", "/plugins/"]], card: { title: x.name }, software: x.software,
+    heroCta: `<div class="hero-cta">
+      <a href="${x.zip}" class="btn btn-light" download data-track="Plugin download" data-loc="hero-${x.slug}">Download ${esc(x.short)} ↓</a>
+      <a href="/plugins/" class="btn btn-ghost" data-track="Plugin details" data-loc="hero-${x.slug}">All plugins</a>
+    </div>`,
+    faqs: x.faqs, related: ["/services/ecommerce", "/services/automation"],
+    body: `<p><a class="btn btn-dark" href="${x.zip}" download data-track="Plugin download" data-loc="${x.slug}-detail-top">Download ZIP ↓</a> <span class="plugin-ver">Version ${x.version}${x.size ? " · " + x.size : ""} · WordPress 5.9+ · PHP 7.4+ · GPL-2.0-or-later</span></p>
+<h2>What's inside</h2>
+<ul>
+${x.inside.map((t) => `  <li><strong>${esc(t[0])}:</strong> ${esc(t[1])}</li>`).join("\n")}
+</ul>
+${x.shots}
+<h2>Install in 3 steps</h2>
+<ol>
+  <li>Download the ZIP above.</li>
+  <li>In WordPress go to <em>Plugins → Add New → Upload Plugin</em>, choose the ZIP, install and activate.</li>
+  <li>${x.install}</li>
+</ol>
+<p><a class="btn btn-dark" href="${x.zip}" download data-track="Plugin download" data-loc="${x.slug}-detail-bottom">Download ZIP ↓</a></p>
+<h2>Changelog</h2>
+${x.changelog.slice(0, 4).map((c) => `<h3>Version ${esc(c.version)}</h3>\n<ul>\n${c.items.map((i) => `  <li>${esc(i)}</li>`).join("\n")}\n</ul>`).join("\n")}
+<p class="plugin-note">Need this set up properly, or want something built for your site? <a href="/#book">Book a free call</a> and we'll help.</p>`,
+  }));
+}
+
+
 // ---------- Shared footer on the homepage ----------
 const homeFile = path.join(PUBLIC, "index.html");
 const home = fs.readFileSync(homeFile, "utf8");
@@ -569,7 +702,7 @@ const urls = [
   ...SERVICES.map((p) => [p.path, "0.9"]),
   ...INDUSTRIES.map((p) => [p.path, "0.8"]),
   ...GUIDES.map((p) => [p.path, "0.7"]),
-  ["/plugins/", "0.7"], ["/plugins/weberslink-forms-pro", "0.7"], ["/plugins/weberslink-smtp", "0.7"],
+  ["/plugins/", "0.7"], ["/plugins/weberslink-forms-pro", "0.7"], ["/plugins/weberslink-smtp", "0.7"], ["/plugins/weberslink-redirects", "0.7"], ["/plugins/weberslink-security", "0.7"],
   ["/privacy", "0.2"],
 ];
 fs.writeFileSync(path.join(PUBLIC, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>
