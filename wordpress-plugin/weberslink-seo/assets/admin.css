@@ -1,0 +1,15 @@
+.wlseo-serp{max-width:600px;background:#fff;border:1px solid #dcdcde;border-radius:8px;padding:12px 16px;margin:6px 0 14px;font-family:arial,sans-serif}
+.wlseo-serp-url{color:#202124;font-size:12px;line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wlseo-serp-title{color:#1a0dab;font-size:20px;line-height:1.3;margin:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wlseo-serp-desc{color:#4d5156;font-size:14px;line-height:1.58}
+.wlseo-count{font-weight:400;color:#646970;font-size:12px;margin-left:6px}.wlseo-count.over{color:#b32d2e;font-weight:600}
+.wlseo-score-row{display:flex;gap:10px;margin:14px 0 8px}
+.wlseo-score{display:flex;align-items:baseline;gap:8px;padding:8px 16px;border-radius:8px;background:#f6f7f7;border:1px solid #dcdcde;border-left:5px solid #8c8f94}
+.wlseo-score strong{font-size:24px;line-height:1}.wlseo-score span{color:#646970;font-size:12px}
+.wlseo-score.good{border-left-color:#1a7f45}.wlseo-score.good strong{color:#1a7f45}.wlseo-score.mid{border-left-color:#dba617}.wlseo-score.mid strong{color:#996800}.wlseo-score.low{border-left-color:#d63638}.wlseo-score.low strong{color:#b32d2e}
+.wlseo-checks{list-style:none;margin:0;padding:0}
+.wlseo-checks li{display:flex;gap:8px;padding:7px 10px;margin:0 0 5px;background:#fff;border:1px solid #dcdcde;border-inline-start:4px solid #8c8f94;border-radius:3px;font-size:13px}
+.wlseo-c-ok{border-inline-start-color:#1a7f45!important}.wlseo-c-warn{border-inline-start-color:#dba617!important}.wlseo-c-bad{border-inline-start-color:#d63638!important}.wlseo-c-info{border-inline-start-color:#2271b1!important}
+.wlseo-stats{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
+.wlseo-stat{background:#fff;border:1px solid #dcdcde;border-radius:10px;padding:14px 22px;min-width:130px;border-left:5px solid #8c8f94}.wlseo-stat strong{display:block;font-size:28px;line-height:1.1}.wlseo-stat span{color:#646970;font-size:12px}
+.wlseo-stat.good{border-left-color:#1a7f45}.wlseo-stat.warn{border-left-color:#dba617}.wlseo-stat.bad{border-left-color:#d63638}

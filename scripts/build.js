@@ -535,6 +535,74 @@ const EXTRA = [
       ["Which WordPress and PHP versions does it need?", "WordPress 5.9 or newer and PHP 7.4 or newer."],
     ],
   },
+  {
+    slug: "weberslink-seo", dir: "weberslink-seo", file: "weberslink-seo.php", name: "Weberslink SEO Toolkit", short: "SEO Toolkit", menu: "SEO",
+    title: "Weberslink SEO Toolkit: Free WordPress SEO Plugin | WebersLink",
+    description: "Download Weberslink SEO Toolkit: a free WordPress SEO plugin with title and meta description templates, live SEO and readability analysis with a Google preview, Open Graph and Twitter cards, JSON-LD schema, robots and sitemap controls and an SEO audit.",
+    h1: "Weberslink SEO Toolkit — <em>rank with confidence, not guesswork.</em>",
+    lead: "Write better titles and descriptions, see exactly how your page looks in Google, and get a clear checklist for every post.",
+    cardText: "Titles and meta descriptions with templates, a live SEO and readability check with a Google preview, social cards, schema, robots and sitemap controls, and a site-wide audit.",
+    feats: ["Live SEO & readability analysis", "Google result preview", "Title & description templates", "Open Graph & Twitter cards", "JSON-LD schema graph", "Robots, sitemap & SEO audit"],
+    inside: [
+      ["Live analysis in the editor", "Set a focus keyword and get a checklist as you type: title and description length, keyword in the title, description, URL, introduction and subheadings, keyword density, content length, image alt text, internal and outbound links."],
+      ["Readability", "Flesch reading ease, long sentences, paragraph length and subheadings, with plain-English advice. Both scores update while you write, using the same analyser everywhere."],
+      ["Google preview", "See your title, address and description exactly as a search result, with a live character count that turns red when Google would cut it off."],
+      ["Templates for the whole site", "Set one pattern such as %title% - %sitename% for posts, pages, categories, authors, search and 404, and override any page by hand. Variables for excerpt, category, author, date and page number."],
+      ["Social cards and schema", "Open Graph and Twitter cards with a default image, and a clean JSON-LD graph: WebSite with search, Organization or Person, WebPage, Article and breadcrumbs. The output cannot break out of the page."],
+      ["Robots, sitemap and audit", "Noindex or nofollow per page, hide search, date and author archives, keep noindex pages out of the WordPress sitemap, add the sitemap and your own rules to robots.txt, verify with Google, Bing, Yandex and Pinterest, and see which pages still lack a description."],
+    ],
+    phases: [["Write", "Optimise each page"], ["Configure", "Templates and schema"], ["Audit", "Find what is missing"]],
+    steps: [
+      ["seo-2-editor", "Editor", "Optimise as you write", "Focus keyword, SEO title and meta description with a live Google preview, character counts and an SEO and readability score with a checklist.", 0, "yoursite.com/wp-admin · Edit post"],
+      ["seo-3-settings", "Templates", "Set the pattern once", "Title and description templates for every kind of page, with a separator of your choice. Override any single page in its own SEO box.", 1, "yoursite.com/wp-admin · SEO settings"],
+      ["seo-4-schema", "Social & schema", "Be ready to share and be understood", "Open Graph and Twitter cards, a default social image, and structured data for your organization or yourself, plus search engine settings.", 1, "yoursite.com/wp-admin · SEO settings"],
+      ["seo-1-audit", "Audit", "See what still needs work", "How many pages have no meta description or focus keyword, and a list of the pages to fix first, each one click from its SEO box.", 2, "yoursite.com/wp-admin · SEO audit"],
+    ],
+    install: "Open <em>SEO → Settings</em> to set your title templates and organization, then edit any post and fill in the new <em>SEO</em> box.",
+    faqs: [
+      ["Is Weberslink SEO Toolkit free?", "Yes. It is a free download under the GPL and works on as many of your own WordPress sites as you like."],
+      ["Will it conflict with Yoast or Rank Math?", "Use one SEO plugin at a time. Deactivate the other before activating this one, because both would print titles, descriptions and schema."],
+      ["Does it migrate my existing titles and descriptions?", "Not automatically. This version stores its own fields, so existing titles and descriptions from another plugin are not imported."],
+      ["Does it guarantee rankings?", "No tool can. It checks the things you control (titles, descriptions, headings, links, readability, structured data) and shows what is missing."],
+      ["Does it work with page builders and custom post types?", "Yes. The SEO box appears on every public post type. In page builders the analysis reads the editor content when it is available; the fields and front-end output work everywhere."],
+      ["Which WordPress and PHP versions does it need?", "WordPress 5.9 or newer and PHP 7.4 or newer."],
+    ],
+  },
+  {
+    slug: "weberslink-cookies", dir: "weberslink-cookies", file: "weberslink-cookies.php", name: "Weberslink Cookie Consent", short: "Cookie Consent", menu: "Cookie Consent",
+    title: "Weberslink Cookie Consent: Free WordPress Cookie Banner & GDPR Plugin | WebersLink",
+    description: "Download Weberslink Cookie Consent: a free WordPress cookie banner that blocks analytics and marketing scripts until visitors agree, with Google Consent Mode v2, equal Accept and Reject buttons, a consent log and CSV export.",
+    h1: "Weberslink Cookie Consent — <em>tracking only after a yes.</em>",
+    lead: "A clear, accessible cookie banner that really holds back your analytics and marketing tags, and keeps proof of every choice.",
+    cardText: "A cookie banner that holds back analytics and marketing until visitors agree: equal Accept and Reject buttons, Google Consent Mode v2, embeds that wait, and an exportable consent log.",
+    feats: ["Equal Accept & Reject buttons", "Scripts, iframes & pixels held back", "Google Consent Mode v2", "Consent log with CSV export", "Reopen button & cookie table", "Accessible, keyboard friendly"],
+    inside: [
+      ["A banner people can use", "Accept all and Reject all with the same size and prominence, a Customise dialog with a switch per category, and your colours and wording. Bar, corner box or centred dialog, and a small button to reopen it."],
+      ["Scripts really wait", "Paste Google Analytics, Meta Pixel, TikTok or any tag into its category: it is held back and released only after consent. Iframes (YouTube, Maps) and tracking images stay blank until the visitor agrees."],
+      ["Google Consent Mode v2", "Everything starts denied and is updated with the visitor's choice, so Google tags (GA4, Ads, Tag Manager) behave correctly. A data layer event and a browser event are fired for your own code."],
+      ["Proof of consent", "A log of each choice (action, categories, policy version) with a one-way fingerprint instead of an IP address, acceptance statistics, and CSV export. Ask everyone again with one tick when your policy changes."],
+      ["Policy helpers", "A [wlcc_cookies] shortcode prints a table of the cookies you use, and [wlcc_settings] adds a “Cookie settings” link anywhere."],
+      ["Accessible and light", "Focus is trapped in the dialog, Escape closes it, focus rings are visible, buttons are at least 44px tall, and the script is small and dependency free."],
+    ],
+    phases: [["Show", "The banner visitors see"], ["Control", "Categories and scripts"], ["Prove", "Log and statistics"]],
+    steps: [
+      ["cc-1-banner", "Banner", "A clear first choice", "Reject all and Accept all look alike, so declining is as easy as accepting. Nothing is tracked until a choice is made.", 0, "yoursite.com"],
+      ["cc-3-modal", "Preferences", "Let visitors choose", "A switch per category, with Necessary always on. Choices are remembered and can be changed at any time from the reopen button.", 0, "yoursite.com"],
+      ["cc-2-box", "Layouts", "Fit your design", "Choose a bottom bar, a corner box or a centred dialog, and set your own colours, wording and policy link.", 0, "yoursite.com"],
+      ["cc-4-mobile", "Mobile", "Made for phones too", "Full-width buttons, nothing cut off, and a dialog that always fits the screen.", 0, "yoursite.com (mobile)"],
+      ["cc-5-settings", "Scripts", "Hold back your tags", "Paste analytics, pixels and embeds into the matching category and turn on Google Consent Mode. They run only after consent.", 1, "yoursite.com/wp-admin · Cookie Consent"],
+      ["cc-6-log", "Consent log", "Keep proof of every choice", "Acceptance rates for the last 30 days and a record of each choice with the policy version. Export it as CSV whenever you need it.", 2, "yoursite.com/wp-admin · Consent log"],
+    ],
+    install: "Open <em>Cookie Consent</em>, pick your categories and paste your analytics or marketing tags into the matching boxes (and remove them from your theme).",
+    faqs: [
+      ["Is Weberslink Cookie Consent free?", "Yes. It is a free download under the GPL and works on as many of your own WordPress sites as you like."],
+      ["Does it make my site GDPR compliant?", "It handles the consent part of cookie rules: a clear choice, scripts held back until agreement, and a record. You are still responsible for what your site sets, for a clear cookie policy and for the rest of the law. This is not legal advice."],
+      ["Why do I need to move my tracking tags into the plugin?", "A tag already in your theme or another plugin loads before the banner can stop it. Paste it into the matching box and the plugin releases it only after consent. Google tags that load themselves are controlled through Consent Mode."],
+      ["Does it work with Google Tag Manager and GA4?", "Yes. Consent Mode v2 starts everything denied and updates it with the visitor's choice. You can also put the GTM snippet in the Analytics or Marketing box."],
+      ["Does it store visitors' IP addresses?", "No. The consent log keeps the choice, the policy version and a one-way fingerprint used only to limit abuse, never the IP address itself."],
+      ["Which WordPress and PHP versions does it need?", "WordPress 5.9 or newer and PHP 7.4 or newer."],
+    ],
+  },
 ];
 for (const x of EXTRA) {
   x.zip = `/downloads/${x.slug}.zip`;
@@ -560,14 +628,14 @@ ${x.feats.map((f) => `    <li>${esc(f)}</li>`).join("\n")}
 write("/plugins/", render({
   path: "/plugins/", type: "hub", kicker: "Plugins",
   title: "Free WordPress Plugins | WebersLink",
-  description: "Free WordPress plugins from WebersLink: Forms Pro (form builder with payments), SMTP & Email Log, Redirects & 404 Monitor and Security Shield (login limiting and two-factor).",
+  description: "Free WordPress plugins from WebersLink: Forms Pro, SMTP & Email Log, Redirects & 404 Monitor, Security Shield, SEO Toolkit and Cookie Consent.",
   h1: "Free WordPress plugins <em>you can download.</em>",
   lead: "Tools we build and use for our own client sites, packaged so you can install them in a minute.",
   card: { title: "Plugins" },
   software: SOFTWARE,
   heroCta: `<div class="hero-cta">
       <a href="${PLUGIN_ZIP}" class="btn btn-light" download data-track="Plugin download" data-loc="hero">Download Forms Pro ↓</a>
-      <a href="/plugins/weberslink-smtp" class="btn btn-ghost" data-track="Plugin details" data-loc="hero-all">Browse all 4 plugins</a>
+      <a href="/plugins/weberslink-smtp" class="btn btn-ghost" data-track="Plugin details" data-loc="hero-all">Browse all 6 plugins</a>
     </div>`,
   faqs: pluginFaqs,
   body: pluginCard("plugins-hub") + "\n" + smtpCard("plugins-hub") + "\n" + EXTRA.map((x) => x.card("plugins-hub")).join("\n"),
@@ -702,7 +770,7 @@ const urls = [
   ...SERVICES.map((p) => [p.path, "0.9"]),
   ...INDUSTRIES.map((p) => [p.path, "0.8"]),
   ...GUIDES.map((p) => [p.path, "0.7"]),
-  ["/plugins/", "0.7"], ["/plugins/weberslink-forms-pro", "0.7"], ["/plugins/weberslink-smtp", "0.7"], ["/plugins/weberslink-redirects", "0.7"], ["/plugins/weberslink-security", "0.7"],
+  ["/plugins/", "0.7"], ["/plugins/weberslink-forms-pro", "0.7"], ["/plugins/weberslink-smtp", "0.7"], ["/plugins/weberslink-redirects", "0.7"], ["/plugins/weberslink-security", "0.7"], ["/plugins/weberslink-seo", "0.7"], ["/plugins/weberslink-cookies", "0.7"],
   ["/privacy", "0.2"],
 ];
 fs.writeFileSync(path.join(PUBLIC, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>
