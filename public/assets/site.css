@@ -586,3 +586,21 @@ form.sent .form-fields{display:none}
 .wf:not(.wf-js) .wf-step+.wf-step{margin-top:34px}
 @media(max-width:720px){.wf-phases{grid-template-columns:1fr;gap:8px}.wf-phases li:not(:last-child)::after{display:none}.wf-phases li+li .wf-phase-btn,.wf-phases li:not(:last-child) .wf-phase-btn{margin:0}.wf-stage{padding:16px 10px 14px}.wf-step figcaption strong{font-size:17px}.wf-step figcaption{font-size:14px;text-align:left}.wf-url{display:none}}
 @media(prefers-reduced-motion:reduce){.wf-js .wf-step.on{animation:none}}
+
+/* ---------- Motion layer (pairs with the motion block at the end of site.js) ---------- */
+.mo-progress{position:fixed;top:0;left:0;right:0;height:3px;z-index:90;background:linear-gradient(90deg,var(--red-deep),var(--red-bright));transform-origin:0 50%;transform:scaleX(0);pointer-events:none;box-shadow:0 0 12px rgba(255,59,46,.6)}
+.mo .mo-split .mo-w{display:inline-block;overflow:hidden;vertical-align:top;padding-bottom:.12em;margin-bottom:-.12em}
+.mo .mo-split .mo-wi{display:inline-block;transform:translateY(110%) rotate(4deg);opacity:0;transition:transform .9s var(--ease),opacity .6s var(--ease);will-change:transform}
+.mo .mo-split.mo-in .mo-wi{transform:none;opacity:1}
+.mo .kicker::before{width:0;transition:width .8s var(--ease) .1s}
+.mo .kicker.mo-in::before{width:18px}
+.mo-num{font-variant-numeric:tabular-nums;color:var(--red-bright);font-weight:600}
+.marquee-track span{display:inline-block;transform:skewX(var(--sk,0deg));transition:transform .2s linear}
+.hero .btn-light{animation:moPulse 2.8s ease-out infinite}
+.hero .btn-light:hover{animation:none}
+@keyframes moPulse{0%{box-shadow:0 0 0 0 rgba(217,37,28,.55)}70%,100%{box-shadow:0 0 0 18px rgba(217,37,28,0)}}
+.svc,.card,.ts,.plugin-card{transition-property:transform,box-shadow,border-color,opacity}
+.svc-ico{animation:moFloat 5s ease-in-out infinite}
+.svc:nth-child(2n) .svc-ico{animation-delay:-1.4s}.svc:nth-child(3n) .svc-ico{animation-delay:-2.8s}
+@keyframes moFloat{0%,100%{translate:0 0}50%{translate:0 -6px}}
+@media(prefers-reduced-motion:reduce){.mo-progress{display:none}.hero .btn-light,.svc-ico{animation:none}.marquee-track span{transform:none}}

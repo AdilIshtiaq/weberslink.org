@@ -213,3 +213,115 @@
     show(0, 'auto');
   });
 }());
+
+/* ---------- Motion layer: scroll progress, headline reveals, counters, parallax, magnetic buttons ---------- */
+(function () {
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce) return;
+  var fine = window.matchMedia('(pointer:fine)').matches;
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var root = document.documentElement;
+  var hasIO = 'IntersectionObserver' in window;
+  root.classList.add('mo');
+
+  // Scroll progress bar
+  var bar = document.createElement('div'); bar.className = 'mo-progress'; bar.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(bar);
+
+  // Headline word-by-word reveal (skips the home hero h1, whose gradient text can't be split)
+  function splitWords(el) {
+    var n = 0;
+    (function walk(node) {
+      Array.prototype.slice.call(node.childNodes).forEach(function (c) {
+        if (c.nodeType === 3) {
+          var parts = c.nodeValue.split(/(\s+)/), frag = document.createDocumentFragment();
+          parts.forEach(function (p) {
+            if (!p) return;
+            if (/^\s+$/.test(p)) { frag.appendChild(document.createTextNode(' ')); return; }
+            var o = document.createElement('span'); o.className = 'mo-w';
+            var i = document.createElement('span'); i.className = 'mo-wi'; i.textContent = p;
+            i.style.transitionDelay = (n++ * 45) + 'ms'; o.appendChild(i); frag.appendChild(o);
+          });
+          node.replaceChild(frag, c);
+        } else if (c.nodeType === 1 && c.nodeName !== 'BR') walk(c);
+      });
+    })(el);
+  }
+  var heads = $$('.h2, .page-hero h1').filter(function (h) { return !h.closest('.hero'); });
+  heads.forEach(function (h) { h.classList.remove('rv', 'd1', 'd2', 'd3'); splitWords(h); h.classList.add('mo-split'); });
+
+  // Kicker line draw
+  var kick = $$('.kicker');
+
+  // Stagger children of card grids
+  $$('.svc-grid,.work-grid,.ts-grid,.stack,.pk-grid,.plugin-grid').forEach(function (g) {
+    Array.prototype.slice.call(g.children).forEach(function (c, i) { c.style.transitionDelay = (i % 6) * 90 + 'ms'; });
+  });
+
+  // Counters ("50+ websites shipped")
+  var counters = [];
+  $$('.hero span').forEach(function (s) {
+    var m = /^(\d+)(\+?)(\s.*)$/.exec(s.textContent.trim());
+    if (m && !s.children.length) {
+      s.textContent = '';
+      var num = document.createElement('span'); num.className = 'mo-num'; num.textContent = '0' + m[2];
+      s.appendChild(num); s.appendChild(document.createTextNode(m[3]));
+      counters.push({ el: num, to: +m[1], plus: m[2] });
+    }
+  });
+  function runCounter(c) {
+    var t0 = null, dur = 1400;
+    function step(t) {
+      if (t0 === null) t0 = t;
+      var p = Math.min((t - t0) / dur, 1), e = 1 - Math.pow(1 - p, 3);
+      c.el.textContent = Math.round(c.to * e) + c.plus;
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  if (hasIO) {
+    var io = new IntersectionObserver(function (es) {
+      es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('mo-in'); io.unobserve(e.target); } });
+    }, { threshold: .25, rootMargin: '0px 0px -8% 0px' });
+    heads.concat(kick).forEach(function (el) { io.observe(el); });
+    var cio = new IntersectionObserver(function (es) {
+      es.forEach(function (e) { if (e.isIntersecting) { runCounter(e.target._c); cio.unobserve(e.target); } });
+    }, { threshold: .6 });
+    counters.forEach(function (c) { c.el._c = c; cio.observe(c.el); });
+  } else {
+    heads.concat(kick).forEach(function (el) { el.classList.add('mo-in'); });
+    counters.forEach(function (c) { c.el.textContent = c.to + c.plus; });
+  }
+
+  // Scroll-linked: progress bar, hero parallax, marquee skew from scroll velocity
+  var scene = $('#scene'), grid = $('.hero-grid'), heroWrap = $('.hero .wrap'), heroEl = $('.hero');
+  var track = $('.marquee-track'), lastY = window.scrollY, vel = 0, ticking = false;
+  function frame() {
+    ticking = false;
+    var y = window.scrollY, h = document.documentElement.scrollHeight - window.innerHeight;
+    bar.style.transform = 'scaleX(' + (h > 0 ? y / h : 0) + ')';
+    if (heroEl && y < heroEl.offsetHeight * 1.2) {
+      if (scene) scene.style.transform = 'translate3d(0,' + (y * .18) + 'px,0)';
+      if (grid) grid.style.transform = 'translate3d(0,' + (y * .1) + 'px,0)';
+      if (heroWrap) { heroWrap.style.transform = 'translate3d(0,' + (y * -.06) + 'px,0)'; heroWrap.style.opacity = Math.max(0, 1 - y / (heroEl.offsetHeight * .9)); }
+    }
+    vel += ((y - lastY) - vel) * .2; lastY = y;
+    if (track) track.style.setProperty('--sk', Math.max(-12, Math.min(12, vel * -.35)) + 'deg');
+    if (Math.abs(vel) > .1) request();
+  }
+  function request() { if (!ticking) { ticking = true; requestAnimationFrame(frame); } }
+  window.addEventListener('scroll', request, { passive: true }); window.addEventListener('resize', request); frame();
+
+  // Magnetic buttons
+  if (fine) {
+    $$('.btn, .chat-launch, .wa-float').forEach(function (b) {
+      b.addEventListener('mousemove', function (e) {
+        var r = b.getBoundingClientRect();
+        b.style.translate = ((e.clientX - r.left - r.width / 2) * .18) + 'px ' + ((e.clientY - r.top - r.height / 2) * .25) + 'px';
+      });
+      b.addEventListener('mouseleave', function () { b.style.translate = ''; });
+    });
+  }
+}());
