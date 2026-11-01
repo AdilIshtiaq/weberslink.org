@@ -40,10 +40,10 @@ function iconify(html) {
   return html;
 }
 // hreflang, locale, robots hints, manifest and feed links shared by every generated page.
-function headExtra(url) {
+function headExtra(url, noindex = false) {
   return `<link rel="alternate" hreflang="en" href="${url}">
 <link rel="alternate" hreflang="x-default" href="${url}">
-<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+<meta name="robots" content="${noindex ? "noindex" : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"}">
 <meta property="og:locale" content="en_US">
 <meta property="og:locale:alternate" content="en_GB">
 <link rel="manifest" href="/site.webmanifest">
@@ -137,7 +137,7 @@ function schema(p) {
       author: org,
       publisher: org,
       mainEntityOfPage: url,
-      image: SITE + "/og.png",
+      image: SITE + "/og-fde.jpg",
     });
   }
   if (p.software) {
@@ -187,11 +187,17 @@ ${headExtra(url)}
 <meta property="og:url" content="${url}">
 <meta property="og:title" content="${esc(p.title)}">
 <meta property="og:description" content="${esc(p.description)}">
-<meta property="og:image" content="${SITE}/og.png">
+<meta property="og:image" content="${SITE}/og-fde.jpg">
+<meta property="og:image:secure_url" content="${SITE}/og-fde.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="WebersLink: forward-deployed engineers for contractors and service businesses">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${esc(p.title)}">
 <meta name="twitter:description" content="${esc(p.description)}">
-<meta name="twitter:image" content="${SITE}/og.png">
+<meta name="twitter:image" content="${SITE}/og-fde.jpg">
+<meta name="twitter:image:alt" content="WebersLink: forward-deployed engineers for contractors and service businesses">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
@@ -214,7 +220,7 @@ ${nav()}
     <p class="lead">${p.lead}</p>
     ${meta}
     ${p.heroCta || `<div class="hero-cta">
-      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="${p.path}">Book a free strategy call →</a>
+      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="${p.path}">Book a walkthrough →</a>
       <a href="/#audit" class="btn btn-ghost" data-track="Audit CTA" data-loc="${p.path}">Get a free website audit</a>
     </div>`}
   </div>
@@ -265,10 +271,11 @@ ${related.map((r) => `      <a class="rel" href="${r.path}"><span class="rel-k">
 }
 <section class="dark pad-sm cta-band">
   <div class="wrap">
+    <div class="kicker">Next step</div>
     <h2 class="h2">Ready for more <em>booked jobs?</em></h2>
-    <p class="sub">Book a free 20-minute call. We'll show you how to answer every lead in 60 seconds — no obligation.</p>
+    <p class="sub">Book a free 20-minute walkthrough. We'll show you how to answer every lead in 60 seconds — no obligation.</p>
     <div class="hero-cta" style="margin-top:28px">
-      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="band">Book a free strategy call →</a>
+      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="band">Book a walkthrough →</a>
       <a href="/#pricing" class="btn btn-ghost">See pricing</a>
     </div>
   </div>
@@ -295,7 +302,7 @@ function pageShell(p, main) {
 <title>${esc(p.title)}</title>
 <meta name="description" content="${esc(p.description)}">
 <link rel="canonical" href="${url}">
-${headExtra(url)}
+${headExtra(url, p.noindex)}
 <meta name="theme-color" content="#090807">
 <link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48"><link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -304,11 +311,17 @@ ${headExtra(url)}
 <meta property="og:url" content="${url}">
 <meta property="og:title" content="${esc(p.title)}">
 <meta property="og:description" content="${esc(p.description)}">
-<meta property="og:image" content="${SITE}/og.png">
+<meta property="og:image" content="${SITE}/og-fde.jpg">
+<meta property="og:image:secure_url" content="${SITE}/og-fde.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="WebersLink: forward-deployed engineers for contractors and service businesses">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${esc(p.title)}">
 <meta name="twitter:description" content="${esc(p.description)}">
-<meta name="twitter:image" content="${SITE}/og.png">
+<meta name="twitter:image" content="${SITE}/og-fde.jpg">
+<meta name="twitter:image:alt" content="WebersLink: forward-deployed engineers for contractors and service businesses">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
@@ -1093,6 +1106,44 @@ ${x.changelog.slice(0, 4).map((c) => `<h3>Version ${esc(c.version)}</h3>\n<ul>\n
   }));
 }
 
+
+// ---------- Privacy policy and 404 (shared shell, so nav, footer and metadata match every other page) ----------
+const privacyBody = fs.readFileSync(path.join(__dirname, "content", "privacy.body.html"), "utf8");
+write("/privacy", pageShell({
+  path: "/privacy", type: "hub", title: "Privacy Policy | WebersLink",
+  description: "How WebersLink collects, uses and protects personal data from enquiries and website audits, and your rights under GDPR and US privacy laws.",
+  card: { title: "Privacy Policy" }, crumbs: [],
+}, `<section class="page-hero">
+  <div class="hero-grid" aria-hidden="true"></div>
+  <div class="wrap">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a><span>/</span><span aria-current="page">Privacy Policy</span></nav>
+    <div class="kicker">Legal</div>
+    <h1>Privacy <em>Policy.</em></h1>
+    <p class="lead">Last updated: October 2026</p>
+  </div>
+</section>
+<article class="white page-body">
+  <div class="wrap legal-wrap"><div class="prose">
+${privacyBody}
+  </div></div>
+</article>`));
+write("/404", pageShell({
+  path: "/404", type: "hub", noindex: true, title: "Page not found | WebersLink",
+  description: "This page doesn't exist. Head back to the WebersLink home page.",
+  card: { title: "Page not found" }, crumbs: [],
+}, `<section class="page-hero error-hero">
+  <div class="hero-grid" aria-hidden="true"></div>
+  <div class="wrap">
+    <div class="kicker">Error 404</div>
+    <h1>This page <em>doesn't exist.</em></h1>
+    <p class="lead">But your next client might be looking for you right now.</p>
+    <div class="hero-cta">
+      <a href="/" class="btn btn-light">Go to the homepage →</a>
+      <a href="/offers/" class="btn btn-ghost">See our offers</a>
+      <a href="/contact" class="btn btn-ghost">Contact us</a>
+    </div>
+  </div>
+</section>`));
 
 // ---------- FDE pages ----------
 OFFERS.forEach((o) => write(o.path, renderOffer(o)));

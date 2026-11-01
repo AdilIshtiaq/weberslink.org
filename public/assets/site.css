@@ -753,3 +753,62 @@ a:hover>.ico-arrow-left,.btn:hover .ico-arrow-left{transform:translateX(-4px)}
 .skip:focus{top:12px}
 :focus-visible{outline:2px solid var(--red-bright);outline-offset:3px;border-radius:4px}
 .btn:focus-visible{outline-offset:4px;border-radius:999px}
+
+/* ---------- Design pass: one visual language across every page ---------- */
+/* Inner-page hero: red glow and hairline, like the home hero */
+.page-hero::before{content:"";position:absolute;right:-10%;top:-40%;width:760px;height:760px;border-radius:50%;background:radial-gradient(circle,rgba(217,37,28,.24),transparent 65%);pointer-events:none}
+.page-hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:linear-gradient(90deg,transparent,rgba(217,37,28,.65),transparent);pointer-events:none}
+.page-hero .kicker{color:var(--grey-3)}
+.error-hero{min-height:78vh;display:flex;align-items:center}
+.error-hero .lead{max-width:520px}
+
+/* Article body: paper background with the content on a white card, numbered section labels */
+.page-body.white{background:var(--paper)}
+.prose-wrap .prose,.legal-wrap .prose{background:var(--white);border:1px solid var(--line-l);border-radius:18px;padding:48px 52px;box-shadow:0 40px 80px -60px rgba(0,0,0,.35)}
+.prose-wrap.hub .prose{background:none;border:0;padding:0;box-shadow:none;max-width:none}
+.legal-wrap{max-width:900px}
+.legal-wrap .prose{max-width:none}
+.prose{counter-reset:sec}
+.prose>h2{counter-increment:sec;font-family:var(--display);font-stretch:112%;font-weight:800;letter-spacing:-.03em}
+.prose>h2::before{content:counter(sec,decimal-leading-zero);display:block;font:400 12px/1 var(--mono);letter-spacing:.14em;color:var(--red);margin-bottom:12px}
+.prose h3{font-family:var(--display);font-stretch:108%;font-weight:700}
+.prose li::marker{color:var(--red)}
+.prose a{text-decoration-color:rgba(217,37,28,.5)}
+.prose a:hover{text-decoration-color:var(--red);color:var(--red-deep)}
+.prose .callout{background:rgba(217,37,28,.05);border:1px solid rgba(217,37,28,.28);border-left:4px solid var(--red)}
+.prose-wrap.hub .prose>h2::before{display:none}
+@media(max-width:700px){.prose-wrap .prose,.legal-wrap .prose{padding:28px 22px;border-radius:14px}}
+
+/* Sidebar card */
+.side-card{position:relative;overflow:hidden;border:1px solid rgba(217,37,28,.35);background:linear-gradient(160deg,#1a0d0b,#0d0c0b)}
+.side-card::before{content:"";position:absolute;right:-70px;top:-70px;width:200px;height:200px;background:radial-gradient(circle,rgba(217,37,28,.4),transparent 70%);pointer-events:none}
+.side-card>*{position:relative}
+.side-card h2{font-family:var(--display);font-stretch:112%;font-weight:800}
+.side-k{color:var(--red-bright)}
+
+/* Related and hub cards */
+.rel{position:relative;overflow:hidden}
+.rel::before{content:"";position:absolute;left:0;top:0;width:100%;height:2px;background:linear-gradient(90deg,var(--red),transparent);transform:scaleX(.2);transform-origin:0 50%;transition:transform .5s var(--ease)}
+.rel:hover{border-color:rgba(217,37,28,.45)}
+.rel:hover::before{transform:scaleX(1)}
+.rel-k{color:var(--red)}
+.rel h2,.rel h3{font-family:var(--display);font-stretch:108%;font-weight:700;letter-spacing:-.02em}
+.plugin-card{transition:border-color .3s,transform .5s var(--ease)}
+.plugin-card:hover{border-color:rgba(217,37,28,.4)}
+
+/* Call-to-action band */
+.cta-band{position:relative;overflow:hidden;background:var(--black)}
+.cta-band::before{content:"";position:absolute;left:50%;bottom:-340px;width:900px;height:640px;transform:translateX(-50%);background:radial-gradient(ellipse,rgba(217,37,28,.3),transparent 68%);pointer-events:none}
+.cta-band>.wrap{position:relative}
+.cta-band .kicker{justify-content:center}
+
+/* FAQ, nav and footer details */
+.faq summary::after{color:var(--red)}
+.faq details[open] summary{color:var(--ink)}
+.nav-links>a{position:relative}
+.nav-links>a::after{content:"";position:absolute;left:0;right:0;bottom:-7px;height:1px;background:var(--red);transform:scaleX(0);transform-origin:0 50%;transition:transform .3s var(--ease)}
+.nav-links>a:hover::after{transform:scaleX(1)}
+@media(max-width:860px){.nav-links>a::after{display:none}}
+footer{position:relative}
+footer::before{content:"";position:absolute;left:0;right:0;top:0;height:1px;background:linear-gradient(90deg,transparent,rgba(217,37,28,.55),transparent)}
+.foot-big{font-stretch:100%;font-size:clamp(40px,11.2vw,168px);letter-spacing:-.05em}
