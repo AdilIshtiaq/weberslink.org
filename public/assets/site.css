@@ -726,3 +726,89 @@ form.sent .form-fields{display:none}
 .more-label{margin-top:52px;font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--grey-5)}
 @media(max-width:1000px){.offer-minis{grid-template-columns:1fr 1fr}}
 @media(max-width:560px){.offer-minis{grid-template-columns:1fr}}
+
+/* ---------- Typography: Archivo (expanded display) + Inter (body) + JetBrains Mono (labels) ---------- */
+:root{--display:'Archivo','Inter',system-ui,-apple-system,sans-serif;--serif:'Archivo','Inter',system-ui,-apple-system,sans-serif}
+h1,.h2,.hero h1,.page-hero h1{font-family:var(--display);font-stretch:125%;font-weight:800;letter-spacing:-.035em;line-height:1.04}
+.hero h1{font-size:clamp(36px,6vw,80px);line-height:1.02}
+.h2{font-size:clamp(28px,4.1vw,52px)}
+.page-hero h1{font-size:clamp(30px,4.7vw,58px)}
+.hero h1 em,.h2 em,.page-hero h1 em,.dark .h2 em{font-family:var(--display);font-stretch:125%;font-style:italic;font-weight:700;letter-spacing:-.03em}
+.stat-n,.foot-big{font-family:var(--display);font-stretch:125%;font-weight:800}
+.offer-card h2,.offer-card h3,.offer-mini h3,.pain h3,.step h3,.fde h3,.contact-card h2{font-family:var(--display);font-stretch:112%;font-weight:700;letter-spacing:-.02em}
+.marquee-track,.kite{font-family:var(--display);font-stretch:112%;font-weight:600}
+@media(max-width:600px){h1,.h2,.hero h1,.page-hero h1{font-stretch:110%}}
+
+/* ---------- Icon arrows (SVG sprite, see iconify() in scripts/build.js) ---------- */
+.ico{width:1em;height:1em;flex:none}
+.ico-arrow,.ico-arrow-down,.ico-arrow-left{display:inline-block;vertical-align:-.14em;margin-left:.45em;transition:transform .3s var(--ease)}
+.ico:first-child{margin-left:0}
+a:hover>.ico-arrow,.btn:hover .ico-arrow,.card:hover .ico-arrow,.offer-card:hover .ico-arrow,.offer-mini:hover .ico-arrow,.contact-card:hover .ico-arrow,.rel:hover .ico-arrow{transform:translateX(4px)}
+a:hover>.ico-arrow-down,.btn:hover .ico-arrow-down{transform:translateY(3px)}
+a:hover>.ico-arrow-left,.btn:hover .ico-arrow-left{transform:translateX(-4px)}
+.btn .ico{width:1.05em;height:1.05em}
+
+/* ---------- Accessibility: skip link and visible keyboard focus ---------- */
+.skip{position:fixed;left:16px;top:-60px;z-index:200;background:var(--red);color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;font-weight:500;transition:top .2s}
+.skip:focus{top:12px}
+:focus-visible{outline:2px solid var(--red-bright);outline-offset:3px;border-radius:4px}
+.btn:focus-visible{outline-offset:4px;border-radius:999px}
+
+/* ---------- Design pass: one visual language across every page ---------- */
+/* Inner-page hero: red glow and hairline, like the home hero */
+.page-hero::before{content:"";position:absolute;right:-10%;top:-40%;width:760px;height:760px;border-radius:50%;background:radial-gradient(circle,rgba(217,37,28,.24),transparent 65%);pointer-events:none}
+.page-hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:linear-gradient(90deg,transparent,rgba(217,37,28,.65),transparent);pointer-events:none}
+.page-hero .kicker{color:var(--grey-3)}
+.error-hero{min-height:78vh;display:flex;align-items:center}
+.error-hero .lead{max-width:520px}
+
+/* Article body: paper background with the content on a white card, numbered section labels */
+.page-body.white{background:var(--paper)}
+.prose-wrap .prose,.legal-wrap .prose{background:var(--white);border:1px solid var(--line-l);border-radius:18px;padding:48px 52px;box-shadow:0 40px 80px -60px rgba(0,0,0,.35)}
+.prose-wrap.hub .prose{background:none;border:0;padding:0;box-shadow:none;max-width:none}
+.legal-wrap{max-width:900px}
+.legal-wrap .prose{max-width:none}
+.prose{counter-reset:sec}
+.prose>h2{counter-increment:sec;font-family:var(--display);font-stretch:112%;font-weight:800;letter-spacing:-.03em}
+.prose>h2::before{content:counter(sec,decimal-leading-zero);display:block;font:400 12px/1 var(--mono);letter-spacing:.14em;color:var(--red);margin-bottom:12px}
+.prose h3{font-family:var(--display);font-stretch:108%;font-weight:700}
+.prose li::marker{color:var(--red)}
+.prose a{text-decoration-color:rgba(217,37,28,.5)}
+.prose a:hover{text-decoration-color:var(--red);color:var(--red-deep)}
+.prose .callout{background:rgba(217,37,28,.05);border:1px solid rgba(217,37,28,.28);border-left:4px solid var(--red)}
+.prose-wrap.hub .prose>h2::before{display:none}
+@media(max-width:700px){.prose-wrap .prose,.legal-wrap .prose{padding:28px 22px;border-radius:14px}}
+
+/* Sidebar card */
+.side-card{position:relative;overflow:hidden;border:1px solid rgba(217,37,28,.35);background:linear-gradient(160deg,#1a0d0b,#0d0c0b)}
+.side-card::before{content:"";position:absolute;right:-70px;top:-70px;width:200px;height:200px;background:radial-gradient(circle,rgba(217,37,28,.4),transparent 70%);pointer-events:none}
+.side-card>*{position:relative}
+.side-card h2{font-family:var(--display);font-stretch:112%;font-weight:800}
+.side-k{color:var(--red-bright)}
+
+/* Related and hub cards */
+.rel{position:relative;overflow:hidden}
+.rel::before{content:"";position:absolute;left:0;top:0;width:100%;height:2px;background:linear-gradient(90deg,var(--red),transparent);transform:scaleX(.2);transform-origin:0 50%;transition:transform .5s var(--ease)}
+.rel:hover{border-color:rgba(217,37,28,.45)}
+.rel:hover::before{transform:scaleX(1)}
+.rel-k{color:var(--red)}
+.rel h2,.rel h3{font-family:var(--display);font-stretch:108%;font-weight:700;letter-spacing:-.02em}
+.plugin-card{transition:border-color .3s,transform .5s var(--ease)}
+.plugin-card:hover{border-color:rgba(217,37,28,.4)}
+
+/* Call-to-action band */
+.cta-band{position:relative;overflow:hidden;background:var(--black)}
+.cta-band::before{content:"";position:absolute;left:50%;bottom:-340px;width:900px;height:640px;transform:translateX(-50%);background:radial-gradient(ellipse,rgba(217,37,28,.3),transparent 68%);pointer-events:none}
+.cta-band>.wrap{position:relative}
+.cta-band .kicker{justify-content:center}
+
+/* FAQ, nav and footer details */
+.faq summary::after{color:var(--red)}
+.faq details[open] summary{color:var(--ink)}
+.nav-links>a{position:relative}
+.nav-links>a::after{content:"";position:absolute;left:0;right:0;bottom:-7px;height:1px;background:var(--red);transform:scaleX(0);transform-origin:0 50%;transition:transform .3s var(--ease)}
+.nav-links>a:hover::after{transform:scaleX(1)}
+@media(max-width:860px){.nav-links>a::after{display:none}}
+footer{position:relative}
+footer::before{content:"";position:absolute;left:0;right:0;top:0;height:1px;background:linear-gradient(90deg,transparent,rgba(217,37,28,.55),transparent)}
+.foot-big{font-stretch:100%;font-size:clamp(40px,11.2vw,168px);letter-spacing:-.05em}

@@ -1,0 +1,42 @@
+# WebersLink
+
+> WebersLink is a forward-deployed engineering team for contractors, home-service and other service businesses in the US, UK and Europe. We build and run lead systems in-house: websites, AI assistants that reply in 60 seconds, follow-up automation, local SEO and AI workflow automation. Based in Lahore, Pakistan. Plans are month-to-month. Lead System: $490/month plus a one-time $1,490 setup. Growth Engine: $990/month plus setup. Websites from $1,490 one-time.
+
+## Offers
+- [Lead Command Center](https://weberslink.org/offers/lead-command-center): A conversion website, an AI assistant on your site and WhatsApp, and estimates booked straight into your calendar. Built in-house by WebersLink for contractors and home-service businesses. Live in 2–3 weeks.
+- [Follow-Up Engine](https://weberslink.org/offers/follow-up-engine): Automatic follow-up on every lead and quote, plus Google review requests after every job. Built in-house by WebersLink for contractors and service businesses. Included in the Lead System.
+- [Local Growth Engine](https://weberslink.org/offers/local-growth-engine): Local SEO, service-area pages, Google Business Profile management and Google & Meta ads, on top of the Lead System. Built in-house by WebersLink. Month-to-month, plain-English monthly reporting.
+- [AI Workflow Agents](https://weberslink.org/offers/ai-workflow-agents): AI agents that take over repeat customer and admin tasks inside your real workflow: answering, updating your CRM and calendar, and handing over to a person when needed. Built in-house by WebersLink.
+- [Knowledge Assistant](https://weberslink.org/offers/knowledge-assistant): An AI assistant trained on your price lists, policies and procedures, so your team and customers get answers from your own documents. Built in-house by WebersLink, with privacy set up properly.
+- [AI Team Rollout](https://weberslink.org/offers/ai-team-rollout): We set up AI tools for your team, write the rules for what goes in, and train people on the tasks they do every day. Built and delivered in-house by WebersLink.
+- [Document & Admin Automation](https://weberslink.org/offers/document-automation): Automation that reads your emails, forms and PDFs, pulls out the details, and puts them where they belong, with a review step for anything unclear. Built in-house by WebersLink.
+
+## Services
+- [Small Business Web Design](https://weberslink.org/services/web-design): Conversion-focused web design for small and service businesses in the US and Europe. Fast, mobile-first websites built to turn visitors into booked calls. From $1,490.
+- [AI Chatbots for Small Business](https://weberslink.org/services/ai-chatbots): Custom AI chatbots for small business websites and WhatsApp. Answers questions 24/7, qualifies leads and books appointments into your calendar. US & EU businesses.
+- [Lead Follow-Up Automation](https://weberslink.org/services/automation): Automate lead follow-up, CRM updates, reminders and reporting. We connect your website, forms, email, calendar and CRM so no enquiry slips through the cracks.
+- [SEO for Service Businesses](https://weberslink.org/services/seo): SEO for service businesses and contractors in the US and Europe: technical SEO, local SEO, Google Business Profile, content and links that bring in enquiries.
+- [WooCommerce & E-commerce](https://weberslink.org/services/ecommerce): WooCommerce store design and development for small brands: product variations, payments, WhatsApp ordering, fast checkout and SEO. See our live store work.
+- [Website Redesign](https://weberslink.org/services/website-redesign): Website redesign for small businesses with outdated or underperforming sites. We audit first, keep what works, protect your SEO and rebuild for speed and conversions.
+- [WooCommerce Sales Recovery Pilot](https://weberslink.org/woocommerce): Free 14-day pilot for WooCommerce stores: an AI shopping assistant that answers shoppers 24/7, automatic abandoned-cart follow-up, and mobile speed fixes. Set up in 48 hours.
+
+## Industries
+- [Contractors & Home Services](https://weberslink.org/industries/contractors): Contractor website design for roofers, remodelers, plumbers, HVAC and handyman businesses. Quote forms, service-area pages, reviews and AI that books jobs 24/7.
+- [Home Builders & Construction](https://weberslink.org/industries/home-builders): Website design for custom home builders, design-build firms and construction companies. Portfolio galleries, 3D walkthroughs, process pages and qualified project inquiries.
+- [Accounting & Professional Services](https://weberslink.org/industries/professional-services): Websites for accounting firms, tax advisors, consultants and IT companies. Clear service pages, credibility, client portals and booking that converts visitors into consultations.
+- [Manufacturers & B2B Suppliers](https://weberslink.org/industries/manufacturers): Website design for manufacturers and B2B suppliers: product catalogues, certifications, spec sheets and inquiry flows that generate qualified RFQs from buyers.
+
+## Guides
+- [How Much Does a Small Business Website Cost in 2026?](https://weberslink.org/blog/small-business-website-cost): Small business website costs in 2026: DIY builders vs freelancers vs agencies, what drives the price, ongoing costs and how to budget for a site that brings in clients.
+- [How Much Does an AI Chatbot Cost?](https://weberslink.org/blog/ai-chatbot-cost): AI chatbot costs for small businesses in 2026: subscription tools vs custom builds, usage fees, setup costs and how to calculate whether a chatbot pays for itself.
+- [Speed to Lead: Why 5 Minutes Matters](https://weberslink.org/blog/speed-to-lead): What speed to lead is, why the first business to respond usually wins the job, and 6 practical ways small businesses can reply to every lead within minutes.
+- [WordPress vs Custom Website](https://weberslink.org/blog/wordpress-vs-custom-website): WordPress vs a custom-coded website for small businesses: cost, speed, security, SEO, editing and maintenance compared — plus which to choose for your situation.
+- [Contractor Website Checklist: 15 Must-Haves](https://weberslink.org/blog/contractor-website-checklist): A practical contractor website checklist: 15 things every roofing, remodeling, plumbing and HVAC website needs to rank locally and turn visitors into booked estimates.
+- [Why Is My Website Not Getting Leads?](https://weberslink.org/blog/website-not-generating-leads): Website getting visitors but no enquiries? 9 common reasons small business websites don't generate leads — and practical fixes you can make this week.
+
+## Free resources
+- [Free WordPress plugins](https://weberslink.org/plugins/): Free, GPL-licensed WordPress plugins for forms, email, redirects, security and SEO.
+
+## Contact
+- [Contact and booking](https://weberslink.org/contact): Book a free 20-minute walkthrough, email hassan@weberslink.org, or message on WhatsApp.
+- [Sitemap](https://weberslink.org/sitemap.xml)

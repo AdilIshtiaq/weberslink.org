@@ -26,6 +26,31 @@ const OFFERS = require("./content/fde");
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const strip = (s) => String(s).replace(/<[^>]+>/g, "");
 
+// ---------- Icons, shared head metadata ----------
+const SPRITE = '<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></symbol><symbol id="i-arrow-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></symbol><symbol id="i-arrow-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></symbol></svg>';
+// Turns a trailing text arrow (end of a link, button or span) into an SVG icon. Arrows inside sentences are left alone.
+function iconify(html) {
+  const map = { "→": "arrow", "↓": "arrow-down", "←": "arrow-left" };
+  let n = 0;
+  html = html.replace(/\s*([→↓←])\s*(?=<\/(?:a|span|button)>)/g, (m, c) => {
+    n++;
+    return `<svg class="ico ico-${map[c]}" aria-hidden="true" focusable="false"><use href="#i-${map[c]}"/></svg>`;
+  });
+  if (n && !html.includes('id="i-arrow"')) html = html.replace(/<body([^>]*)>/, `<body$1>\n${SPRITE}`);
+  return html;
+}
+// hreflang, locale, robots hints, manifest and feed links shared by every generated page.
+function headExtra(url, noindex = false) {
+  return `<link rel="alternate" hreflang="en" href="${url}">
+<link rel="alternate" hreflang="x-default" href="${url}">
+<meta name="robots" content="${noindex ? "noindex" : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"}">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="en_GB">
+<link rel="manifest" href="/site.webmanifest">
+<link rel="alternate" type="application/rss+xml" title="WebersLink guides" href="${SITE}/feed.xml">`;
+}
+const SKIP = '<a class="skip" href="#main">Skip to content</a>';
+
 // ---------- Shared navigation ----------
 const SERVICES = pages.filter((p) => p.type === "service");
 const INDUSTRIES = pages.filter((p) => p.type === "industry");
@@ -112,7 +137,7 @@ function schema(p) {
       author: org,
       publisher: org,
       mainEntityOfPage: url,
-      image: SITE + "/og.png",
+      image: SITE + "/og-fde.jpg",
     });
   }
   if (p.software) {
@@ -153,6 +178,7 @@ function render(p) {
 <title>${esc(p.title)}</title>
 <meta name="description" content="${esc(p.description)}">
 <link rel="canonical" href="${url}">
+${headExtra(url)}
 <meta name="theme-color" content="#090807">
 <link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48"><link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -161,23 +187,30 @@ function render(p) {
 <meta property="og:url" content="${url}">
 <meta property="og:title" content="${esc(p.title)}">
 <meta property="og:description" content="${esc(p.description)}">
-<meta property="og:image" content="${SITE}/og.png">
+<meta property="og:image" content="${SITE}/og-fde.jpg">
+<meta property="og:image:secure_url" content="${SITE}/og-fde.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="WebersLink: forward-deployed engineers for contractors and service businesses">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${esc(p.title)}">
 <meta name="twitter:description" content="${esc(p.description)}">
-<meta name="twitter:image" content="${SITE}/og.png">
+<meta name="twitter:image" content="${SITE}/og-fde.jpg">
+<meta name="twitter:image:alt" content="WebersLink: forward-deployed engineers for contractors and service businesses">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
-<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400&display=swap"></noscript>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap"></noscript>
 <link rel="stylesheet" href="/assets/site.css">
 <script type="application/ld+json">
 ${schema(p)}
 </script>
 </head>
 <body>
+${SKIP}
 ${nav()}
-<main>
+<main id="main">
 <section class="page-hero">
   <div class="hero-grid" aria-hidden="true"></div>
   <div class="wrap">
@@ -187,7 +220,7 @@ ${nav()}
     <p class="lead">${p.lead}</p>
     ${meta}
     ${p.heroCta || `<div class="hero-cta">
-      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="${p.path}">Book a free strategy call →</a>
+      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="${p.path}">Book a walkthrough →</a>
       <a href="/#audit" class="btn btn-ghost" data-track="Audit CTA" data-loc="${p.path}">Get a free website audit</a>
     </div>`}
   </div>
@@ -238,10 +271,11 @@ ${related.map((r) => `      <a class="rel" href="${r.path}"><span class="rel-k">
 }
 <section class="dark pad-sm cta-band">
   <div class="wrap">
+    <div class="kicker">Next step</div>
     <h2 class="h2">Ready for more <em>booked jobs?</em></h2>
-    <p class="sub">Book a free 20-minute call. We'll show you how to answer every lead in 60 seconds — no obligation.</p>
+    <p class="sub">Book a free 20-minute walkthrough. We'll show you how to answer every lead in 60 seconds — no obligation.</p>
     <div class="hero-cta" style="margin-top:28px">
-      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="band">Book a free strategy call →</a>
+      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="band">Book a walkthrough →</a>
       <a href="/#pricing" class="btn btn-ghost">See pricing</a>
     </div>
   </div>
@@ -268,6 +302,7 @@ function pageShell(p, main) {
 <title>${esc(p.title)}</title>
 <meta name="description" content="${esc(p.description)}">
 <link rel="canonical" href="${url}">
+${headExtra(url, p.noindex)}
 <meta name="theme-color" content="#090807">
 <link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48"><link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -276,23 +311,30 @@ function pageShell(p, main) {
 <meta property="og:url" content="${url}">
 <meta property="og:title" content="${esc(p.title)}">
 <meta property="og:description" content="${esc(p.description)}">
-<meta property="og:image" content="${SITE}/og.png">
+<meta property="og:image" content="${SITE}/og-fde.jpg">
+<meta property="og:image:secure_url" content="${SITE}/og-fde.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="WebersLink: forward-deployed engineers for contractors and service businesses">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${esc(p.title)}">
 <meta name="twitter:description" content="${esc(p.description)}">
-<meta name="twitter:image" content="${SITE}/og.png">
+<meta name="twitter:image" content="${SITE}/og-fde.jpg">
+<meta name="twitter:image:alt" content="WebersLink: forward-deployed engineers for contractors and service businesses">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
-<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400&display=swap"></noscript>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap"></noscript>
 <link rel="stylesheet" href="/assets/site.css">
 <script type="application/ld+json">
 ${schema(p)}
 </script>
 </head>
 <body>
+${SKIP}
 ${nav()}
-<main>
+<main id="main">
 ${main}
 </main>
 ${footer()}
@@ -511,7 +553,7 @@ ${items.map((r) => `<a class="rel" href="${r.path}"><span class="rel-k">${r.type
 function write(urlPath, html) {
   const file = urlPath.endsWith("/") ? path.join(PUBLIC, urlPath, "index.html") : path.join(PUBLIC, urlPath + ".html");
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, html);
+  fs.writeFileSync(file, iconify(html));
   return file;
 }
 
@@ -1065,10 +1107,78 @@ ${x.changelog.slice(0, 4).map((c) => `<h3>Version ${esc(c.version)}</h3>\n<ul>\n
 }
 
 
+// ---------- Privacy policy and 404 (shared shell, so nav, footer and metadata match every other page) ----------
+const privacyBody = fs.readFileSync(path.join(__dirname, "content", "privacy.body.html"), "utf8");
+write("/privacy", pageShell({
+  path: "/privacy", type: "hub", title: "Privacy Policy | WebersLink",
+  description: "How WebersLink collects, uses and protects personal data from enquiries and website audits, and your rights under GDPR and US privacy laws.",
+  card: { title: "Privacy Policy" }, crumbs: [],
+}, `<section class="page-hero">
+  <div class="hero-grid" aria-hidden="true"></div>
+  <div class="wrap">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a><span>/</span><span aria-current="page">Privacy Policy</span></nav>
+    <div class="kicker">Legal</div>
+    <h1>Privacy <em>Policy.</em></h1>
+    <p class="lead">Last updated: October 2026</p>
+  </div>
+</section>
+<article class="white page-body">
+  <div class="wrap legal-wrap"><div class="prose">
+${privacyBody}
+  </div></div>
+</article>`));
+write("/404", pageShell({
+  path: "/404", type: "hub", noindex: true, title: "Page not found | WebersLink",
+  description: "This page doesn't exist. Head back to the WebersLink home page.",
+  card: { title: "Page not found" }, crumbs: [],
+}, `<section class="page-hero error-hero">
+  <div class="hero-grid" aria-hidden="true"></div>
+  <div class="wrap">
+    <div class="kicker">Error 404</div>
+    <h1>This page <em>doesn't exist.</em></h1>
+    <p class="lead">But your next client might be looking for you right now.</p>
+    <div class="hero-cta">
+      <a href="/" class="btn btn-light">Go to the homepage →</a>
+      <a href="/offers/" class="btn btn-ghost">See our offers</a>
+      <a href="/contact" class="btn btn-ghost">Contact us</a>
+    </div>
+  </div>
+</section>`));
+
 // ---------- FDE pages ----------
 OFFERS.forEach((o) => write(o.path, renderOffer(o)));
 write("/offers/", offersHub());
 write("/contact", contactPage());
+
+// ---------- Homepage: head metadata, skip link, structured data ----------
+const decode = (t) => t.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+function enhanceHome(html) {
+  const canon = `<link rel="canonical" href="${SITE}/">`;
+  if (!html.includes('hreflang="x-default"')) html = html.replace(canon, () => `${canon}\n${headExtra(SITE + "/")}`);
+  if (!html.includes('class="skip"')) html = html.replace(/<body>/, `<body>\n${SKIP}`);
+  html = html.replace(/<main>/, '<main id="main">');
+  const re = /<script type="application\/ld\+json">\s*([\s\S]*?)\s*<\/script>/;
+  const m = html.match(re);
+  if (m) {
+    const prev = JSON.parse(m[1]);
+    const biz = { ...(prev["@graph"] ? prev["@graph"].find((n) => n["@type"] === "ProfessionalService") : prev) };
+    delete biz["@context"];
+    biz["@id"] = SITE + "/#business";
+    biz.areaServed = ["United States", "United Kingdom", "Europe"];
+    biz.availableLanguage = "English";
+    const faqSec = (html.match(/<section class="white pad" id="faq">[\s\S]*?<\/section>/) || [""])[0];
+    const faqs = [...faqSec.matchAll(/<details[^>]*><summary>([\s\S]*?)<\/summary><p>([\s\S]*?)<\/p><\/details>/g)].map((x) => [decode(strip(x[1])), decode(strip(x[2]))]);
+    const graph = [
+      { "@type": "Organization", "@id": SITE + "/#org", name: "WebersLink", url: SITE + "/", logo: SITE + "/apple-touch-icon.png", email: "hassan@weberslink.org", address: biz.address, areaServed: biz.areaServed },
+      { "@type": "WebSite", "@id": SITE + "/#website", url: SITE + "/", name: "WebersLink", inLanguage: "en", publisher: { "@id": SITE + "/#org" } },
+      biz,
+    ];
+    if (faqs.length) graph.push({ "@type": "FAQPage", mainEntity: faqs.map(([q, a]) => ({ "@type": "Question", name: q, acceptedAnswer: { "@type": "Answer", text: a } })) });
+    const ldBlock = `<script type="application/ld+json">\n${JSON.stringify({ "@context": "https://schema.org", "@graph": graph }, null, 1)}\n</script>`;
+    html = html.replace(re, () => ldBlock); // function form: the text contains "$1,490", which a string replacement would treat as a capture group
+  }
+  return html;
+}
 
 // ---------- Shared footer on the homepage ----------
 const homeFile = path.join(PUBLIC, "index.html");
@@ -1077,7 +1187,7 @@ const updated = home
   .replace(/<!-- NAV -->[\s\S]*?<!-- \/NAV -->/, `<!-- NAV -->\n${nav("nav", "#top")}\n<!-- /NAV -->`)
   .replace(/<!-- FOOTER -->[\s\S]*?<!-- \/FOOTER -->/, `<!-- FOOTER -->\n${footer()}\n<!-- /FOOTER -->`);
 if (updated === home && !home.includes("<!-- FOOTER -->")) console.warn("Homepage footer markers not found.");
-fs.writeFileSync(homeFile, updated);
+fs.writeFileSync(homeFile, iconify(enhanceHome(updated)));
 
 // ---------- Sitemap ----------
 const urls = [
@@ -1092,6 +1202,53 @@ fs.writeFileSync(path.join(PUBLIC, "sitemap.xml"), `<?xml version="1.0" encoding
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${urls.map(([u, pr]) => `  <url><loc>${SITE}${u}</loc><lastmod>${(byPath[u] && (byPath[u].updated || byPath[u].date)) || TODAY}</lastmod><priority>${pr}</priority></url>`).join("\n")}
 </urlset>
+`);
+
+// ---------- llms.txt (for AI assistants and AI search) and RSS feed ----------
+const oneLine = (t) => strip(String(t)).replace(/\s+/g, " ").trim();
+const llmLink = (p, name, desc) => `- [${oneLine(name)}](${SITE}${p}): ${oneLine(desc)}`;
+fs.writeFileSync(path.join(PUBLIC, "llms.txt"), `# WebersLink
+
+> WebersLink is a forward-deployed engineering team for contractors, home-service and other service businesses in the US, UK and Europe. We build and run lead systems in-house: websites, AI assistants that reply in 60 seconds, follow-up automation, local SEO and AI workflow automation. Based in Lahore, Pakistan. Plans are month-to-month. Lead System: $490/month plus a one-time $1,490 setup. Growth Engine: $990/month plus setup. Websites from $1,490 one-time.
+
+## Offers
+${OFFERS.map((o) => llmLink(o.path, o.name, o.description)).join("\n")}
+
+## Services
+${SERVICES.map((p) => llmLink(p.path, p.card.title, p.description)).join("\n")}
+
+## Industries
+${INDUSTRIES.map((p) => llmLink(p.path, p.card.title, p.description)).join("\n")}
+
+## Guides
+${GUIDES.map((p) => llmLink(p.path, p.card.title, p.description)).join("\n")}
+
+## Free resources
+- [Free WordPress plugins](${SITE}/plugins/): Free, GPL-licensed WordPress plugins for forms, email, redirects, security and SEO.
+
+## Contact
+- [Contact and booking](${SITE}/contact): Book a free 20-minute walkthrough, email hassan@weberslink.org, or message on WhatsApp.
+- [Sitemap](${SITE}/sitemap.xml)
+`);
+const rfc822 = (d) => new Date(d).toUTCString();
+const xmlEsc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+fs.writeFileSync(path.join(PUBLIC, "feed.xml"), `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+<channel>
+  <title>WebersLink guides</title>
+  <link>${SITE}/blog/</link>
+  <description>Practical guides on website costs, AI chatbots, SEO and turning visitors into booked clients.</description>
+  <language>en</language>
+  <atom:link href="${SITE}/feed.xml" rel="self" type="application/rss+xml"/>
+${GUIDES.map((g) => `  <item>
+    <title>${xmlEsc(oneLine(g.h1))}</title>
+    <link>${SITE}${g.path}</link>
+    <guid isPermaLink="true">${SITE}${g.path}</guid>
+    <pubDate>${rfc822(g.updated || g.date)}</pubDate>
+    <description>${xmlEsc(oneLine(g.description))}</description>
+  </item>`).join("\n")}
+</channel>
+</rss>
 `);
 
 console.log(`Built ${pages.length + 6} pages and sitemap.xml (${urls.length} URLs).`);
