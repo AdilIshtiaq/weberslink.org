@@ -21,6 +21,7 @@ const pages = [
   ...require("./content/offers"),
 ];
 const byPath = Object.fromEntries(pages.map((p) => [p.path, p]));
+const OFFERS = require("./content/fde");
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const strip = (s) => String(s).replace(/<[^>]+>/g, "");
@@ -30,19 +31,19 @@ const SERVICES = pages.filter((p) => p.type === "service");
 const INDUSTRIES = pages.filter((p) => p.type === "industry");
 const GUIDES = pages.filter((p) => p.type === "guide");
 
-function nav() {
-  return `<header class="nav scrolled" id="nav">
+function nav(cls = "nav scrolled", logoHref = "/") {
+  return `<header class="${cls}" id="nav">
   <div class="wrap">
-    <a href="/" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="187" height="33"></a>
+    <a href="${logoHref}" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="187" height="33"></a>
     <nav class="nav-links" id="navLinks" aria-label="Main">
-      <a href="/services/">Services</a>
-      <a href="/industries/">Industries</a>
+      <div class="nav-dd"><a href="/offers/" class="dd-t">Offers <i aria-hidden="true"></i></a><div class="dd-menu">${OFFERS.map((o) => `<a href="${o.path}"><b>${o.n}</b>${esc(o.name)}</a>`).join("")}</div></div>
       <a href="/#work">Work</a>
       <a href="/#pricing">Pricing</a>
+      <a href="/plugins/">Free resources</a>
       <a href="/blog/">Guides</a>
-      <a href="/plugins/">Plugins</a>
+      <a href="/contact">Contact</a>
     </nav>
-    <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="nav">Book a free call</a>
+    <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="nav">Book a walkthrough</a>
     <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false"><span></span><span></span></button>
   </div>
 </header>`;
@@ -56,9 +57,10 @@ function footer() {
     <div class="foot-cols">
       <div class="fcol fcol-brand">
         <a href="/" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="187" height="33"></a>
-        <p>Done-for-you lead systems — websites, AI that answers every lead in 60 seconds, and automatic follow-up — for contractors and service businesses in the US &amp; Europe.</p>
-        <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="footer">Book a free call</a>
+        <p>Forward-deployed engineers for contractors and service businesses in the US &amp; Europe. We build and run your lead system in-house: website, AI replies in 60 seconds, follow-up and reporting.</p>
+        <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="footer">Book a walkthrough</a>
       </div>
+      ${col("Offers", OFFERS)}
       ${col("Services", SERVICES)}
       ${col("Industries", INDUSTRIES)}
       ${col("Guides", GUIDES.slice(0, 5))}
@@ -72,7 +74,7 @@ function footer() {
 function stickyCta() {
   return `<aside aria-label="Quick contact">
 <div class="sticky-cta" id="stickyCta">
-  <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="sticky">Book a free call</a>
+  <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="sticky">Book a walkthrough</a>
   <a href="https://wa.me/message/2MT2JFO63P3LA1" class="btn btn-ghost" data-wa data-track="WhatsApp click" data-loc="sticky" target="_blank" rel="noopener">WhatsApp</a>
 </div>
 </aside>`;
@@ -253,6 +255,224 @@ ${stickyCta()}
 </body>
 </html>
 `;
+}
+
+// ---------- FDE offer pages (full-width sections) ----------
+function pageShell(p, main) {
+  const url = SITE + p.path;
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(p.title)}</title>
+<meta name="description" content="${esc(p.description)}">
+<link rel="canonical" href="${url}">
+<meta name="theme-color" content="#090807">
+<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48"><link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="WebersLink">
+<meta property="og:url" content="${url}">
+<meta property="og:title" content="${esc(p.title)}">
+<meta property="og:description" content="${esc(p.description)}">
+<meta property="og:image" content="${SITE}/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${esc(p.title)}">
+<meta name="twitter:description" content="${esc(p.description)}">
+<meta name="twitter:image" content="${SITE}/og.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400&display=swap"></noscript>
+<link rel="stylesheet" href="/assets/site.css">
+<script type="application/ld+json">
+${schema(p)}
+</script>
+</head>
+<body>
+${nav()}
+<main>
+${main}
+</main>
+${footer()}
+${stickyCta()}
+<script src="/config.js"></script>
+<script src="/assets/site.js" defer></script>
+<script src="/assets/chat-widget.js" defer></script>
+</body>
+</html>
+`;
+}
+
+const ctaBand = (loc, h2, sub) => `<section class="dark pad cta-band final-cta">
+  <div class="wrap">
+    <div class="kicker">Next step</div>
+    <h2 class="h2">${h2}</h2>
+    <p class="sub">${sub}</p>
+    <div class="hero-cta" style="margin-top:28px">
+      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="${loc}">Book a walkthrough →</a>
+      <a href="mailto:hassan@weberslink.org" class="btn btn-ghost" data-track="Email CTA" data-loc="${loc}">Or email us directly</a>
+    </div>
+  </div>
+</section>`;
+
+function renderOffer(o) {
+  const p = { ...o, type: "service", serviceName: o.name, crumbs: [["Offers", "/offers/"]] };
+  const others = OFFERS.filter((x) => x.path !== o.path);
+  const main = `<section class="page-hero offer-hero">
+  <div class="hero-grid" aria-hidden="true"></div>
+  <div class="wrap">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a><span>/</span><a href="/offers/">Offers</a><span>/</span><span aria-current="page">${esc(o.name)}</span></nav>
+    <div class="kicker">${esc(o.for)}</div>
+    <h1>${o.h1}</h1>
+    <p class="lead">${o.lead}</p>
+    <div class="hero-cta">
+      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="${o.path}">Book a walkthrough →</a>
+      <a href="/#audit" class="btn btn-ghost" data-track="Audit CTA" data-loc="${o.path}">Get a free website audit</a>
+    </div>
+    <p class="cta-note">${esc(o.price)} · Live in 2–3 weeks</p>
+  </div>
+</section>
+
+<section class="dark pad" id="pain">
+  <div class="wrap">
+    <div class="kicker">The cost of waiting</div>
+    <h2 class="h2">Four ways this <em>leaks money.</em></h2>
+    <div class="pain-grid">
+${o.pains.map((x, i) => `      <div class="pain"><span class="pain-n">PAIN/0${i + 1}</span><h3>${esc(x[0])}</h3><p>${esc(x[1])}</p></div>`).join("\n")}
+    </div>
+  </div>
+</section>
+
+<section class="light pad" id="system">
+  <div class="wrap sys-grid">
+    <div>
+      <div class="kicker">${esc(o.promise.eyebrow)}</div>
+      <h2 class="h2">${esc(o.promise.title)}<em>.</em></h2>
+      <p class="sub">${esc(o.promise.line)}</p>
+    </div>
+    <div class="mock" role="img" aria-label="Illustration of the ${esc(o.name)} with sample data">
+      <div class="mock-bar"><i></i><i></i><i></i><span>${esc(o.mock.title)}</span><b>LIVE</b></div>
+      <div class="mock-rows">
+${o.mock.rows.map((r) => `        <div class="mock-row"><span class="mock-src">${esc(r[0])}</span><span class="mock-what">${esc(r[1])}</span><span class="mock-res">${esc(r[2])}</span></div>`).join("\n")}
+      </div>
+      <p class="mock-note">Illustration with sample data.</p>
+    </div>
+  </div>
+</section>
+
+<section class="white pad" id="inside">
+  <div class="wrap">
+    <div class="kicker">${esc(o.featuresTitle)}</div>
+    <h2 class="h2">Built in-house. <em>Connected to what you use.</em></h2>
+    <div class="feat-grid">
+${o.features.map((x, i) => `      <div class="feat"><span class="feat-n">${String(i + 1).padStart(2, "0")}</span><h3>${esc(x[0])}</h3><p>${esc(x[1])}</p></div>`).join("\n")}
+    </div>
+  </div>
+</section>
+
+${proofSection()}
+
+<section class="dark pad" id="process">
+  <div class="wrap">
+    <div class="kicker">How it works</div>
+    <h2 class="h2">Live in 2–3 weeks. <em>Watched every month after.</em></h2>
+    <div class="steps">
+${o.steps.map((x, i) => `      <div class="step"><span class="step-n">0${i + 1}</span><h3>${esc(x[0])}</h3><p>${esc(x[1])}</p></div>`).join("\n")}
+    </div>
+    <div class="guarantee"><strong>${esc(o.guarantee.lead)}</strong> ${esc(o.guarantee.text)}</div>
+  </div>
+</section>
+
+<section class="light pad-sm">
+  <div class="wrap faq-grid">
+    <div><div class="kicker">FAQ</div><h2 class="h2">Common <em>questions.</em></h2></div>
+    <div class="faq">
+${o.faqs.map(([q, a], i) => `      <details${i === 0 ? " open" : ""}><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("\n")}
+    </div>
+  </div>
+</section>
+
+<section class="white pad-sm">
+  <div class="wrap">
+    <div class="kicker">More systems</div>
+    <h2 class="h2" style="margin-bottom:32px">Other things we <em>build and run.</em></h2>
+    <div class="rel-grid">
+${others.map((r) => `      <a class="rel" href="${r.path}"><span class="rel-k">SYS/${r.n}</span><h3>${esc(r.name)}</h3><p>${esc(r.card.blurb)}</p><span class="rel-go">See the system →</span></a>`).join("\n")}
+    </div>
+  </div>
+</section>
+
+${ctaBand(o.path, "Want this running on <em>your</em> leads?", "A 20-minute call about how your leads get handled today. You leave with a clear plan and a fixed setup price.")}`;
+  return pageShell(p, main);
+}
+
+// Real, already-published facts only (see pricing, hero and process copy on the home page).
+function proofSection() {
+  const stats = [["50", "+", "websites shipped"], ["60", "s", "target reply time, every channel, day or night"], ["2–3", "", "weeks, typical time to go live"], ["24", "h", "reply to every message"]];
+  return `<section class="light pad-sm proof" id="proof">
+  <div class="wrap">
+    <div class="kicker">The numbers we stand behind</div>
+    <div class="proof-row">
+${stats.map((s) => `      <div class="stat"><b class="stat-n"${/^\d+$/.test(s[0]) ? ` data-count="${s[0]}" data-suffix="${s[1]}"` : ""}>${s[0]}${s[1]}</b><span>${s[2]}</span></div>`).join("\n")}
+    </div>
+    <p class="proof-note">From our own client work and service terms.</p>
+  </div>
+</section>`;
+}
+
+function offersHub() {
+  const main = `<section class="page-hero offer-hero">
+  <div class="hero-grid" aria-hidden="true"></div>
+  <div class="wrap">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a><span>/</span><span aria-current="page">Offers</span></nav>
+    <div class="kicker">Offers</div>
+    <h1>Three systems. <em>One team that builds and runs them.</em></h1>
+    <p class="lead">Each system is built in-house, connected to the tools you already use, and watched every month. Pick the one that fixes your biggest leak.</p>
+  </div>
+</section>
+<section class="dark pad">
+  <div class="wrap">
+    <div class="offer-cards">
+${OFFERS.map((o) => `      <a class="offer-card" href="${o.path}"><span class="offer-n">SYS/${o.n}</span><h2>${esc(o.name)}</h2><p class="offer-for">${esc(o.for)}</p><p>${esc(o.cardLine)}</p><ul>${o.cardPoints.map((t) => `<li>${esc(t)}</li>`).join("")}</ul><span class="offer-price">${esc(o.price)}</span><span class="rel-go">See the system →</span></a>`).join("\n")}
+    </div>
+  </div>
+</section>
+${ctaBand("offers-hub", "Not sure which one <em>fits?</em>", "Book a 20-minute walkthrough. We'll recommend the right setup and give you a fixed setup price.")}`;
+  return pageShell({
+    path: "/offers/", type: "hub", title: "FDE Lead Systems for Contractors & Service Businesses | WebersLink",
+    description: "Forward-deployed engineers who build and run your lead system in-house: Lead Command Center, Follow-Up Engine and Local Growth Engine.",
+    card: { title: "Offers" }, crumbs: [],
+  }, main);
+}
+
+function contactPage() {
+  const main = `<section class="page-hero offer-hero">
+  <div class="hero-grid" aria-hidden="true"></div>
+  <div class="wrap">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a><span>/</span><span aria-current="page">Contact</span></nav>
+    <div class="kicker">Contact</div>
+    <h1>Fastest route: <em>a walkthrough.</em></h1>
+    <p class="lead">Twenty minutes, free. Bring how your leads get handled today and leave with a clear plan and a fixed setup price.</p>
+  </div>
+</section>
+<section class="dark pad">
+  <div class="wrap">
+    <div class="contact-cards">
+      <a class="contact-card primary" href="/#book" data-track="Book CTA" data-loc="contact"><span class="offer-n">01 · Walkthrough</span><h2>Book a walkthrough</h2><p>20 minutes about your services, your area and how leads are handled today. We usually reply within 24 hours.</p><span class="rel-go">Pick a time →</span></a>
+      <a class="contact-card" href="mailto:hassan@weberslink.org" data-track="Email CTA" data-loc="contact"><span class="offer-n">02 · Email</span><h2>Email us directly</h2><p>Describe what's breaking in one paragraph. hassan@weberslink.org</p><span class="rel-go">Write to us →</span></a>
+      <a class="contact-card" href="https://wa.me/message/2MT2JFO63P3LA1" data-wa data-track="WhatsApp click" data-loc="contact" target="_blank" rel="noopener"><span class="offer-n">03 · WhatsApp</span><h2>Message on WhatsApp</h2><p>Quick question? Send it there. We reply within 24 hours.</p><span class="rel-go">Open WhatsApp →</span></a>
+      <a class="contact-card" href="/#audit" data-track="Audit CTA" data-loc="contact"><span class="offer-n">04 · Free audit</span><h2>Get a free website audit</h2><p>We'll record a short video showing what's costing you enquiries, within 48 hours.</p><span class="rel-go">Request the audit →</span></a>
+    </div>
+    <p class="contact-note">Based in Lahore, Pakistan · Serving clients in the US &amp; Europe · Calls scheduled in your time zone.</p>
+  </div>
+</section>`;
+  return pageShell({
+    path: "/contact", type: "hub", title: "Contact WebersLink: Book a Walkthrough",
+    description: "Book a free 20-minute walkthrough, email, or message WebersLink on WhatsApp. We reply within 24 hours.",
+    card: { title: "Contact" }, crumbs: [],
+  }, main);
 }
 
 // ---------- Hub pages (/services/, /industries/, /blog/) ----------
@@ -825,16 +1045,23 @@ ${x.changelog.slice(0, 4).map((c) => `<h3>Version ${esc(c.version)}</h3>\n<ul>\n
 }
 
 
+// ---------- FDE pages ----------
+OFFERS.forEach((o) => write(o.path, renderOffer(o)));
+write("/offers/", offersHub());
+write("/contact", contactPage());
+
 // ---------- Shared footer on the homepage ----------
 const homeFile = path.join(PUBLIC, "index.html");
 const home = fs.readFileSync(homeFile, "utf8");
-const updated = home.replace(/<!-- FOOTER -->[\s\S]*?<!-- \/FOOTER -->/, `<!-- FOOTER -->\n${footer()}\n<!-- /FOOTER -->`);
+const updated = home
+  .replace(/<!-- NAV -->[\s\S]*?<!-- \/NAV -->/, `<!-- NAV -->\n${nav("nav", "#top")}\n<!-- /NAV -->`)
+  .replace(/<!-- FOOTER -->[\s\S]*?<!-- \/FOOTER -->/, `<!-- FOOTER -->\n${footer()}\n<!-- /FOOTER -->`);
 if (updated === home && !home.includes("<!-- FOOTER -->")) console.warn("Homepage footer markers not found.");
 fs.writeFileSync(homeFile, updated);
 
 // ---------- Sitemap ----------
 const urls = [
-  ["/", "1.0"], ["/services/", "0.9"], ["/industries/", "0.8"], ["/blog/", "0.8"],
+  ["/", "1.0"], ["/offers/", "0.9"], ...OFFERS.map((o) => [o.path, "0.9"]), ["/contact", "0.6"], ["/services/", "0.9"], ["/industries/", "0.8"], ["/blog/", "0.8"],
   ...SERVICES.map((p) => [p.path, "0.9"]),
   ...INDUSTRIES.map((p) => [p.path, "0.8"]),
   ...GUIDES.map((p) => [p.path, "0.7"]),

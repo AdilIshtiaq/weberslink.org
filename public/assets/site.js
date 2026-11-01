@@ -270,6 +270,11 @@
       counters.push({ el: num, to: +m[1], plus: m[2] });
     }
   });
+  $$('[data-count]').forEach(function (el) {
+    var suf = el.getAttribute('data-suffix') || '';
+    el.textContent = '0' + suf;
+    counters.push({ el: el, to: +el.getAttribute('data-count'), plus: suf });
+  });
   function runCounter(c) {
     var t0 = null, dur = 1400;
     function step(t) {
