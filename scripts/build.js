@@ -409,7 +409,7 @@ ${o.mock.rows.map((r) => `        <div class="mock-row"><span class="mock-src">$
     <div class="kicker">${esc(o.featuresTitle)}</div>
     <h2 class="h2">Built in-house. <em>Connected to what you use.</em></h2>
     <div class="feat-grid">
-${o.features.map((x, i) => `      <div class="feat"><span class="feat-n">${String(i + 1).padStart(2, "0")}</span><h3>${esc(x[0])}</h3><p>${esc(x[1])}</p></div>`).join("\n")}
+${o.features.map((x, i) => `      <div class="feature"><span class="feature-n">${String(i + 1).padStart(2, "0")}</span><h3>${esc(x[0])}</h3><p>${esc(x[1])}</p></div>`).join("\n")}
     </div>
   </div>
 </section>
