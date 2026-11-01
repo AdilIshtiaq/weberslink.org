@@ -319,7 +319,7 @@ const ctaBand = (loc, h2, sub) => `<section class="dark pad cta-band final-cta">
 
 function renderOffer(o) {
   const p = { ...o, type: "service", serviceName: o.name, crumbs: [["Offers", "/offers/"]] };
-  const others = OFFERS.filter((x) => x.path !== o.path);
+  const others = OFFERS.filter((x) => x.path !== o.path).slice(0, 3);
   const main = `<section class="page-hero offer-hero">
   <div class="hero-grid" aria-hidden="true"></div>
   <div class="wrap">
@@ -331,7 +331,7 @@ function renderOffer(o) {
       <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="${o.path}">Book a walkthrough →</a>
       <a href="/#audit" class="btn btn-ghost" data-track="Audit CTA" data-loc="${o.path}">Get a free website audit</a>
     </div>
-    <p class="cta-note">${esc(o.price)} · Live in 2–3 weeks</p>
+    <p class="cta-note">${esc(o.price)} · ${esc(o.timeline || "Live in 2–3 weeks")}</p>
   </div>
 </section>
 
@@ -372,12 +372,12 @@ ${o.features.map((x, i) => `      <div class="feat"><span class="feat-n">${Strin
   </div>
 </section>
 
-${proofSection()}
+${proofSection(o.proofStats)}
 
 <section class="dark pad" id="process">
   <div class="wrap">
     <div class="kicker">How it works</div>
-    <h2 class="h2">Live in 2–3 weeks. <em>Watched every month after.</em></h2>
+    <h2 class="h2">${o.processTitle || "Live in 2–3 weeks. <em>Watched every month after.</em>"}</h2>
     <div class="steps">
 ${o.steps.map((x, i) => `      <div class="step"><span class="step-n">0${i + 1}</span><h3>${esc(x[0])}</h3><p>${esc(x[1])}</p></div>`).join("\n")}
     </div>
@@ -404,17 +404,24 @@ ${others.map((r) => `      <a class="rel" href="${r.path}"><span class="rel-k">S
   </div>
 </section>
 
-${ctaBand(o.path, "Want this running on <em>your</em> leads?", "A 20-minute call about how your leads get handled today. You leave with a clear plan and a fixed setup price.")}`;
+${ctaBand(o.path, "Want this running on <em>your</em> leads?", "A 20-minute call about how your leads get handled today. You leave with a clear plan and a fixed price.")}`;
   return pageShell(p, main);
 }
 
 // Real, already-published facts only (see pricing, hero and process copy on the home page).
-function proofSection() {
-  const stats = [["50", "+", "websites shipped"], ["60", "s", "target reply time, every channel, day or night"], ["2–3", "", "weeks, typical time to go live"], ["24", "h", "reply to every message"]];
+function proofSection(keys = ["sites", "reply", "weeks", "response"]) {
+  const all = {
+    sites: ["50", "+", "websites shipped"],
+    reply: ["60", "s", "target reply time, every channel, day or night"],
+    weeks: ["2–3", "", "weeks, typical time to go live"],
+    response: ["24", "h", "reply to every message"],
+  };
+  // The 60s and 2–3 week figures describe the Lead System, so newer offers show only the two general ones.
+  const stats = keys.map((k) => all[k]);
   return `<section class="light pad-sm proof" id="proof">
   <div class="wrap">
     <div class="kicker">The numbers we stand behind</div>
-    <div class="proof-row">
+    <div class="proof-row" style="grid-template-columns:repeat(${stats.length},1fr)">
 ${stats.map((s) => `      <div class="stat"><b class="stat-n"${/^\d+$/.test(s[0]) ? ` data-count="${s[0]}" data-suffix="${s[1]}"` : ""}>${s[0]}${s[1]}</b><span>${s[2]}</span></div>`).join("\n")}
     </div>
     <p class="proof-note">From our own client work and service terms.</p>
@@ -423,26 +430,39 @@ ${stats.map((s) => `      <div class="stat"><b class="stat-n"${/^\d+$/.test(s[0]
 }
 
 function offersHub() {
+  const card = (o) => `      <a class="offer-card" href="${o.path}"><span class="offer-n">SYS/${o.n}</span><h2>${esc(o.name)}</h2><p class="offer-for">${esc(o.for)}</p><p>${esc(o.cardLine)}</p><ul>${o.cardPoints.map((t) => `<li>${esc(t)}</li>`).join("")}</ul><span class="offer-price">${esc(o.price)}</span><span class="rel-go">See the system →</span></a>`;
+  const core = OFFERS.slice(0, 3), more = OFFERS.slice(3);
   const main = `<section class="page-hero offer-hero">
   <div class="hero-grid" aria-hidden="true"></div>
   <div class="wrap">
     <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a><span>/</span><span aria-current="page">Offers</span></nav>
     <div class="kicker">Offers</div>
-    <h1>Three systems. <em>One team that builds and runs them.</em></h1>
-    <p class="lead">Each system is built in-house, connected to the tools you already use, and watched every month. Pick the one that fixes your biggest leak.</p>
+    <h1>Systems we build and run. <em>One team behind all of them.</em></h1>
+    <p class="lead">Each system is built in-house, connected to the tools you already use, and reviewed after launch. Start with the one that fixes your biggest leak.</p>
   </div>
 </section>
 <section class="dark pad">
   <div class="wrap">
+    <div class="kicker">Core systems</div>
+    <h2 class="h2" style="margin-bottom:40px">Lead systems for <em>service businesses.</em></h2>
     <div class="offer-cards">
-${OFFERS.map((o) => `      <a class="offer-card" href="${o.path}"><span class="offer-n">SYS/${o.n}</span><h2>${esc(o.name)}</h2><p class="offer-for">${esc(o.for)}</p><p>${esc(o.cardLine)}</p><ul>${o.cardPoints.map((t) => `<li>${esc(t)}</li>`).join("")}</ul><span class="offer-price">${esc(o.price)}</span><span class="rel-go">See the system →</span></a>`).join("\n")}
+${core.map(card).join("\n")}
     </div>
   </div>
 </section>
-${ctaBand("offers-hub", "Not sure which one <em>fits?</em>", "Book a 20-minute walkthrough. We'll recommend the right setup and give you a fixed setup price.")}`;
+<section class="dark pad" style="padding-top:0">
+  <div class="wrap">
+    <div class="kicker">And more</div>
+    <h2 class="h2" style="margin-bottom:40px">Built on top, <em>when you're ready.</em></h2>
+    <div class="offer-cards two">
+${more.map(card).join("\n")}
+    </div>
+  </div>
+</section>
+${ctaBand("offers-hub", "Not sure which one <em>fits?</em>", "Book a 20-minute walkthrough. We'll recommend the right setup and give you a fixed price.")}`;
   return pageShell({
-    path: "/offers/", type: "hub", title: "FDE Lead Systems for Contractors & Service Businesses | WebersLink",
-    description: "Forward-deployed engineers who build and run your lead system in-house: Lead Command Center, Follow-Up Engine and Local Growth Engine.",
+    path: "/offers/", type: "hub", title: "FDE Systems for Contractors & Service Businesses | WebersLink",
+    description: "Forward-deployed engineers who build and run your systems in-house: lead response, follow-up, local growth, AI workflow agents, knowledge assistants, team rollout and document automation.",
     card: { title: "Offers" }, crumbs: [],
   }, main);
 }
