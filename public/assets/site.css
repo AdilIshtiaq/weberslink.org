@@ -694,11 +694,11 @@ form.sent .form-fields{display:none}
 @media(max-width:900px){.sys-grid{grid-template-columns:1fr;gap:36px}.mock-row{grid-template-columns:1fr auto}.mock-src{grid-column:1/-1}}
 
 .feat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:56px;border-top:1px solid var(--line-l);border-left:1px solid var(--line-l)}
-.feat{padding:28px 24px 30px;border-right:1px solid var(--line-l);border-bottom:1px solid var(--line-l);transition:background .3s}
-.feat:hover{background:var(--paper)}
-.feat-n{font-family:var(--mono);font-size:11px;color:var(--red)}
-.feat h3{font-size:17px;letter-spacing:-.01em;font-weight:600;margin:12px 0 8px;color:var(--ink)}
-.feat p{font-size:14.5px;color:var(--grey-5)}
+.feature{padding:28px 24px 30px;border-right:1px solid var(--line-l);border-bottom:1px solid var(--line-l);transition:background .3s}
+.feature:hover{background:var(--paper)}
+.feature-n{font-family:var(--mono);font-size:11px;color:var(--red)}
+.feature h3{font-size:17px;letter-spacing:-.01em;font-weight:600;margin:12px 0 8px;color:var(--ink)}
+.feature p{font-size:14.5px;color:var(--grey-5)}
 @media(max-width:1000px){.feat-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:560px){.feat-grid{grid-template-columns:1fr}}
 
@@ -812,3 +812,4 @@ a:hover>.ico-arrow-left,.btn:hover .ico-arrow-left{transform:translateX(-4px)}
 footer{position:relative}
 footer::before{content:"";position:absolute;left:0;right:0;top:0;height:1px;background:linear-gradient(90deg,transparent,rgba(217,37,28,.55),transparent)}
 .foot-big{font-stretch:100%;font-size:clamp(40px,11.2vw,168px);letter-spacing:-.05em}
+.pk.feat h3{color:var(--white)}

@@ -1,6 +1,6 @@
 # WebersLink
 
-> WebersLink is a forward-deployed engineering team for contractors, home-service and other service businesses in the US, UK and Europe. We build and run lead systems in-house: websites, AI assistants that reply in 60 seconds, follow-up automation, local SEO and AI workflow automation. Based in Lahore, Pakistan. Plans are month-to-month. Lead System: $490/month plus a one-time $1,490 setup. Growth Engine: $990/month plus setup. Websites from $1,490 one-time.
+> WebersLink is a forward-deployed engineering team for businesses in the US, UK and Europe. We build and run systems in-house: AI assistants and workflow agents, automation, websites, lead response and follow-up, local SEO and reporting. Contractors and home-service businesses are a core industry, not the limit. Based in Lahore, Pakistan. Plans are month-to-month. Lead System: $490/month plus a one-time $1,490 setup. Growth Engine: $990/month plus setup. Websites from $1,490 one-time.
 
 ## Offers
 - [Lead Command Center](https://weberslink.org/offers/lead-command-center): A conversion website, an AI assistant on your site and WhatsApp, and estimates booked straight into your calendar. Built in-house by WebersLink for contractors and home-service businesses. Live in 2–3 weeks.
