@@ -82,7 +82,7 @@ function footer() {
     <div class="foot-cols">
       <div class="fcol fcol-brand">
         <a href="/" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="187" height="33"></a>
-        <p>Forward-deployed engineers for contractors and service businesses in the US &amp; Europe. We build and run your lead system in-house: website, AI replies in 60 seconds, follow-up and reporting.</p>
+        <p>Forward-deployed engineers for businesses in the US, UK &amp; Europe. We build and run AI assistants, automation, websites and reporting in-house.</p>
         <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="footer">Book a walkthrough</a>
       </div>
       ${col("Offers", OFFERS)}
@@ -137,7 +137,7 @@ function schema(p) {
       author: org,
       publisher: org,
       mainEntityOfPage: url,
-      image: SITE + "/og-fde.jpg",
+      image: SITE + "/og-weberslink.jpg",
     });
   }
   if (p.software) {
@@ -187,17 +187,17 @@ ${headExtra(url)}
 <meta property="og:url" content="${url}">
 <meta property="og:title" content="${esc(p.title)}">
 <meta property="og:description" content="${esc(p.description)}">
-<meta property="og:image" content="${SITE}/og-fde.jpg">
-<meta property="og:image:secure_url" content="${SITE}/og-fde.jpg">
+<meta property="og:image" content="${SITE}/og-weberslink.jpg">
+<meta property="og:image:secure_url" content="${SITE}/og-weberslink.jpg">
 <meta property="og:image:type" content="image/jpeg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="WebersLink: forward-deployed engineers for contractors and service businesses">
+<meta property="og:image:alt" content="WebersLink: forward-deployed engineers who build and run AI, automation and web systems">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${esc(p.title)}">
 <meta name="twitter:description" content="${esc(p.description)}">
-<meta name="twitter:image" content="${SITE}/og-fde.jpg">
-<meta name="twitter:image:alt" content="WebersLink: forward-deployed engineers for contractors and service businesses">
+<meta name="twitter:image" content="${SITE}/og-weberslink.jpg">
+<meta name="twitter:image:alt" content="WebersLink: forward-deployed engineers who build and run AI, automation and web systems">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
@@ -272,8 +272,8 @@ ${related.map((r) => `      <a class="rel" href="${r.path}"><span class="rel-k">
 <section class="dark pad-sm cta-band">
   <div class="wrap">
     <div class="kicker">Next step</div>
-    <h2 class="h2">Ready for more <em>booked jobs?</em></h2>
-    <p class="sub">Book a free 20-minute walkthrough. We'll show you how to answer every lead in 60 seconds — no obligation.</p>
+    <h2 class="h2">Ready to see what we'd <em>build for you?</em></h2>
+    <p class="sub">Book a free 20-minute walkthrough. We'll look at where your business loses time or leads, and what we'd build — no obligation.</p>
     <div class="hero-cta" style="margin-top:28px">
       <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="band">Book a walkthrough →</a>
       <a href="/#pricing" class="btn btn-ghost">See pricing</a>
@@ -311,17 +311,17 @@ ${headExtra(url, p.noindex)}
 <meta property="og:url" content="${url}">
 <meta property="og:title" content="${esc(p.title)}">
 <meta property="og:description" content="${esc(p.description)}">
-<meta property="og:image" content="${SITE}/og-fde.jpg">
-<meta property="og:image:secure_url" content="${SITE}/og-fde.jpg">
+<meta property="og:image" content="${SITE}/og-weberslink.jpg">
+<meta property="og:image:secure_url" content="${SITE}/og-weberslink.jpg">
 <meta property="og:image:type" content="image/jpeg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="WebersLink: forward-deployed engineers for contractors and service businesses">
+<meta property="og:image:alt" content="WebersLink: forward-deployed engineers who build and run AI, automation and web systems">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${esc(p.title)}">
 <meta name="twitter:description" content="${esc(p.description)}">
-<meta name="twitter:image" content="${SITE}/og-fde.jpg">
-<meta name="twitter:image:alt" content="WebersLink: forward-deployed engineers for contractors and service businesses">
+<meta name="twitter:image" content="${SITE}/og-weberslink.jpg">
+<meta name="twitter:image:alt" content="WebersLink: forward-deployed engineers who build and run AI, automation and web systems">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
@@ -503,7 +503,7 @@ ${more.map(card).join("\n")}
 </section>
 ${ctaBand("offers-hub", "Not sure which one <em>fits?</em>", "Book a 20-minute walkthrough. We'll recommend the right setup and give you a fixed price.")}`;
   return pageShell({
-    path: "/offers/", type: "hub", title: "FDE Systems for Contractors & Service Businesses | WebersLink",
+    path: "/offers/", type: "hub", title: "Offers: AI, Automation & Web Systems Built In-House | WebersLink",
     description: "Forward-deployed engineers who build and run your systems in-house: lead response, follow-up, local growth, AI workflow agents, knowledge assistants, team rollout and document automation.",
     card: { title: "Offers" }, crumbs: [],
   }, main);
@@ -1164,12 +1164,14 @@ function enhanceHome(html) {
     const biz = { ...(prev["@graph"] ? prev["@graph"].find((n) => n["@type"] === "ProfessionalService") : prev) };
     delete biz["@context"];
     biz["@id"] = SITE + "/#business";
+    biz.description = "Forward-deployed engineers who build and run AI assistants, workflow automation, websites, lead response and reporting in-house for businesses in the US, UK and Europe.";
+    biz.knowsAbout = ["AI assistants and agents", "Workflow automation", "Web design and development", "Lead response and follow-up", "Local SEO", "WordPress", "E-commerce"];
     biz.areaServed = ["United States", "United Kingdom", "Europe"];
     biz.availableLanguage = "English";
     const faqSec = (html.match(/<section class="white pad" id="faq">[\s\S]*?<\/section>/) || [""])[0];
     const faqs = [...faqSec.matchAll(/<details[^>]*><summary>([\s\S]*?)<\/summary><p>([\s\S]*?)<\/p><\/details>/g)].map((x) => [decode(strip(x[1])), decode(strip(x[2]))]);
     const graph = [
-      { "@type": "Organization", "@id": SITE + "/#org", name: "WebersLink", url: SITE + "/", logo: SITE + "/apple-touch-icon.png", email: "hassan@weberslink.org", address: biz.address, areaServed: biz.areaServed },
+      { "@type": "Organization", "@id": SITE + "/#org", name: "WebersLink", url: SITE + "/", description: biz.description, logo: SITE + "/apple-touch-icon.png", email: "hassan@weberslink.org", address: biz.address, areaServed: biz.areaServed },
       { "@type": "WebSite", "@id": SITE + "/#website", url: SITE + "/", name: "WebersLink", inLanguage: "en", publisher: { "@id": SITE + "/#org" } },
       biz,
     ];
@@ -1209,7 +1211,7 @@ const oneLine = (t) => strip(String(t)).replace(/\s+/g, " ").trim();
 const llmLink = (p, name, desc) => `- [${oneLine(name)}](${SITE}${p}): ${oneLine(desc)}`;
 fs.writeFileSync(path.join(PUBLIC, "llms.txt"), `# WebersLink
 
-> WebersLink is a forward-deployed engineering team for contractors, home-service and other service businesses in the US, UK and Europe. We build and run lead systems in-house: websites, AI assistants that reply in 60 seconds, follow-up automation, local SEO and AI workflow automation. Based in Lahore, Pakistan. Plans are month-to-month. Lead System: $490/month plus a one-time $1,490 setup. Growth Engine: $990/month plus setup. Websites from $1,490 one-time.
+> WebersLink is a forward-deployed engineering team for businesses in the US, UK and Europe. We build and run systems in-house: AI assistants and workflow agents, automation, websites, lead response and follow-up, local SEO and reporting. Contractors and home-service businesses are a core industry, not the limit. Based in Lahore, Pakistan. Plans are month-to-month. Lead System: $490/month plus a one-time $1,490 setup. Growth Engine: $990/month plus setup. Websites from $1,490 one-time.
 
 ## Offers
 ${OFFERS.map((o) => llmLink(o.path, o.name, o.description)).join("\n")}
