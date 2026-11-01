@@ -14,11 +14,11 @@
   function matcap() {
     var c = document.createElement('canvas'); c.width = c.height = 256; var g = c.getContext('2d');
     var bg = g.createRadialGradient(100, 80, 10, 128, 128, 140);
-    bg.addColorStop(0, '#ffffff'); bg.addColorStop(.25, '#d9dadd'); bg.addColorStop(.55, '#6e7075');
-    bg.addColorStop(.8, '#1c1c1e'); bg.addColorStop(1, '#8a8c90');
+    bg.addColorStop(0, '#ffb0a6'); bg.addColorStop(.25, '#ff3b2e'); bg.addColorStop(.55, '#8a1812');
+    bg.addColorStop(.8, '#1d0c0a'); bg.addColorStop(1, '#d9251c');
     g.fillStyle = bg; g.beginPath(); g.arc(128, 128, 128, 0, Math.PI * 2); g.fill();
     var rim = g.createLinearGradient(0, 180, 0, 256);
-    rim.addColorStop(0, 'rgba(255,255,255,0)'); rim.addColorStop(1, 'rgba(230,230,235,.55)');
+    rim.addColorStop(0, 'rgba(255,255,255,0)'); rim.addColorStop(1, 'rgba(255,120,105,.55)');
     g.fillStyle = rim; g.beginPath(); g.arc(128, 128, 128, 0, Math.PI * 2); g.fill();
     return new THREE.CanvasTexture(c);
   }
@@ -27,9 +27,9 @@
   var group = new THREE.Group(); scene.add(group);
   var knot = new THREE.Mesh(new THREE.TorusKnotGeometry(1.25, .38, mobile ? 140 : 220, mobile ? 20 : 32, 2, 3), chrome);
   group.add(knot);
-  var ring = new THREE.Mesh(new THREE.TorusGeometry(2.6, .025, 8, 120), new THREE.MeshBasicMaterial({ color: 0x9a9ca1, transparent: true, opacity: .55 }));
+  var ring = new THREE.Mesh(new THREE.TorusGeometry(2.6, .025, 8, 120), new THREE.MeshBasicMaterial({ color: 0xd9251c, transparent: true, opacity: .55 }));
   ring.rotation.x = 1.2; group.add(ring);
-  var ring2 = new THREE.Mesh(new THREE.TorusGeometry(3.1, .012, 8, 120), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .25 }));
+  var ring2 = new THREE.Mesh(new THREE.TorusGeometry(3.1, .012, 8, 120), new THREE.MeshBasicMaterial({ color: 0xff3b2e, transparent: true, opacity: .25 }));
   ring2.rotation.set(.4, .9, 0); group.add(ring2);
   var orbs = [];
   [[.32, 2.6, 0], [.18, 3.1, 2.1], [.22, 2.6, 4.2]].forEach(function (o) {
@@ -43,7 +43,7 @@
     pos[i * 3] = r * Math.sin(ph) * Math.cos(th); pos[i * 3 + 1] = r * Math.sin(ph) * Math.sin(th); pos[i * 3 + 2] = r * Math.cos(ph) - 4;
   }
   var pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  var stars = new THREE.Points(pg, new THREE.PointsMaterial({ color: 0xd0d2d6, size: .03, transparent: true, opacity: .7 }));
+  var stars = new THREE.Points(pg, new THREE.PointsMaterial({ color: 0xff8a7e, size: .03, transparent: true, opacity: .7 }));
   scene.add(stars);
 
   function layout() {
