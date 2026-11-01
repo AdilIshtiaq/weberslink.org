@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+<channel>
+  <title>WebersLink guides</title>
+  <link>https://weberslink.org/blog/</link>
+  <description>Practical guides on website costs, AI chatbots, SEO and turning visitors into booked clients.</description>
+  <language>en</language>
+  <atom:link href="https://weberslink.org/feed.xml" rel="self" type="application/rss+xml"/>
+  <item>
+    <title>How much does a small business website cost in 2026?</title>
+    <link>https://weberslink.org/blog/small-business-website-cost</link>
+    <guid isPermaLink="true">https://weberslink.org/blog/small-business-website-cost</guid>
+    <pubDate>Mon, 05 Oct 2026 00:00:00 GMT</pubDate>
+    <description>Small business website costs in 2026: DIY builders vs freelancers vs agencies, what drives the price, ongoing costs and how to budget for a site that brings in clients.</description>
+  </item>
+  <item>
+    <title>How much does an AI chatbot cost for a small business?</title>
+    <link>https://weberslink.org/blog/ai-chatbot-cost</link>
+    <guid isPermaLink="true">https://weberslink.org/blog/ai-chatbot-cost</guid>
+    <pubDate>Mon, 05 Oct 2026 00:00:00 GMT</pubDate>
+    <description>AI chatbot costs for small businesses in 2026: subscription tools vs custom builds, usage fees, setup costs and how to calculate whether a chatbot pays for itself.</description>
+  </item>
+  <item>
+    <title>Speed to lead: why replying in 5 minutes wins more clients</title>
+    <link>https://weberslink.org/blog/speed-to-lead</link>
+    <guid isPermaLink="true">https://weberslink.org/blog/speed-to-lead</guid>
+    <pubDate>Mon, 05 Oct 2026 00:00:00 GMT</pubDate>
+    <description>What speed to lead is, why the first business to respond usually wins the job, and 6 practical ways small businesses can reply to every lead within minutes.</description>
+  </item>
+  <item>
+    <title>WordPress vs custom website: which is better for a small business?</title>
+    <link>https://weberslink.org/blog/wordpress-vs-custom-website</link>
+    <guid isPermaLink="true">https://weberslink.org/blog/wordpress-vs-custom-website</guid>
+    <pubDate>Mon, 05 Oct 2026 00:00:00 GMT</pubDate>
+    <description>WordPress vs a custom-coded website for small businesses: cost, speed, security, SEO, editing and maintenance compared — plus which to choose for your situation.</description>
+  </item>
+  <item>
+    <title>Contractor website checklist: 15 must-haves that win more jobs</title>
+    <link>https://weberslink.org/blog/contractor-website-checklist</link>
+    <guid isPermaLink="true">https://weberslink.org/blog/contractor-website-checklist</guid>
+    <pubDate>Mon, 05 Oct 2026 00:00:00 GMT</pubDate>
+    <description>A practical contractor website checklist: 15 things every roofing, remodeling, plumbing and HVAC website needs to rank locally and turn visitors into booked estimates.</description>
+  </item>
+  <item>
+    <title>Why is my website not getting leads? 9 common fixes</title>
+    <link>https://weberslink.org/blog/website-not-generating-leads</link>
+    <guid isPermaLink="true">https://weberslink.org/blog/website-not-generating-leads</guid>
+    <pubDate>Mon, 05 Oct 2026 00:00:00 GMT</pubDate>
+    <description>Website getting visitors but no enquiries? 9 common reasons small business websites don't generate leads — and practical fixes you can make this week.</description>
+  </item>
+</channel>
+</rss>

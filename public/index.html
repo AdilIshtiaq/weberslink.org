@@ -6,6 +6,13 @@
 <title>FDE Lead Systems for Contractors & Home Services | WebersLink</title>
 <meta name="description" content="Forward-deployed engineers who build and run your lead system in-house for contractors and home service businesses in the US & Europe: a website, AI that answers every lead in 60 seconds, and automatic follow-up. From $490/month.">
 <link rel="canonical" href="https://weberslink.org/">
+<link rel="alternate" hreflang="en" href="https://weberslink.org/">
+<link rel="alternate" hreflang="x-default" href="https://weberslink.org/">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="en_GB">
+<link rel="manifest" href="/site.webmanifest">
+<link rel="alternate" type="application/rss+xml" title="WebersLink guides" href="https://weberslink.org/feed.xml">
 <meta name="theme-color" content="#090807">
 <link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48"><link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -23,27 +30,180 @@
 <meta name="twitter:image" content="https://weberslink.org/og.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
-<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400&display=swap"></noscript>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap"></noscript>
 <link rel="stylesheet" href="/assets/site.css">
 <script type="application/ld+json">
 {
-  "@context": "https://schema.org",
-  "@type": "ProfessionalService",
-  "name": "WebersLink",
-  "url": "https://weberslink.org/",
-  "logo": "https://weberslink.org/apple-touch-icon.png",
-  "image": "https://weberslink.org/og.png",
-  "description": "Done-for-you lead systems for contractors and home service businesses: websites, AI assistants that answer every lead in 60 seconds, follow-up automation and local SEO.",
-  "email": "hassan@weberslink.org",
-  "address": {"@type": "PostalAddress", "addressLocality": "Lahore", "addressCountry": "PK"},
-  "areaServed": ["United States", "Europe"],
-  "priceRange": "$$",
-  "knowsAbout": ["Web design", "Web development", "AI chatbots", "Marketing automation", "SEO", "WordPress", "E-commerce"]
+ "@context": "https://schema.org",
+ "@graph": [
+  {
+   "@type": "Organization",
+   "@id": "https://weberslink.org/#org",
+   "name": "WebersLink",
+   "url": "https://weberslink.org/",
+   "logo": "https://weberslink.org/apple-touch-icon.png",
+   "email": "hassan@weberslink.org",
+   "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "Lahore",
+    "addressCountry": "PK"
+   },
+   "areaServed": [
+    "United States",
+    "United Kingdom",
+    "Europe"
+   ]
+  },
+  {
+   "@type": "WebSite",
+   "@id": "https://weberslink.org/#website",
+   "url": "https://weberslink.org/",
+   "name": "WebersLink",
+   "inLanguage": "en",
+   "publisher": {
+    "@id": "https://weberslink.org/#org"
+   }
+  },
+  {
+   "@type": "ProfessionalService",
+   "name": "WebersLink",
+   "url": "https://weberslink.org/",
+   "logo": "https://weberslink.org/apple-touch-icon.png",
+   "image": "https://weberslink.org/og.png",
+   "description": "Done-for-you lead systems for contractors and home service businesses: websites, AI assistants that answer every lead in 60 seconds, follow-up automation and local SEO.",
+   "email": "hassan@weberslink.org",
+   "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "Lahore",
+    "addressCountry": "PK"
+   },
+   "areaServed": [
+    "United States",
+    "United Kingdom",
+    "Europe"
+   ],
+   "priceRange": "$$",
+   "knowsAbout": [
+    "Web design",
+    "Web development",
+    "AI chatbots",
+    "Marketing automation",
+    "SEO",
+    "WordPress",
+    "E-commerce"
+   ],
+   "@id": "https://weberslink.org/#business",
+   "availableLanguage": "English"
+  },
+  {
+   "@type": "FAQPage",
+   "mainEntity": [
+    {
+     "@type": "Question",
+     "name": "What does \"forward-deployed engineering\" mean here?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "The engineers who build your system work on your actual business, not from a generic template. We learn your services, your area and how your leads arrive, build around that, connect it to your calendar, CRM, WhatsApp and email, and stay on to improve it every month."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Do you replace the tools I already use?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "No. We connect to what you already have: your calendar, CRM, WhatsApp, email and spreadsheets. Where something is missing, we recommend the simplest option that does the job, and you own every account."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "How much does it cost?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "The Lead System is $490/month plus a one-time $1,490 setup. Growth Engine (adds local SEO, Google Business Profile and ads management) is $990/month plus setup. If you only want a website you own outright, that starts at $1,490 one-time."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Why not just build it myself with AI tools?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "You can — and for some businesses that's the right call. Most owners we talk to don't have time to connect a website, chatbot, calendar, CRM, follow-ups and reviews, keep them all working, and improve them every month. That ongoing work is what you're paying us for."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "How long does setup take?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Most Lead Systems go live in 2–3 weeks. The biggest factor is how quickly we get your service details, photos and feedback — we'll give you a dated plan up front."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Is there a contract?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "No long-term contract. Plans are month-to-month and you can cancel anytime. If you cancel, you keep your website and domain — and we'll help you move hosting if you want."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "You're based in Pakistan — how does working across time zones work?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "We schedule calls at times that suit you, whether you're in New York, London or Berlin. Progress lives in a shared board you can check any time, and we reply to messages within 24 hours — usually much faster. Many clients like that work continues while they sleep."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "How do payments work?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "The setup fee is paid 50% to start and 50% at launch. Monthly plans begin at launch and are billed at the start of each month. We accept bank transfer, Wise or PayPal in USD, EUR or GBP."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Do I own my website?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Yes. The design, code, content and domain are yours. We hand over all logins at launch, and you're never locked in to us."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Will my site be GDPR compliant?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "For EU and UK clients we set up a privacy policy page, cookie consent where needed and privacy-friendly analytics, and we keep forms collecting only the data you need."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "What exactly is the AI assistant?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "A chat assistant on your website (and optionally WhatsApp) trained on your services, prices and FAQs. It answers questions instantly, collects the visitor's details and books calls into your calendar — and hands over to you whenever a human is needed."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Do you only work with contractors?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Contractors and home service businesses are our focus, but the same system works for builders, clinics, accountants, consultants and any business that lives on enquiries and appointments. See industries we serve."
+     }
+    }
+   ]
+  }
+ ]
 }
 </script>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></symbol><symbol id="i-arrow-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></symbol><symbol id="i-arrow-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></symbol></svg>
+<a class="skip" href="#main">Skip to content</a>
 
 <!-- NAV -->
 <header class="nav" id="nav">
@@ -63,7 +223,7 @@
 </header>
 <!-- /NAV -->
 
-<main>
+<main id="main">
 <!-- HERO -->
 <section class="hero" id="top">
   <div class="hero-grid" aria-hidden="true"></div>
@@ -74,7 +234,7 @@
     <h1 class="rv d1">Engineers on your side. <em>Every lead answered in 60 seconds.</em></h1>
     <p class="lead rv d2">WebersLink is an in-house engineering team that sits inside your operation. We build your website, AI replies, follow-up and reporting, connect them to the tools you already use, and run them every month.</p>
     <div class="hero-cta rv d3">
-      <a href="#book" class="btn btn-light" data-track="Book CTA" data-loc="hero">Book a walkthrough →</a>
+      <a href="#book" class="btn btn-light" data-track="Book CTA" data-loc="hero">Book a walkthrough<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a>
       <a href="#audit" class="btn btn-ghost" data-track="Audit CTA" data-loc="hero">Get a free website audit</a>
     </div>
     <p class="cta-note rv d3">Free 20-min call · Live in 2–3 weeks · Month-to-month, cancel anytime</p>
@@ -136,16 +296,16 @@
       <p class="sub rv d2">Start with the leak that costs you most. Every system connects to the others when you're ready.</p>
     </div>
     <div class="offer-cards">
-      <a class="offer-card rv" href="/offers/lead-command-center"><span class="offer-n">SYS/01</span><h3>Lead Command Center</h3><p class="offer-for">For contractors &amp; home-service businesses</p><p>Every enquiry caught, answered and booked.</p><ul><li>AI replies on site and WhatsApp in under 60 seconds</li><li>Estimates land straight in your calendar</li><li>A website built around your services and areas</li></ul><span class="offer-price">Part of the Lead System · $490/month + $1,490 setup</span><span class="rel-go">See the system →</span></a>
-      <a class="offer-card rv d1" href="/offers/follow-up-engine"><span class="offer-n">SYS/02</span><h3>Follow-Up Engine</h3><p class="offer-for">For businesses that quote, then wait</p><p>Chase every quote. Ask for every review.</p><ul><li>Reminders on days 1, 3 and 7 until the lead books or says no</li><li>Review requests linked to your Google page</li><li>Stops the moment a lead replies</li></ul><span class="offer-price">Included in the Lead System · $490/month + $1,490 setup</span><span class="rel-go">See the system →</span></a>
-      <a class="offer-card rv d2" href="/offers/local-growth-engine"><span class="offer-n">SYS/03</span><h3>Local Growth Engine</h3><p class="offer-for">For businesses ready for more leads coming in</p><p>More of the right searches, landing on pages that convert.</p><ul><li>Local SEO and a page for every service and area</li><li>Google Business Profile management</li><li>Google and Meta ads management (ad spend separate)</li></ul><span class="offer-price">Growth Engine · $990/month + $1,490 setup</span><span class="rel-go">See the system →</span></a>
+      <a class="offer-card rv" href="/offers/lead-command-center"><span class="offer-n">SYS/01</span><h3>Lead Command Center</h3><p class="offer-for">For contractors &amp; home-service businesses</p><p>Every enquiry caught, answered and booked.</p><ul><li>AI replies on site and WhatsApp in under 60 seconds</li><li>Estimates land straight in your calendar</li><li>A website built around your services and areas</li></ul><span class="offer-price">Part of the Lead System · $490/month + $1,490 setup</span><span class="rel-go">See the system<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></span></a>
+      <a class="offer-card rv d1" href="/offers/follow-up-engine"><span class="offer-n">SYS/02</span><h3>Follow-Up Engine</h3><p class="offer-for">For businesses that quote, then wait</p><p>Chase every quote. Ask for every review.</p><ul><li>Reminders on days 1, 3 and 7 until the lead books or says no</li><li>Review requests linked to your Google page</li><li>Stops the moment a lead replies</li></ul><span class="offer-price">Included in the Lead System · $490/month + $1,490 setup</span><span class="rel-go">See the system<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></span></a>
+      <a class="offer-card rv d2" href="/offers/local-growth-engine"><span class="offer-n">SYS/03</span><h3>Local Growth Engine</h3><p class="offer-for">For businesses ready for more leads coming in</p><p>More of the right searches, landing on pages that convert.</p><ul><li>Local SEO and a page for every service and area</li><li>Google Business Profile management</li><li>Google and Meta ads management (ad spend separate)</li></ul><span class="offer-price">Growth Engine · $990/month + $1,490 setup</span><span class="rel-go">See the system<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></span></a>
     </div>
     <p class="more-label rv">And when you're ready for more</p>
     <div class="offer-minis">
-      <a class="offer-mini rv" href="/offers/ai-workflow-agents"><span class="offer-n">SYS/04</span><h3>AI Workflow Agents</h3><p>Agents that take over repeat customer and admin tasks inside your real tools.</p><span class="rel-go">See the system →</span></a>
-      <a class="offer-mini rv d1" href="/offers/knowledge-assistant"><span class="offer-n">SYS/05</span><h3>Knowledge Assistant</h3><p>An assistant trained on your own documents, for your team or customers.</p><span class="rel-go">See the system →</span></a>
-      <a class="offer-mini rv d2" href="/offers/ai-team-rollout"><span class="offer-n">SYS/06</span><h3>AI Team Rollout</h3><p>Setup, rules and hands-on training so your team uses AI tools well.</p><span class="rel-go">See the system →</span></a>
-      <a class="offer-mini rv d3" href="/offers/document-automation"><span class="offer-n">SYS/07</span><h3>Document &amp; Admin Automation</h3><p>Automation that reads emails, forms and PDFs and files the details for you.</p><span class="rel-go">See the system →</span></a>
+      <a class="offer-mini rv" href="/offers/ai-workflow-agents"><span class="offer-n">SYS/04</span><h3>AI Workflow Agents</h3><p>Agents that take over repeat customer and admin tasks inside your real tools.</p><span class="rel-go">See the system<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></span></a>
+      <a class="offer-mini rv d1" href="/offers/knowledge-assistant"><span class="offer-n">SYS/05</span><h3>Knowledge Assistant</h3><p>An assistant trained on your own documents, for your team or customers.</p><span class="rel-go">See the system<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></span></a>
+      <a class="offer-mini rv d2" href="/offers/ai-team-rollout"><span class="offer-n">SYS/06</span><h3>AI Team Rollout</h3><p>Setup, rules and hands-on training so your team uses AI tools well.</p><span class="rel-go">See the system<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></span></a>
+      <a class="offer-mini rv d3" href="/offers/document-automation"><span class="offer-n">SYS/07</span><h3>Document &amp; Admin Automation</h3><p>Automation that reads emails, forms and PDFs and files the details for you.</p><span class="rel-go">See the system<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></span></a>
     </div>
   </div>
 </section>
@@ -186,7 +346,7 @@
             <div class="cs-row"><dt>What we built</dt><dd>A design-build showcase with full-screen galleries, Matterport 3D walkthroughs and project-inquiry flows.</dd></div>
             <div class="cs-row"><dt>Outcome</dt><dd>Every home presented like a portfolio piece — and buyers can tour projects remotely before they call.</dd></div>
           </dl>
-          <div class="cs-foot"><span><span class="tag">WordPress</span><span class="tag g1">Matterport 3D</span></span><a href="https://bcidesignbuild.com/" target="_blank" rel="noopener">Visit live site →</a></div>
+          <div class="cs-foot"><span><span class="tag">WordPress</span><span class="tag g1">Matterport 3D</span></span><a href="https://bcidesignbuild.com/" target="_blank" rel="noopener">Visit live site<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a></div>
         </div>
       </article>
       <article class="cs rv">
@@ -199,7 +359,7 @@
             <div class="cs-row"><dt>What we built</dt><dd>Service-area selection, a guided quote request and licensing &amp; trust sections throughout.</dd></div>
             <div class="cs-row"><dt>Outcome</dt><dd>A simple path from Google search to quote request, with trust built in from the start, not bolted on.</dd></div>
           </dl>
-          <div class="cs-foot"><span><span class="tag">Lead Gen</span><span class="tag g1">Home Services</span></span><a href="https://senjoeycollectivellc.com/" target="_blank" rel="noopener">Visit live site →</a></div>
+          <div class="cs-foot"><span><span class="tag">Lead Gen</span><span class="tag g1">Home Services</span></span><a href="https://senjoeycollectivellc.com/" target="_blank" rel="noopener">Visit live site<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a></div>
         </div>
       </article>
       <article class="cs rv">
@@ -212,12 +372,12 @@
             <div class="cs-row"><dt>What we built</dt><dd>A full WooCommerce store with product variations and one-tap WhatsApp ordering.</dd></div>
             <div class="cs-row"><dt>Outcome</dt><dd>A storefront that holds up under real traffic, with ordering in the channel customers already use.</dd></div>
           </dl>
-          <div class="cs-foot"><span><span class="tag">WooCommerce</span><span class="tag g1">E-Commerce</span></span><a href="https://sharjahoptical.online/" target="_blank" rel="noopener">Visit live site →</a></div>
+          <div class="cs-foot"><span><span class="tag">WooCommerce</span><span class="tag g1">E-Commerce</span></span><a href="https://sharjahoptical.online/" target="_blank" rel="noopener">Visit live site<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a></div>
         </div>
       </article>
     </div>
 
-    <div class="more-work"><button class="btn btn-outline" id="showAll" aria-expanded="false" aria-controls="allWork">See all 10 projects <span aria-hidden="true">↓</span></button></div>
+    <div class="more-work"><button class="btn btn-outline" id="showAll" aria-expanded="false" aria-controls="allWork">See all 10 projects <span aria-hidden="true"><svg class="ico ico-arrow-down" aria-hidden="true" focusable="false"><use href="#i-arrow-down"/></svg></span></button></div>
     <div id="allWork" hidden>
     <div class="db-bar rv">
       <div class="db-tabs" role="tablist">
@@ -236,7 +396,7 @@
         <div class="card-body">
           <div class="card-title">Devziner — Digital Agency</div>
           <p class="card-desc">Agency site bringing branding, UI/UX and web/app development together with clear project-inquiry CTAs.</p>
-          <div class="card-foot"><span><span class="tag">Web Design</span><span class="tag g1">UI/UX</span></span><span class="card-link">Visit <span class="arr">→</span></span></div>
+          <div class="card-foot"><span><span class="tag">Web Design</span><span class="tag g1">UI/UX</span></span><span class="card-link">Visit <span class="arr"><svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></span></span></div>
         </div>
       </a>
       <a class="card tilt-soft rv d1" data-cat="live ecom" href="https://sharjahoptical.online/" target="_blank" rel="noopener">
@@ -244,7 +404,7 @@
         <div class="card-body">
           <div class="card-title">Sharjah Optical — Eyewear Store</div>
           <p class="card-desc">Full WooCommerce storefront for glasses, sunglasses and lenses, with WhatsApp ordering and nationwide delivery.</p>
-          <div class="card-foot"><span><span class="tag">WooCommerce</span><span class="tag g1">E-Commerce</span></span><span class="card-link">Visit <span class="arr">→</span></span></div>
+          <div class="card-foot"><span><span class="tag">WooCommerce</span><span class="tag g1">E-Commerce</span></span><span class="card-link">Visit <span class="arr"><svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></span></span></div>
         </div>
       </a>
       <a class="card tilt-soft rv d2" data-cat="live corp" href="https://hurmatindustries.com/" target="_blank" rel="noopener">
@@ -252,7 +412,7 @@
         <div class="card-body">
           <div class="card-title">Hurmat Industries — Medical Equipment</div>
           <p class="card-desc">Corporate site for a manufacturer with a legacy since 1935 — catalog, certifications and inquiry flows.</p>
-          <div class="card-foot"><span><span class="tag">Corporate</span><span class="tag g1">Healthcare</span></span><span class="card-link">Visit <span class="arr">→</span></span></div>
+          <div class="card-foot"><span><span class="tag">Corporate</span><span class="tag g1">Healthcare</span></span><span class="card-link">Visit <span class="arr"><svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></span></span></div>
         </div>
       </a>
       <a class="card tilt-soft rv" data-cat="live corp lead" href="https://bcidesignbuild.com/" target="_blank" rel="noopener">
@@ -260,7 +420,7 @@
         <div class="card-body">
           <div class="card-title">Baladez Construction — Luxury Homes</div>
           <p class="card-desc">Premium design-build showcase for a Houston-area home builder, with Matterport 3D walkthroughs.</p>
-          <div class="card-foot"><span><span class="tag">Real Estate</span><span class="tag g1">Matterport 3D</span></span><span class="card-link">Visit <span class="arr">→</span></span></div>
+          <div class="card-foot"><span><span class="tag">Real Estate</span><span class="tag g1">Matterport 3D</span></span><span class="card-link">Visit <span class="arr"><svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></span></span></div>
         </div>
       </a>
       <a class="card tilt-soft rv d1" data-cat="live lead" href="https://senjoeycollectivellc.com/" target="_blank" rel="noopener">
@@ -268,7 +428,7 @@
         <div class="card-body">
           <div class="card-title">Senjoey Collective — Home Services</div>
           <p class="card-desc">Handyman company site with service-area selection, quote requests and trust sections that convert.</p>
-          <div class="card-foot"><span><span class="tag">Home Services</span><span class="tag g1">Lead Gen</span></span><span class="card-link">Visit <span class="arr">→</span></span></div>
+          <div class="card-foot"><span><span class="tag">Home Services</span><span class="tag g1">Lead Gen</span></span><span class="card-link">Visit <span class="arr"><svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></span></span></div>
         </div>
       </a>
       <a class="card tilt-soft rv d2" data-cat="live ecom" href="https://aimonsters-thekite.com/" target="_blank" rel="noopener">
@@ -276,7 +436,7 @@
         <div class="card-body">
           <div class="card-title">The Kite — Sci-Fi Book Series</div>
           <p class="card-desc">Cinematic world-building site with character profiles, story galleries and shop integration.</p>
-          <div class="card-foot"><span><span class="tag">Publishing</span><span class="tag g1">Online Shop</span></span><span class="card-link">Visit <span class="arr">→</span></span></div>
+          <div class="card-foot"><span><span class="tag">Publishing</span><span class="tag g1">Online Shop</span></span><span class="card-link">Visit <span class="arr"><svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></span></span></div>
         </div>
       </a>
       <div class="card tilt-soft rv" data-cat="corp">
@@ -371,7 +531,7 @@
           <li>Google review requests after every job</li>
           <li>Monthly tuning, fixes &amp; lead report</li>
         </ul>
-        <a href="#book" class="btn btn-light" data-package="Lead System">Get the Lead System →</a>
+        <a href="#book" class="btn btn-light" data-package="Lead System">Get the Lead System<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a>
       </article>
       <article class="pk tilt-soft rv d2">
         <h3>Growth Engine</h3>
@@ -472,7 +632,7 @@
         <a href="/blog/small-business-website-cost">How much does a small business website cost?</a>
         <a href="/blog/ai-chatbot-cost">How much does an AI chatbot cost?</a>
         <a href="/blog/speed-to-lead">Speed to lead: why 5 minutes matters</a>
-        <a href="/blog/">All guides →</a>
+        <a href="/blog/">All guides<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a>
       </div>
     </div>
     <div class="faq rv d1">
@@ -507,7 +667,7 @@
           <input id="a-site" name="website" type="text" inputmode="url" placeholder="yourwebsite.com" required>
           <label for="a-email" class="hp">Your email</label>
           <input id="a-email" name="email" type="email" placeholder="you@company.com" required autocomplete="email">
-          <button class="btn btn-light" type="submit">Get my free audit →</button>
+          <button class="btn btn-light" type="submit">Get my free audit<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></button>
           <p class="form-msg" role="status" style="flex-basis:100%;text-align:left"></p>
         </div>
         <div class="success" style="flex-basis:100%;padding:8px 0;text-align:left"><h3 style="font-size:19px">✓ Request received</h3><p>Your audit video will land in your inbox within 48 hours.</p></div>
@@ -566,7 +726,7 @@
             </div>
             <div class="field"><label for="f-msg">Anything we should know? <span class="opt">(optional)</span></label><textarea id="f-msg" name="message" placeholder="Your goals, what's not working, links…"></textarea></div>
             <label class="consent"><input type="checkbox" required> <span>I agree to WebersLink contacting me about this request. See our <a href="/privacy">privacy policy</a>.</span></label>
-            <button class="btn btn-light" type="submit">Request my free call →</button>
+            <button class="btn btn-light" type="submit">Request my free call<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></button>
             <p class="form-msg" role="status"></p>
             <p class="form-note">We reply within 24 hours with call times in your time zone.</p>
           </div>

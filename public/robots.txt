@@ -1,6 +1,18 @@
+# Search engines and AI search/answer crawlers are welcome. Admin and API paths stay private.
 User-agent: *
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: GPTBot
+User-agent: ClaudeBot
+User-agent: Claude-SearchBot
+User-agent: Claude-User
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: Google-Extended
+User-agent: Applebot-Extended
 Allow: /
 Disallow: /admin/
 Disallow: /api/
 
 Sitemap: https://weberslink.org/sitemap.xml
+# AI-readable site summary: https://weberslink.org/llms.txt

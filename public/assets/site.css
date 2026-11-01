@@ -726,3 +726,30 @@ form.sent .form-fields{display:none}
 .more-label{margin-top:52px;font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--grey-5)}
 @media(max-width:1000px){.offer-minis{grid-template-columns:1fr 1fr}}
 @media(max-width:560px){.offer-minis{grid-template-columns:1fr}}
+
+/* ---------- Typography: Archivo (expanded display) + Inter (body) + JetBrains Mono (labels) ---------- */
+:root{--display:'Archivo','Inter',system-ui,-apple-system,sans-serif;--serif:'Archivo','Inter',system-ui,-apple-system,sans-serif}
+h1,.h2,.hero h1,.page-hero h1{font-family:var(--display);font-stretch:125%;font-weight:800;letter-spacing:-.035em;line-height:1.04}
+.hero h1{font-size:clamp(36px,6vw,80px);line-height:1.02}
+.h2{font-size:clamp(28px,4.1vw,52px)}
+.page-hero h1{font-size:clamp(30px,4.7vw,58px)}
+.hero h1 em,.h2 em,.page-hero h1 em,.dark .h2 em{font-family:var(--display);font-stretch:125%;font-style:italic;font-weight:700;letter-spacing:-.03em}
+.stat-n,.foot-big{font-family:var(--display);font-stretch:125%;font-weight:800}
+.offer-card h2,.offer-card h3,.offer-mini h3,.pain h3,.step h3,.fde h3,.contact-card h2{font-family:var(--display);font-stretch:112%;font-weight:700;letter-spacing:-.02em}
+.marquee-track,.kite{font-family:var(--display);font-stretch:112%;font-weight:600}
+@media(max-width:600px){h1,.h2,.hero h1,.page-hero h1{font-stretch:110%}}
+
+/* ---------- Icon arrows (SVG sprite, see iconify() in scripts/build.js) ---------- */
+.ico{width:1em;height:1em;flex:none}
+.ico-arrow,.ico-arrow-down,.ico-arrow-left{display:inline-block;vertical-align:-.14em;margin-left:.45em;transition:transform .3s var(--ease)}
+.ico:first-child{margin-left:0}
+a:hover>.ico-arrow,.btn:hover .ico-arrow,.card:hover .ico-arrow,.offer-card:hover .ico-arrow,.offer-mini:hover .ico-arrow,.contact-card:hover .ico-arrow,.rel:hover .ico-arrow{transform:translateX(4px)}
+a:hover>.ico-arrow-down,.btn:hover .ico-arrow-down{transform:translateY(3px)}
+a:hover>.ico-arrow-left,.btn:hover .ico-arrow-left{transform:translateX(-4px)}
+.btn .ico{width:1.05em;height:1.05em}
+
+/* ---------- Accessibility: skip link and visible keyboard focus ---------- */
+.skip{position:fixed;left:16px;top:-60px;z-index:200;background:var(--red);color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;font-weight:500;transition:top .2s}
+.skip:focus{top:12px}
+:focus-visible{outline:2px solid var(--red-bright);outline-offset:3px;border-radius:4px}
+.btn:focus-visible{outline-offset:4px;border-radius:999px}
