@@ -2,8 +2,8 @@ Subject: {domain} after midnight
 
 {greeting}
 
-One number: Baymard's research puts average cart abandonment at about 70%. If {store} gets 100 carts a week at {currency}60 each, that is roughly {currency}4,200 left behind every week. Some of it is simply a question nobody answered in time.
+One number: Baymard's research puts average cart abandonment at about 70%. Some of those carts are simply a question nobody answered in time. If {store} gets 100 carts a week at {currency}60 each, that is roughly {currency}4,200 left behind every week.
 
-The video is free and takes me 3 minutes to record. Should I send it?
+An assistant trained on your products, shipping and returns, that answers in seconds and hands over to you when it isn't sure, is one of the first things we build. The video shows what it would look like on {domain}. It is free and takes me 3 minutes to record. Should I send it?
 
 {sender_first_name}

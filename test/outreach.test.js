@@ -47,7 +47,19 @@ test("every bundled template renders with no leftover fields; A/B differ only in
   assert.match(a.text, /frame sizes/);
   assert.match(a.text, /41\/100/);
   assert.doesNotMatch(a.text, /\$|£|\{|\}/); // email 1 never sells or quotes money
+  assert.doesNotMatch(a.text, /https?:|www\./i, "email 1 has no links");
+  assert.match(a.text, /engineers who build and run AI assistants and automation/, "new positioning: an engineering team, not a lead-system agency");
+  assert.match(a.text, /I'm [A-Za-z]+ from WebersLink/, "says who is writing and from where");
+  assert.doesNotMatch(a.text, /contractor|home.service/i, "not limited to one industry");
   assert.match(tpl.render(2, lead, CONFIG).text, /£4,200/);
+  for (const step of [1, 2, 3, 4]) {
+    for (const v of tpl.variantsFor(step)) {
+      const r = tpl.render(step, lead, CONFIG, v);
+      assert.doesNotMatch(r.text + r.subject, /contractor|home.service|lead system/i, `email ${step}${v} keeps to the new positioning`);
+      assert.match(r.text, /Prefer not to hear from me\?/, `email ${step}${v} carries the opt-out line`);
+      assert.match(r.text, /1 Example St/, `email ${step}${v} carries the postal address`);
+    }
+  }
   assert.match(a.html, /1 Example St/);
   assert.throws(() => tpl.render(1, lead, CONFIG, "a", "Subject: hi\n\n{nope}"), /unknown field \{nope\}/);
   assert.throws(() => tpl.parseTemplate("no subject here"), /Subject/);
