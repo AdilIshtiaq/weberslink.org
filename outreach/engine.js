@@ -14,7 +14,9 @@ const research = require("./research");
 const { Mailbox, passwordFor } = require("./mail");
 const { stripOurFooter } = require("./inbound");
 
-const VERSION = "2.3";
+const VERSION = "2.4";
+const MAX_PER_MAILBOX_PER_DAY = 100; // hard cap per mailbox (raised from 40 so one mailbox can send every 15-20 minutes around the clock)
+const RESCAN_MS = 10 * 60 * 1000;    // during a long run, re-read the inboxes at least this often so replies and opt-outs stop the sequence promptly
 const DONE_STATUSES = ["replied", "unsubscribed", "bounced", "do-not-contact"];
 const STOP_WORDS = /\b(unsubscribe|remove me|stop emailing|stop sending|not interested|take me off|do not (contact|email)|don'?t (contact|email)|opt.?out|no thanks|no thank you)\b/i;
 const BOUNCE_FROM = /mailer-daemon|postmaster|mail delivery/i;
@@ -38,7 +40,7 @@ const DEFAULT_CONFIG = {
   sending: {
     dry_run: true, countries: ["US", "UK"], send_days: ["Mon", "Tue", "Wed", "Thu", "Fri"], timezone: "America/New_York",
     daily_limit: 20, ramp: [5, 10, 15, 20], followup_gaps_days: [3, 4, 7], min_delay_seconds: 600, max_delay_seconds: 1200,
-    notify_email: "", html_emails: true, check_mx: true, bounce_pause_percent: 3, check_inbox_in_dry_run: false,
+    notify_email: "", html_emails: true, check_mx: true, bounce_pause_percent: 3, check_inbox_in_dry_run: false, auto_run: true,
     window_enabled: true, window_start: "19:00", window_end: "07:00",
   },
   mailboxes: [{ id: 1, email: "hassan@weberslink.org", from_name: "Hassan Ali", enabled: true, smtp_host: "smtp.hostinger.com", smtp_port: 465, imap_host: "imap.hostinger.com", imap_port: 993 }],
@@ -77,13 +79,13 @@ function sanitizeConfig(input) {
       countries: [...new Set(intList0(s.countries, d.sending.countries).map((c) => c.toUpperCase()))],
       send_days: intList0(s.send_days, d.sending.send_days).map((x) => x.slice(0, 1).toUpperCase() + x.slice(1, 3).toLowerCase()).filter((x) => DAYS.includes(x.toLowerCase())),
       timezone: tz,
-      daily_limit: intIn(s.daily_limit, 1, 40, 40), // hard cap: never above 40/day per mailbox
-      ramp: intList(s.ramp, d.sending.ramp).map((x) => Math.min(x, 40)),
+      daily_limit: intIn(s.daily_limit, 1, MAX_PER_MAILBOX_PER_DAY, 40), // hard cap: never above MAX_PER_MAILBOX_PER_DAY per mailbox
+      ramp: intList(s.ramp, d.sending.ramp).map((x) => Math.min(x, MAX_PER_MAILBOX_PER_DAY)),
       followup_gaps_days: intList(s.followup_gaps_days, d.sending.followup_gaps_days).slice(0, 3),
       min_delay_seconds: minD,
       max_delay_seconds: Math.max(minD, intIn(s.max_delay_seconds, 0, 7200, d.sending.max_delay_seconds)),
       notify_email: str(s.notify_email, 200), html_emails: s.html_emails !== false, check_mx: s.check_mx !== false,
-      bounce_pause_percent: intIn(s.bounce_pause_percent, 1, 50, 3), check_inbox_in_dry_run: Boolean(s.check_inbox_in_dry_run),
+      bounce_pause_percent: intIn(s.bounce_pause_percent, 1, 50, 3), check_inbox_in_dry_run: Boolean(s.check_inbox_in_dry_run), auto_run: s.auto_run !== false,
       window_enabled: s.window_enabled === true, window_start: hhmm(s.window_start, d.sending.window_start), window_end: hhmm(s.window_end, d.sending.window_end),
     },
     mailboxes: sanitizeMailboxes(input.mailboxes),
@@ -180,6 +182,13 @@ function campaignDate(cfg, d) {
   return w && w.crosses && p.hour * 60 + p.minute < w.end ? new Date(Date.parse(p.date + "T12:00:00Z") - 864e5).toISOString().slice(0, 10) : p.date;
 }
 const today = (cfg, now = new Date()) => campaignDate(cfg, now);
+/** Should the app start a run by itself right now? Only when Live sending is on, automatic running is not switched off,
+ *  and sending is allowed at this moment (no daily window, or the window is open). */
+function autoRunDue(cfg, now = new Date(), env = process.env) {
+  if (env.OUTREACH_AUTO_RUN === "off" || cfg.sending.dry_run || cfg.sending.auto_run === false) return false;
+  const w = windowState(cfg, now);
+  return !w.enabled || w.open;
+}
 function windowState(cfg, now = new Date()) {
   const w = windowOf(cfg);
   if (!w) return { enabled: false };
@@ -492,8 +501,10 @@ async function runOnce(opts = {}, deps = {}) {
   if (held.length) log(`  WARNING: ${held.length} lead(s) were mid-send when an earlier run stopped unexpectedly and are on hold. Check your Sent folder, then resolve them in the dashboard.`);
   try {
     // 1. inboxes. Every change is saved lead-by-lead (never the whole list), so edits made in the dashboard
-    //    while this scan is running can't be overwritten.
-    if (!dry || cfg.sending.check_inbox_in_dry_run) {
+    //    while this scan is running can't be overwritten. The same scan is repeated during a long run
+    //    (see rescanIfDue) so a reply or "stop" is honoured within minutes, not at the next run.
+    let lastScan = 0;
+    const scanInboxes = async () => {
       const all = [];
       const sendKeys = new Set(boxes.map((b) => b.addr.toLowerCase()));
       for (const box of scanBoxes) {
@@ -505,7 +516,7 @@ async function runOnce(opts = {}, deps = {}) {
             log(`  Inbox check failed for ${box.addr} (${e.message}). No sending this run, to be safe.`);
             summary.note = "inbox check failed";
             summary.reason = `Stopped for safety: could not read the inbox of ${box.addr} (${String(e.message).slice(0, 100)}). Check its password (OUTREACH_PASSWORD_${box.id}) and mail server settings.`;
-            return summary;
+            return false;
           }
           log(`  (could not read the inbox of switched-off mailbox ${box.addr}: ${e.message})`);
           continue;
@@ -523,7 +534,22 @@ async function runOnce(opts = {}, deps = {}) {
         if (c.kind === "REPLIED") summary.replies++; else if (c.kind === "OPT-OUT" || c.kind === "UNMATCHED-STOP") summary.optOuts++; else summary.bounces++;
       }
       if (all.length) await notify(cfg, boxes, all, dry);
+      lastScan = clock().getTime();
+      return true;
+    };
+    if (!dry || cfg.sending.check_inbox_in_dry_run) {
+      if (!(await scanInboxes())) return summary;
     }
+    // Before each send, re-read the inboxes if the last read is older than RESCAN_MS. One scan at a time, shared by every
+    // mailbox's worker. If the inbox can't be read mid-run, sending stops (the next run tries again).
+    let scanning = null;
+    const rescanIfDue = async () => {
+      if (dry || clock().getTime() - lastScan < RESCAN_MS) return true;
+      scanning = scanning || scanInboxes().finally(() => { scanning = null; });
+      const ok = await scanning;
+      if (!ok) (summary.errors ||= []).push("the inbox could not be read, so sending stopped (it retries on the next run)");
+      return ok;
+    };
     track = loadState(cfg);
     if (!sendDay) { log("=== Run end - today is not in send_days"); summary.reason = "Nothing sent: today isn't one of your send days (Settings > Send days)."; return summary; }
     if (closed) {
@@ -679,6 +705,7 @@ async function runOnce(opts = {}, deps = {}) {
           await sleep(wait * 1000);
           if (run.stop || windowClosed()) break;
         }
+        if (!(await rescanIfDue())) break;
         const r = await deliver(item.t, item.step, box);
         if (r === "stop") break;
         if (r === "sent") sentOne = true;
@@ -804,7 +831,7 @@ function status(cfg = loadConfig(), now = new Date()) {
   const daily = mailboxes.filter((m) => m.enabled && !m.paused).reduce((a, m) => a + m.todayLimit, 0);
   const remaining = track.filter((t) => t.status === "new").length;
   return {
-    version: VERSION, dryRun: cfg.sending.dry_run, sendDay: isSendDay(cfg, now), today: today(cfg, now), window: windowState(cfg, now),
+    version: VERSION, dryRun: cfg.sending.dry_run, autoRun: cfg.sending.auto_run !== false && process.env.OUTREACH_AUTO_RUN !== "off", sendDay: isSendDay(cfg, now), today: today(cfg, now), window: windowState(cfg, now),
     total: track.length, byStatus: count(track, (t) => t.status), byMailbox: group((t) => t.mailbox || "?"), byVariant: group((t) => t.variant || "a"),
     furthestStep: count(started.filter((t) => Number(t.step)), (t) => `email ${t.step}`), mailboxes, remaining,
     daysLeft: remaining && daily ? Math.ceil(remaining / daily) : 0,
@@ -875,5 +902,5 @@ function resolveHeld(email, action) {
   return null;
 }
 
-module.exports = { logTail, markInterrupted, readLastRun, windowState, inWindow, campaignDate, domainReceivesMail, nextEmail, sendTest, dnsHealth, resolveHeld, VERSION, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dailyLimitFor, bounceCheck, dueFollowups, runOnce,
+module.exports = { autoRunDue, MAX_PER_MAILBOX_PER_DAY, RESCAN_MS, logTail, markInterrupted, readLastRun, windowState, inWindow, campaignDate, domainReceivesMail, nextEmail, sendTest, dnsHealth, resolveHeld, VERSION, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dailyLimitFor, bounceCheck, dueFollowups, runOnce,
   startRun, requestStop, previewNext, status, readiness, applyRules, loadState, tzParts, isSendDay, today, daysSince, run, log };

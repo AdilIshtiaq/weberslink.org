@@ -5,10 +5,26 @@ on a phone or desktop use "Install app" / "Add to Home screen" for an icon).
 
 It is **off until `ADMIN_PASSWORD` is set**, and every run is a **dry run until you switch on Live sending** in Settings.
 
+## Runs by itself (automatic running)
+With **Live sending** ticked and **Run automatically** ticked (both in Settings; automatic is the default), the app starts
+a run by itself, checking every 10 minutes and again 30 seconds after any restart. Nothing else is needed: no cron job and no
+environment variable. Dry runs never start by themselves. A run keeps going, waiting between emails, and re-reads the
+inboxes at least every 10 minutes while it runs, so a reply, "unsubscribe" or bounce stops that lead's sequence within minutes
+even in a run that lasts all day. If an inbox cannot be read mid-run, sending stops until the next run can read it.
+To switch it off, untick **Run automatically** in Settings, or set `OUTREACH_AUTO_RUN=off` on the server.
+Hostinger can stop idle Node apps, so keeping the cron job below as a wake-up call is still sensible.
+
+## Sending 24/7 (one email every 15-20 minutes)
+Settings -> Sending rules -> **Use 24/7 settings**, then **Save settings**. It turns the sending window off, selects every
+day of the week, sets the wait between emails to 15-20 minutes (900-1200 seconds), and warms up at 25, 50, 75, then 100
+emails a day. One email every 17.5 minutes on average is about 82 a day from one mailbox. The hard cap is **100 a day per
+mailbox**. To skip the warm-up, set the warm-up field to `100`. Sending this many cold emails from one address, day and night,
+risks spam filtering and a damaged domain reputation: keep the bounce pause on (3%) and watch replies and bounces.
+
 ## What it does
 Each run: reads each mailbox's inbox (replies, opt-outs, bounces) and emails you a summary, pauses any mailbox with a
 high bounce rate, sends follow-ups that are due (in the original thread, from the original mailbox), then starts new
-leads with per-mailbox warm-up (10/20/30/40 a day by week). Emails 2-4 are replies in the same thread.
+leads with per-mailbox warm-up (set in Settings; the 24/7 preset uses 25/50/75/100 a day by week). Emails 2-4 are replies in the same thread.
 When someone replies the sequence stops for them (and for their colleagues). Send the free video audit within 24 hours;
 the Replies tab tracks this.
 
@@ -21,7 +37,7 @@ Safety behaviour worth knowing:
 - If the server dies mid-send, that lead is **held** (dashboard: "Needs your check") instead of being emailed twice.
   Look in the mailbox's Sent folder, then choose "not sent: allow retry" or "sent: never email again".
 - Mailboxes send side by side, each pacing itself (1.5-4 min between its emails), so a day takes about as long as the
-  busiest single mailbox (e.g. 40 emails ≈ 1.5-2 hours), not the sum of all of them.
+  busiest single mailbox (e.g. 40 emails ≈ 1.5-2 hours at the default pacing), not the sum of all of them.
 
 ## Server environment variables (Hostinger hPanel -> Websites -> Node.js -> Environment variables)
 | Variable | Required | Purpose |
@@ -38,7 +54,7 @@ Safety behaviour worth knowing:
 | `GEMINI_OUTREACH_GAP_SECONDS` | optional | Pause between lookups (default 7), to stay inside free-tier rate limits. |
 | `GEMINI_OUTREACH_MODEL` | optional | Model name (default `gemini-flash-latest`). |
 | `OUTREACH_NOTIFY_EMAIL` | optional | Default address for reply notifications (so a private address never has to be written in the code). A value saved in Settings wins. |
-| `OUTREACH_AUTO_RUN` | optional | Set to `window` to start runs automatically (every 10 minutes) whenever the sending window is open and Live sending is on. An alternative to the Hostinger cron job. |
+| `OUTREACH_AUTO_RUN` | optional | Automatic running is on by default (see "Runs by itself"). Set to `off` to disable it on the server. The old values `window` and `always` are accepted and mean the same as the default. |
 | `ADMIN_SESSION_SECRET` | optional | Login-cookie signing key. Default: a random key stored in the data folder. |
 
 Passwords are never stored in files or in the dashboard, and `outreach-data/` is git-ignored (this repo is public).
@@ -150,12 +166,12 @@ line; only **approved** lines go into emails.
 8. Settings -> tick Live sending. Warm-up is automatic. Add the cron job.
 
 ## Rules baked in
-Email 1 never sells (no price, no links). Max 40/day per mailbox. Weekdays only. Canada excluded by default (CASL).
+Email 1 never sells (no price, no links). Max 100/day per mailbox. Weekdays only. Canada excluded by default (CASL).
 Every email carries the postal address and an opt-out line. A mailbox pauses itself above the bounce limit.
 A/B versions share one body and differ only in subject; judge after about 100 leads each.
 
 ## Tests
-`npm test` (about 92 tests: engine, API, auth, regression tests for an independent code review; no network or real
+`npm test` (about 98 tests: engine, API, auth, regression tests for an independent code review; no network or real
 mailboxes needed).
 
 ## Not covered by tests

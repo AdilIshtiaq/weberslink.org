@@ -194,8 +194,9 @@ test("dashboard edits (loom_sent) survive a run, and config limits are enforced"
   await eng.runOnce({ config: CONFIG }, deps([fakeBox(0)]));
   assert.strictEqual(store.loadTracking().find((t) => t.email === "owner2@store2.com").loom_sent, "1");
   const c = eng.sanitizeConfig({ ...CONFIG, sending: { ...CONFIG.sending, daily_limit: 500, ramp: "5,500", bounce_pause_percent: 0 } });
-  assert.strictEqual(c.sending.daily_limit, 40);
-  assert.deepStrictEqual(c.sending.ramp, [5, 40]);
+  assert.strictEqual(c.sending.daily_limit, eng.MAX_PER_MAILBOX_PER_DAY);
+  assert.strictEqual(eng.MAX_PER_MAILBOX_PER_DAY, 100);
+  assert.deepStrictEqual(c.sending.ramp, [5, 100]);
   assert.throws(() => eng.sanitizeConfig({ sending: { timezone: "Mars/Base" } }), /time zone/);
 });
 
@@ -215,3 +216,81 @@ test("background run holds a lock and can be stopped", async () => {
 });
 
 test.after(() => fs.rmSync(DIR, { recursive: true, force: true }));
+
+// ---- 24/7 sending: one mailbox, one email every 15-20 minutes, no window, every day ----
+const ROUND_THE_CLOCK = eng.sanitizeConfig({
+  signature: CONFIG.signature,
+  sending: { dry_run: false, send_days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], timezone: "UTC", countries: ["US", "UK"],
+    window_enabled: false, min_delay_seconds: 900, max_delay_seconds: 1200, ramp: "100", daily_limit: 100, notify_email: "me@example.com" },
+  mailboxes: [{ email: "a@getweberslink.com", from_name: "Hassan" }],
+});
+function fakeClock(startIso) {
+  const c = { t: Date.parse(startIso), gaps: [] };
+  c.now = () => new Date(c.t);
+  c.sleep = async (ms) => { c.gaps.push(ms); c.t += ms; };
+  return c;
+}
+
+test("24/7 mode: one mailbox sends past the old 40/day limit, each email 15-20 minutes after the last", async () => {
+  reset(); eng.importLeads(leads(60), ROUND_THE_CLOCK);
+  const box = { ...fakeBox(0), };
+  const clock = fakeClock("2026-03-02T00:00:00Z"); // a Monday, midnight UTC
+  const s = await eng.runOnce({ config: ROUND_THE_CLOCK }, { mailboxes: [box], sleep: clock.sleep, now: clock.now, mx: async () => "yes" });
+  assert.strictEqual(s.sent, 60, "60 emails in one run, more than the old 40 a day");
+  assert.strictEqual(box.sent.length, 60);
+  assert.strictEqual(clock.gaps.length, 59, "a wait between every pair of emails");
+  assert.ok(clock.gaps.every((ms) => ms >= 900000 && ms <= 1200000), "every gap is 15-20 minutes");
+  assert.ok(new Date(clock.t) - Date.parse("2026-03-02T00:00:00Z") > 14 * 3600 * 1000, "the run spans many hours without stopping");
+});
+
+test("24/7 mode still obeys the (higher) cap and the day's budget", async () => {
+  reset(); eng.importLeads(leads(130), ROUND_THE_CLOCK);
+  const box = fakeBox(0);
+  const clock = fakeClock("2026-03-02T00:00:00Z");
+  const s = await eng.runOnce({ config: ROUND_THE_CLOCK }, { mailboxes: [box], sleep: clock.sleep, now: clock.now, mx: async () => "yes" });
+  assert.strictEqual(s.sent, 100, "never more than 100 planned for one mailbox in a day");
+});
+
+test("a reply that arrives during a long run stops that lead's follow-up (inbox is re-read mid-run)", async () => {
+  reset(); eng.importLeads(leads(4), ROUND_THE_CLOCK);
+  const T0 = "2026-03-09T00:00:00Z";
+  const clock = fakeClock(T0);
+  const track = store.loadTracking();
+  const earlier = new Date(Date.parse(T0) - 5 * 864e5).toISOString();
+  for (const t of track.slice(0, 3)) Object.assign(t, { status: "active", step: "1", mailbox: "a@getweberslink.com", first_message_id: `<id-${t.email}>`, last_message_id: `<id-${t.email}>`, subject: "hi", last_sent: earlier });
+  store.saveTracking(track);
+  const box = fakeBox(0);
+  // empty at the start of the run; owner2 replies "no thanks, remove me" a little later
+  box.scanInbox = async () => (clock.t - Date.parse(T0) < eng.RESCAN_MS ? [] : [{ from: "owner2@store2.com", from_raw: "C", subject: "Re: hi", in_reply_to: "<id-owner2@store2.com>", references: "", body: "no thanks", fresh: "Not interested, please remove me" }]);
+  const s = await eng.runOnce({ config: ROUND_THE_CLOCK }, { mailboxes: [box], sleep: clock.sleep, now: clock.now, mx: async () => "yes" });
+  const sentTo = box.sent.map((m) => m.to);
+  assert.ok(sentTo.includes("owner0@store0.com") && sentTo.includes("owner1@store1.com"));
+  assert.ok(!sentTo.includes("owner2@store2.com"), "owner2 asked to stop mid-run and must not be emailed");
+  assert.strictEqual(s.optOuts, 1);
+  assert.strictEqual(store.loadTracking().find((t) => t.email === "owner2@store2.com").status, "unsubscribed");
+});
+
+test("if the inbox cannot be read mid-run, sending stops instead of emailing blind", async () => {
+  reset(); eng.importLeads(leads(5), ROUND_THE_CLOCK);
+  const clock = fakeClock("2026-03-09T00:00:00Z");
+  const box = fakeBox(0);
+  let scans = 0;
+  box.scanInbox = async () => { if (++scans > 1) throw new Error("connection lost"); return []; };
+  const s = await eng.runOnce({ config: ROUND_THE_CLOCK }, { mailboxes: [box], sleep: clock.sleep, now: clock.now, mx: async () => "yes" });
+  assert.strictEqual(box.sent.length, 1, "one email, then the failed re-check halts sending");
+  assert.ok(s.errors && s.errors.some((e) => /inbox could not be read/.test(e)));
+});
+
+test("automatic running: on by default, only while Live and sending is allowed, and it can be switched off", () => {
+  const cfg = (sending) => eng.sanitizeConfig({ signature: CONFIG.signature, sending: { send_days: ["Mon"], timezone: "UTC", ...sending }, mailboxes: [{ email: "a@getweberslink.com" }] });
+  const noEnv = {};
+  assert.strictEqual(cfg({}).sending.auto_run, true, "automatic by default");
+  assert.strictEqual(cfg({ auto_run: false }).sending.auto_run, false);
+  assert.strictEqual(eng.autoRunDue(cfg({ dry_run: true, window_enabled: false }), new Date(), noEnv), false, "never while it is a dry run");
+  assert.strictEqual(eng.autoRunDue(cfg({ dry_run: false, window_enabled: false }), new Date(), noEnv), true, "24/7: no window means always allowed");
+  assert.strictEqual(eng.autoRunDue(cfg({ dry_run: false, window_enabled: false, auto_run: false }), new Date(), noEnv), false, "switched off in Settings");
+  assert.strictEqual(eng.autoRunDue(cfg({ dry_run: false, window_enabled: false }), new Date(), { OUTREACH_AUTO_RUN: "off" }), false, "switched off on the server");
+  const win = cfg({ dry_run: false, window_enabled: true, window_start: "19:00", window_end: "07:00", timezone: "UTC" });
+  assert.strictEqual(eng.autoRunDue(win, new Date("2026-03-09T20:00:00Z"), noEnv), true, "window open");
+  assert.strictEqual(eng.autoRunDue(win, new Date("2026-03-09T12:00:00Z"), noEnv), false, "window closed");
+});
