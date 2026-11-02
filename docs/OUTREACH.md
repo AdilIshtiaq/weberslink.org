@@ -165,6 +165,15 @@ line; only **approved** lines go into emails.
 7. Run (dry) and read the log.
 8. Settings -> tick Live sending. Warm-up is automatic. Add the cron job.
 
+## Email copy
+The bundled emails (`outreach/templates/email1.txt`, `email1b.txt`, `email2.txt`, `email3.txt`, `email4.txt`) introduce WebersLink as a
+small team of engineers who build and run AI assistants and automation for online stores, and offer a free 3-minute video. Email 1
+never sells (no price, no links) and A/B versions share one body and differ only in the subject. Emails 2-4 reuse the first
+email's subject (as "Re: ..."), so changing a template never breaks a conversation that is already running; a lead who already got
+email 1 simply receives the new wording for emails 2-4.
+**Edits made in the Emails tab win over the bundled files**, so a server where the emails were edited keeps its old wording. Edited
+emails are marked with a pencil in the Emails tab: open each one and click **Reset to default** to switch to the bundled copy.
+
 ## Rules baked in
 Email 1 never sells (no price, no links). Max 100/day per mailbox. Weekdays only. Canada excluded by default (CASL).
 Every email carries the postal address and an opt-out line. A mailbox pauses itself above the bounce limit.
