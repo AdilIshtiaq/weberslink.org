@@ -302,6 +302,11 @@
     $("x_tz").value = "Asia/Karachi"; $("x_win").checked = true; $("x_wstart").value = "19:00"; $("x_wend").value = "07:00";
     toast("Set to 7pm–7am Pakistan time. Click Save settings to keep it.");
   });
+  $("roundclock").addEventListener("click", function () {
+    $("x_win").checked = false; $("x_days").value = "Mon,Tue,Wed,Thu,Fri,Sat,Sun"; $("x_min").value = 900; $("x_max").value = 1200;
+    $("x_ramp").value = "25,50,75,100"; $("x_limit").value = 100; $("x_bounce").value = 3; $("x_auto").checked = true;
+    toast("24/7 settings filled in: one email every 15–20 minutes, every day. Click Save settings to keep them.");
+  });
   $("cautious").addEventListener("click", function () {
     $("x_ramp").value = "5,10,15,20"; $("x_limit").value = 20; $("x_bounce").value = 3;
     toast("Cautious settings filled in. Click Save settings to keep them.");
@@ -372,7 +377,7 @@
       $("s_name").value = g.name; $("s_title").value = g.title; $("s_company").value = g.company; $("s_website").value = g.website; $("s_postal").value = g.postal_address; $("s_accent").value = g.accent_color; $("s_logo").checked = g.logo !== false;
       $("x_notify").value = s.notify_email; $("x_days").value = s.send_days.join(","); $("x_tz").value = s.timezone; $("x_countries").value = s.countries.join(",");
       $("x_ramp").value = s.ramp.join(","); $("x_limit").value = s.daily_limit; $("x_gaps").value = s.followup_gaps_days.join(","); $("x_bounce").value = s.bounce_pause_percent;
-      $("x_win").checked = s.window_enabled; $("x_wstart").value = s.window_start; $("x_wend").value = s.window_end; $("x_min").value = s.min_delay_seconds; $("x_max").value = s.max_delay_seconds; $("x_html").checked = s.html_emails; $("x_mx").checked = s.check_mx; $("x_live").checked = !s.dry_run;
+      $("x_win").checked = s.window_enabled; $("x_wstart").value = s.window_start; $("x_wend").value = s.window_end; $("x_min").value = s.min_delay_seconds; $("x_max").value = s.max_delay_seconds; $("x_html").checked = s.html_emails; $("x_mx").checked = s.check_mx; $("x_live").checked = !s.dry_run; $("x_auto").checked = s.auto_run !== false;
       $("mbList").innerHTML = c.mailboxes.map(mbBlock).join("");
     }).catch(fail);
   }
@@ -389,7 +394,7 @@
       signature: { name: $("s_name").value, title: $("s_title").value, company: $("s_company").value, website: $("s_website").value, postal_address: $("s_postal").value, accent_color: $("s_accent").value, logo: $("s_logo").checked },
       sending: { notify_email: $("x_notify").value, send_days: $("x_days").value, timezone: $("x_tz").value, countries: $("x_countries").value, ramp: $("x_ramp").value, daily_limit: $("x_limit").value,
         followup_gaps_days: $("x_gaps").value, bounce_pause_percent: $("x_bounce").value, min_delay_seconds: $("x_min").value, max_delay_seconds: $("x_max").value,
-        window_enabled: $("x_win").checked, window_start: $("x_wstart").value, window_end: $("x_wend").value, html_emails: $("x_html").checked, check_mx: $("x_mx").checked, dry_run: !live, check_inbox_in_dry_run: state.config ? state.config.sending.check_inbox_in_dry_run : false },
+        window_enabled: $("x_win").checked, window_start: $("x_wstart").value, window_end: $("x_wend").value, html_emails: $("x_html").checked, check_mx: $("x_mx").checked, dry_run: !live, auto_run: $("x_auto").checked, check_inbox_in_dry_run: state.config ? state.config.sending.check_inbox_in_dry_run : false },
       mailboxes: boxes
     };
     api("PUT", "/api/outreach/config", body).then(function (r) { state.config = r.config; toast("Settings saved"); loadSettings(); refresh(); }).catch(fail);
