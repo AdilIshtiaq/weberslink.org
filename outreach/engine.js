@@ -836,7 +836,8 @@ function status(cfg = loadConfig(), now = new Date()) {
     furthestStep: count(started.filter((t) => Number(t.step)), (t) => `email ${t.step}`), mailboxes, remaining,
     daysLeft: remaining && daily ? Math.ceil(remaining / daily) : 0,
     replied: track.filter((t) => t.status === "replied").sort((a, b) => String(b.replied_at).localeCompare(String(a.replied_at))).map((t) => ({
-      email: t.email, store: t.store, mailbox: t.mailbox, note: t.note, repliedAt: t.replied_at, loomSent: t.loom_sent === "1", domain: t.domain })),
+      email: t.email, store: t.store, mailbox: t.mailbox, note: t.note, repliedAt: t.replied_at, loomSent: t.loom_sent === "1", domain: t.domain, firstName: t.first_name, subject: t.subject })),
+    scheduled: listScheduled(),
     held: track.filter((t) => t.sending).map((t) => ({ email: t.email, store: t.store, step: t.sending, mailbox: t.mailbox })),
     problems: readiness(cfg, cfg.mailboxes.filter((m) => m.enabled && m.email).map((m) => new Mailbox(m)), { live: !cfg.sending.dry_run }),
     running: run.running, startedAt: run.startedAt, runMode: run.mode, last: run.last, lastRun: readLastRun(), log: run.lines.length ? run.lines.slice(-200) : logTail(200),
@@ -902,5 +903,97 @@ function resolveHeld(email, action) {
   return null;
 }
 
-module.exports = { autoRunDue, MAX_PER_MAILBOX_PER_DAY, RESCAN_MS, logTail, markInterrupted, readLastRun, windowState, inWindow, campaignDate, domainReceivesMail, nextEmail, sendTest, dnsHealth, resolveHeld, VERSION, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dailyLimitFor, bounceCheck, dueFollowups, runOnce,
+// ---------------------------------------------------------------- replies from the dashboard + scheduled messages
+const SCHEDULE_FILE = "scheduled.json";
+const SCHEDULE_MAX_DAYS = 366;
+const SCHEDULE_TRIES = 3;
+const BLOCKED_FOR_REPLY = ["unsubscribed", "bounced", "do-not-contact"];
+
+function findLead(email) {
+  return store.loadTracking().find((t) => t.email.toLowerCase() === String(email || "").trim().toLowerCase());
+}
+function checkReply({ email, subject, text }) {
+  const lead = findLead(email);
+  if (!lead) throw new Error("That address is not in your lead list.");
+  if (BLOCKED_FOR_REPLY.includes(lead.status)) throw new Error(`Not sending: this lead is ${lead.status}.`);
+  subject = String(subject || "").replace(/[\r\n]+/g, " ").trim().slice(0, 300) || `Re: ${lead.subject || "your free video for " + lead.domain}`;
+  text = String(text || "").replace(/\r\n/g, "\n").trim();
+  if (!text) throw new Error("Write a message first.");
+  if (text.length > 20000) throw new Error("The message is too long (20,000 characters at most).");
+  return { lead, subject, text };
+}
+
+/** Sends one personal reply to a lead from the mailbox that emailed them, inside the same thread. deps.mailboxes is for tests. */
+async function sendReply(input, cfg = loadConfig(), deps = {}) {
+  const { lead, subject, text } = checkReply(input);
+  const want = String(lead.mailbox || "").toLowerCase();
+  const pool = deps.mailboxes || cfg.mailboxes.filter((m) => m.email).map((m) => new Mailbox(m));
+  const box = pool.find((b) => (b.addr || b.email || "").toLowerCase() === want) || (want ? null : pool[0]);
+  if (!box) throw new Error(`The mailbox ${lead.mailbox} is not set up in Settings, so this reply can't be sent from it.`);
+  if (box.hasPassword && !box.hasPassword()) throw new Error(`No password is set on the server for ${box.addr}.`);
+  const refs = [...new Set([lead.first_message_id, lead.last_message_id].filter(Boolean))];
+  try {
+    await box.send({ to: lead.email, subject, text, inReplyTo: refs[refs.length - 1], references: refs.length ? refs : undefined, listUnsubscribe: false });
+  } finally { box.close && box.close(); }
+  log(`REPLY sent ${box.addr} -> ${lead.email} (${lead.store})`);
+  try { store.appendSentLog({ date: new Date().toISOString(), mode: "reply", mailbox: box.addr, email: lead.email, store: lead.store, step: "reply", variant: "", subject }); } catch (e) { /* the log is optional */ }
+  return { mailbox: box.addr };
+}
+
+function readScheduled() { const d = store.readJson(SCHEDULE_FILE, { items: [] }); return Array.isArray(d.items) ? d.items : []; }
+function writeScheduled(items) {
+  const cut = Date.now() - 30 * 864e5;
+  const keep = items.filter((i) => i.status === "pending" || i.status === "sending" || Date.parse(i.sentAt || i.createdAt) > cut).slice(-500);
+  store.writeJson(SCHEDULE_FILE, { items: keep });
+}
+const publicItem = (i) => ({ id: i.id, email: i.email, subject: i.subject, text: i.text, sendAt: i.sendAt, status: i.status, error: i.error || "", sentAt: i.sentAt || "" });
+/** Pending and recent messages, soonest first. */
+function listScheduled() {
+  return readScheduled().map(publicItem).sort((a, b) => (a.status === "pending" ? 0 : 1) - (b.status === "pending" ? 0 : 1) || a.sendAt.localeCompare(b.sendAt));
+}
+function scheduleReply({ email, subject, text, sendAt }, now = new Date()) {
+  const { lead, subject: subj, text: body } = checkReply({ email, subject, text });
+  const when = new Date(sendAt);
+  if (isNaN(when)) throw new Error("Pick a date and time to send.");
+  if (when.getTime() < now.getTime() - 60 * 1000) throw new Error("That time is in the past. Pick a later time, or send it now.");
+  if (when.getTime() > now.getTime() + SCHEDULE_MAX_DAYS * 864e5) throw new Error("Pick a date within the next year.");
+  const item = { id: require("crypto").randomBytes(6).toString("hex"), email: lead.email, subject: subj, text: body, sendAt: when.toISOString(), status: "pending", tries: 0, createdAt: now.toISOString() };
+  writeScheduled(readScheduled().concat(item));
+  log(`Scheduled a reply to ${lead.email} for ${item.sendAt}`);
+  return publicItem(item);
+}
+function cancelScheduled(id) {
+  const items = readScheduled(), i = items.find((x) => x.id === id && x.status === "pending");
+  if (!i) return false;
+  writeScheduled(items.filter((x) => x !== i));
+  return true;
+}
+let processing = false;
+/** Sends every scheduled message that is due. Safe to call often. Returns how many were sent. */
+async function processScheduled(cfg = loadConfig(), deps = {}, now = new Date()) {
+  if (processing) return 0;
+  processing = true;
+  let sent = 0;
+  try {
+    for (const due of readScheduled().filter((i) => i.status === "pending" && Date.parse(i.sendAt) <= now.getTime())) {
+      const update = (patch) => writeScheduled(readScheduled().map((x) => (x.id === due.id ? { ...x, ...patch } : x)));
+      update({ status: "sending" }); // write-ahead: a crash mid-send never causes a second send
+      try {
+        await sendReply(due, cfg, deps);
+        update({ status: "sent", sentAt: new Date().toISOString(), error: "" });
+        sent++;
+      } catch (e) {
+        const unsure = ["ETIMEDOUT", "ESOCKET"].includes(e.code);
+        const tries = (due.tries || 0) + 1, msg = String(e.message).slice(0, 160);
+        if (unsure) update({ status: "failed", tries, error: `Unsure whether it was sent (${e.code}). Check your Sent folder before resending.` });
+        else if (tries < SCHEDULE_TRIES && !/not in your lead list|Not sending|not set up|No password/.test(msg)) update({ status: "pending", tries, error: msg });
+        else update({ status: "failed", tries, error: msg });
+        log(`Scheduled reply to ${due.email} not sent: ${msg}`);
+      }
+    }
+  } finally { processing = false; }
+  return sent;
+}
+
+module.exports = { sendReply, scheduleReply, cancelScheduled, listScheduled, processScheduled, autoRunDue, MAX_PER_MAILBOX_PER_DAY, RESCAN_MS, logTail, markInterrupted, readLastRun, windowState, inWindow, campaignDate, domainReceivesMail, nextEmail, sendTest, dnsHealth, resolveHeld, VERSION, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dailyLimitFor, bounceCheck, dueFollowups, runOnce,
   startRun, requestStop, previewNext, status, readiness, applyRules, loadState, tzParts, isSendDay, today, daysSince, run, log };

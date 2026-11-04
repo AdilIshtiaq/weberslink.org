@@ -180,6 +180,16 @@ async function route(req, res, url, method) {
     const r = eng.startRun({ source: "dashboard", forceDry: body.dry === true });
     return send(res, r.started ? 202 : 409, { ok: r.started, ...(r.started ? {} : { error: r.reason }) });
   }
+  if (p === "/reply" && method === "POST") {
+    const body = await readJson(req);
+    try {
+      if (body.sendAt) return send(res, 200, { ok: true, scheduled: eng.scheduleReply(body) });
+      return send(res, 200, { ok: true, ...(await eng.sendReply(body)) });
+    } catch (e) { return send(res, 400, { ok: false, error: String(e.message).slice(0, 300) }); }
+  }
+  if (p === "/scheduled/cancel" && method === "POST") {
+    return eng.cancelScheduled(String((await readJson(req)).id || "")) ? send(res, 200, { ok: true }) : send(res, 404, { ok: false, error: "That message is no longer waiting to be sent." });
+  }
   if (p === "/stop" && method === "POST") { eng.requestStop(); return send(res, 200, { ok: true }); }
 
   if (p === "/test-email" && method === "POST") {
@@ -359,6 +369,12 @@ function startScheduler() {
     setInterval(tick, 10 * 60 * 1000).unref();
     setTimeout(tick, 30 * 1000).unref(); // pick up again shortly after a restart
     console.log("Outreach auto-run on: starts by itself while Live sending is on and sending is allowed.");
+  }
+  // Scheduled replies: check every minute for messages whose time has come (independent of Live/dry-run, they are personal replies).
+  if (enabled) {
+    const due = () => eng.processScheduled().catch((e) => console.error("outreach scheduled replies:", e.message));
+    setInterval(due, 60 * 1000).unref();
+    setTimeout(due, 20 * 1000).unref();
   }
   const raw = process.env.OUTREACH_AUTO_RUN_HOUR;
   if (!enabled || raw === undefined || raw === "") return;

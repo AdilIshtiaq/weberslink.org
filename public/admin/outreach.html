@@ -105,6 +105,15 @@ textarea.ai-line{width:100%;min-width:300px;resize:vertical;line-height:1.4}.chi
 .reply .who{font-weight:600} .reply .meta{color:var(--dim);font-size:13px}
 .reply .acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;z-index:40}
+.modal[hidden]{display:none}
+.modal .box{background:var(--panel);border:1px solid var(--line-2);border-radius:16px;padding:20px;width:100%;max-width:560px;max-height:100%;overflow:auto}
+.modal h3{margin:0 0 14px}
+.modal textarea{min-height:180px;resize:vertical;line-height:1.5}
+.modal .foot{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:6px}
+.sched{display:grid;grid-template-columns:1fr auto;gap:6px 16px;padding:12px 0;border-top:1px solid var(--line)}
+.sched:first-child{border-top:0} .sched .snip{color:var(--dim);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60ch}
+
 .tpl{display:grid;grid-template-columns:200px 1fr;gap:16px}
 .tpl-list button{display:block;width:100%;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid transparent;background:none;color:var(--dim);font-size:14px;margin-bottom:4px}
 .tpl-list button.on{background:var(--panel-2);color:var(--text);border-color:var(--line-2)}
@@ -184,7 +193,20 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
 
     <section id="v-replies" hidden>
       <div class="panel"><h3>People who replied <small>send each the free video audit within 24 hours</small></h3><div id="replyList"></div></div>
+      <div class="panel" id="schedPanel" hidden><h3>Scheduled messages <small>sent automatically at the time you pick</small></h3><div id="schedList"></div></div>
     </section>
+
+    <div class="modal" id="replyModal" hidden role="dialog" aria-modal="true" aria-labelledby="rmTitle">
+      <form class="box" id="replyForm">
+        <h3 id="rmTitle">Reply</h3>
+        <div class="field"><label>To</label><input type="text" id="rmTo" readonly></div>
+        <div class="field"><label for="rmSubject">Subject</label><input type="text" id="rmSubject" maxlength="300"></div>
+        <div class="field"><label for="rmText">Message</label><textarea id="rmText" maxlength="20000" required></textarea></div>
+        <div class="field"><label class="check"><input type="checkbox" id="rmLater"> Send later (schedule it)</label></div>
+        <div class="field" id="rmWhenField" hidden><label for="rmWhen">Send on <span class="hint">(your computer's time)</span></label><input type="datetime-local" id="rmWhen"></div>
+        <div class="foot"><button type="button" class="btn" id="rmCancel">Cancel</button><button type="submit" class="btn primary" id="rmSend">Send now</button></div>
+      </form>
+    </div>
 
     <section id="v-leads" hidden>
       <div class="toolbar">

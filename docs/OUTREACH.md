@@ -26,7 +26,9 @@ Each run: reads each mailbox's inbox (replies, opt-outs, bounces) and emails you
 high bounce rate, sends follow-ups that are due (in the original thread, from the original mailbox), then starts new
 leads with per-mailbox warm-up (set in Settings; the 24/7 preset uses 25/50/75/100 a day by week). Emails 2-4 are replies in the same thread.
 When someone replies the sequence stops for them (and for their colleagues). Send the free video audit within 24 hours;
-the Replies tab tracks this.
+the Replies tab tracks this. Click **Reply** there to write back from the dashboard: it is sent from the mailbox that
+emailed them, in the same thread. Tick **Send later** to schedule it; scheduled messages are checked every minute while the
+server is awake, listed under the replies, and can be cancelled until they go out. Leads who unsubscribe/bounce are never emailed.
 
 Safety behaviour worth knowing:
 - Before every send the lead is re-read from disk, so anyone you mark do-not-contact (or who replies) while a run is in
