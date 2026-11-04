@@ -148,10 +148,57 @@
       var late = !r.loomSent && r.repliedAt && Date.now() - new Date(r.repliedAt).getTime() > 24 * 36e5;
       return '<div class="reply"><div><div class="who">' + esc(r.store || r.domain) + '</div><div class="meta">' + esc(r.email) + " · via " + esc(r.mailbox || "?") + (r.repliedAt ? " · " + esc(ago(r.repliedAt)) : "") + "</div>" +
         (late ? '<div class="bad" style="font-size:13px">Over 24 hours — send the video now</div>' : "") + '</div><div class="acts">' +
-        '<a class="btn sm" href="mailto:' + esc(r.email) + '?subject=' + encodeURIComponent("Re: your free video for " + (r.domain || "")) + '">Reply</a>' +
+        '<button class="btn sm" data-reply="' + esc(r.email) + '">Reply</button>' +
         '<label class="check" style="font-size:13px"><input type="checkbox" data-loom="' + esc(r.email) + '"' + (r.loomSent ? " checked" : "") + "> Video sent</label></div></div>";
     }).join("") : '<p class="empty">No replies yet. When someone answers, the sequence stops for them automatically.</p>';
+    renderScheduled();
   }
+  // Reply window: sends from the mailbox that emailed them, in the same thread; or schedules it for later.
+  var replyTo = null;
+  var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+  var localInput = function (d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes()); };
+  function syncLater() {
+    var on = $("rmLater").checked; $("rmWhenField").hidden = !on; $("rmSend").textContent = on ? "Schedule" : "Send now";
+    if (on && !$("rmWhen").value) { var d = new Date(Date.now() + 36e5); d.setMinutes(0, 0, 0); $("rmWhen").value = localInput(d); }
+  }
+  function openReply(email) {
+    var r = state.status.replied.filter(function (x) { return x.email === email; })[0]; if (!r) return;
+    replyTo = r.email;
+    $("rmTo").value = r.email + (r.mailbox ? "  (from " + r.mailbox + ")" : "");
+    $("rmSubject").value = /^re:/i.test(r.subject || "") ? r.subject : "Re: " + (r.subject || "your free video for " + (r.domain || ""));
+    $("rmText").value = r.firstName ? "Hi " + r.firstName + ",\n\n" : "";
+    $("rmLater").checked = false; $("rmWhen").value = ""; syncLater();
+    $("replyModal").hidden = false; $("rmText").focus(); $("rmText").setSelectionRange($("rmText").value.length, $("rmText").value.length);
+  }
+  function closeReply() { $("replyModal").hidden = true; replyTo = null; }
+  $("replyList").addEventListener("click", function (e) { var b = e.target.closest("button[data-reply]"); if (b) openReply(b.dataset.reply); });
+  $("rmLater").addEventListener("change", syncLater);
+  $("rmCancel").addEventListener("click", closeReply);
+  $("replyModal").addEventListener("mousedown", function (e) { if (e.target === $("replyModal")) closeReply(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("replyModal").hidden) closeReply(); });
+  $("replyForm").addEventListener("submit", function (e) {
+    e.preventDefault(); if (!replyTo) return;
+    var body = { email: replyTo, subject: $("rmSubject").value, text: $("rmText").value }, later = $("rmLater").checked;
+    if (later) { var d = new Date($("rmWhen").value); if (isNaN(d)) return fail(new Error("Pick a date and time to send.")); body.sendAt = d.toISOString(); }
+    $("rmSend").disabled = true;
+    api("POST", "/api/outreach/reply", body).then(function () { toast(later ? "Scheduled for " + new Date(body.sendAt).toLocaleString() : "Reply sent"); closeReply(); refresh(); })
+      .catch(fail).then(function () { $("rmSend").disabled = false; });
+  });
+  function renderScheduled() {
+    var items = state.status.scheduled || [];
+    $("schedPanel").hidden = !items.length;
+    $("schedList").innerHTML = items.map(function (i) {
+      var st = i.status === "pending" ? "Waiting · " + new Date(i.sendAt).toLocaleString() : i.status === "sending" ? "Sending…" : i.status === "sent" ? "Sent " + ago(i.sentAt) : "Not sent";
+      return '<div class="sched"><div><div class="who">' + esc(i.email) + ' <span class="chip ' + (i.status === "failed" ? "bounced" : i.status === "sent" ? "active" : "") + '">' + esc(st) + '</span></div>' +
+        '<div class="meta">' + esc(i.subject) + '</div><div class="snip">' + esc(i.text.replace(/\s+/g, " ")) + "</div>" +
+        (i.error ? '<div class="bad" style="font-size:13px">' + esc(i.error) + "</div>" : "") + '</div><div class="acts">' +
+        (i.status === "pending" ? '<button class="btn sm danger" data-unsched="' + esc(i.id) + '">Cancel</button>' : "") + "</div></div>";
+    }).join("");
+  }
+  $("schedList").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-unsched]"); if (!b || !confirm("Cancel this scheduled message?")) return;
+    api("POST", "/api/outreach/scheduled/cancel", { id: b.dataset.unsched }).then(function () { toast("Cancelled"); refresh(); }).catch(fail);
+  });
   $("replyList").addEventListener("change", function (e) {
     var em = e.target.getAttribute("data-loom"); if (!em) return;
     api("POST", "/api/outreach/leads/action", { email: em, action: e.target.checked ? "loom_sent" : "loom_unsent" }).then(refresh).catch(fail);
