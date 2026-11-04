@@ -164,7 +164,7 @@
   function openReply(email) {
     var r = state.status.replied.filter(function (x) { return x.email === email; })[0]; if (!r) return;
     replyTo = r.email;
-    $("rmTo").value = r.email + (r.mailbox ? "  (from " + r.mailbox + ")" : "");
+    $("rmTo").value = r.email; $("rmFrom").value = r.mailbox || "";
     $("rmSubject").value = /^re:/i.test(r.subject || "") ? r.subject : "Re: " + (r.subject || "your free video for " + (r.domain || ""));
     $("rmText").value = r.firstName ? "Hi " + r.firstName + ",\n\n" : "";
     $("rmLater").checked = false; $("rmWhen").value = ""; syncLater();
