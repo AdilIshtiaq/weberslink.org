@@ -105,3 +105,36 @@ test("a lead who opts out before the scheduled time is not emailed", async () =>
   assert.strictEqual(box.sent.length, 0);
   assert.strictEqual(eng.listScheduled()[0].status, "failed");
 });
+
+const rt = require("../outreach/richtext");
+const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+
+test("rich text: links and formatting survive, scripts and bad links do not", () => {
+  const out = rt.sanitize('<p>Watch <a href="https://loom.com/x?a=1&amp;b=2" onclick="evil()">the video</a></p><script>alert(1)</script><b style="x">B</b><a href="javascript:alert(1)">bad</a><img src="x" onerror="y"><iframe src="https://e.com">hidden</iframe>');
+  assert.match(out, /<a href="https:\/\/loom.com\/x\?a=1&amp;b=2" target="_blank" rel="noopener">the video<\/a>/);
+  assert.ok(!/script|onclick|onerror|javascript|iframe|hidden/i.test(out));
+  assert.match(out, /<b>B<\/b>/);
+  assert.strictEqual(rt.htmlToText('<div>Hi Ann,</div><div>Watch <a href="https://loom.com/x">the video</a></div><ul><li>one</li></ul>'), "Hi Ann,\nWatch the video (https://loom.com/x)\n\n- one");
+});
+
+test("rich text: pasted images become inline attachments, files are attached, size is capped", () => {
+  const p = rt.prepare(`<div>Look</div><img src="data:image/png;base64,${PNG}" alt="shot">`, [{ name: "../plan.pdf", type: "application/pdf", data: Buffer.from("pdf").toString("base64") }]);
+  assert.strictEqual(p.attachments.length, 2);
+  assert.match(p.html, new RegExp(`<img src="cid:${p.attachments[0].cid}"`));
+  assert.strictEqual(p.attachments[1].filename, "_plan.pdf");
+  assert.throws(() => rt.prepare("<div>x</div>", [{ name: "big.bin", data: "A".repeat(15 * 1024 * 1024) }]), /10 MB/);
+});
+
+test("a scheduled rich reply keeps its links and attachments, sent as HTML", async () => {
+  reset();
+  const now = new Date();
+  const item = eng.scheduleReply({ email: "a@shop.com", html: '<div>Watch: <a href="https://loom.com/v">demo video</a></div>', files: [{ name: "a.txt", type: "text/plain", data: Buffer.from("hello").toString("base64") }], sendAt: new Date(now.getTime() + 1000).toISOString() }, now);
+  assert.deepStrictEqual(item.files, ["a.txt"]);
+  const box = fakeBox("hassan@weberslink.org");
+  assert.strictEqual(await eng.processScheduled(cfg, { mailboxes: [box] }, new Date(now.getTime() + 5000)), 1);
+  const m = box.sent[0];
+  assert.match(m.html, /<a href="https:\/\/loom.com\/v"[^>]*>demo video<\/a>/);
+  assert.strictEqual(m.text, "Watch: demo video (https://loom.com/v)");
+  assert.strictEqual(m.attachments[0].content.toString(), "hello");
+  assert.strictEqual(store.readJson("scheduled.json").items[0].attachments[0].content, ""); // contents dropped once sent
+});

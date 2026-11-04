@@ -119,6 +119,7 @@ async function route(req, res, url, method) {
     if (method !== "POST") return send(res, 405, { ok: false, error: "Use POST." }, { Allow: "POST" });
     const tok = url.searchParams.get("token") || req.headers["x-cron-token"] || "";
     if (CRON_TOKEN.length < 16 || !tok || !safeEqual(tok, CRON_TOKEN)) return send(res, 403, { ok: false, error: "Forbidden" });
+    eng.processScheduled().catch((e) => console.error("outreach scheduled replies:", e.message)); // the cron call also wakes a sleeping app
     const r = eng.startRun({ source: "cron" });
     return send(res, r.started ? 202 : 409, { ok: r.started, ...(r.started ? {} : { error: r.reason }) });
   }
@@ -181,7 +182,7 @@ async function route(req, res, url, method) {
     return send(res, r.started ? 202 : 409, { ok: r.started, ...(r.started ? {} : { error: r.reason }) });
   }
   if (p === "/reply" && method === "POST") {
-    const body = await readJson(req);
+    const body = await readJson(req, 15 * 1024 * 1024); // attachments and pasted images (10 MB, base64-encoded)
     try {
       if (body.sendAt) return send(res, 200, { ok: true, scheduled: eng.scheduleReply(body) });
       return send(res, 200, { ok: true, ...(await eng.sendReply(body)) });

@@ -13,6 +13,7 @@ const cleaner = require("./cleaner");
 const research = require("./research");
 const { Mailbox, passwordFor } = require("./mail");
 const { stripOurFooter } = require("./inbound");
+const richtext = require("./richtext");
 
 const VERSION = "2.4";
 const MAX_PER_MAILBOX_PER_DAY = 100; // hard cap per mailbox (raised from 40 so one mailbox can send every 15-20 minutes around the clock)
@@ -912,20 +913,27 @@ const BLOCKED_FOR_REPLY = ["unsubscribed", "bounced", "do-not-contact"];
 function findLead(email) {
   return store.loadTracking().find((t) => t.email.toLowerCase() === String(email || "").trim().toLowerCase());
 }
-function checkReply({ email, subject, text }) {
+// html (from the dashboard's rich editor) wins over text; prepared = already-sanitised { html, attachments } of a scheduled item.
+function checkReply({ email, subject, text, html, files, attachments }, prepared = false) {
   const lead = findLead(email);
   if (!lead) throw new Error("That address is not in your lead list.");
   if (BLOCKED_FOR_REPLY.includes(lead.status)) throw new Error(`Not sending: this lead is ${lead.status}.`);
   subject = String(subject || "").replace(/[\r\n]+/g, " ").trim().slice(0, 300) || `Re: ${lead.subject || "your free video for " + lead.domain}`;
+  let rich = null;
+  if (prepared && html) rich = { html: String(html), text: richtext.htmlToText(html), attachments: Array.isArray(attachments) ? attachments : [] };
+  else if (html && String(html).trim()) rich = richtext.prepare(html, files);
+  else if (Array.isArray(files) && files.length) rich = richtext.prepare(esc(String(text || "")).replace(/\r?\n/g, "<br>"), files);
+  if (rich) text = rich.text;
   text = String(text || "").replace(/\r\n/g, "\n").trim();
-  if (!text) throw new Error("Write a message first.");
+  if (!text && !(rich && rich.attachments.length)) throw new Error("Write a message first.");
   if (text.length > 20000) throw new Error("The message is too long (20,000 characters at most).");
-  return { lead, subject, text };
+  return { lead, subject, text, html: rich ? rich.html : "", attachments: rich ? rich.attachments : [] };
 }
+const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 /** Sends one personal reply to a lead from the mailbox that emailed them, inside the same thread. deps.mailboxes is for tests. */
-async function sendReply(input, cfg = loadConfig(), deps = {}) {
-  const { lead, subject, text } = checkReply(input);
+async function sendReply(input, cfg = loadConfig(), deps = {}, prepared = false) {
+  const { lead, subject, text, html, attachments } = checkReply(input, prepared);
   const want = String(lead.mailbox || "").toLowerCase();
   const pool = deps.mailboxes || cfg.mailboxes.filter((m) => m.email).map((m) => new Mailbox(m));
   const box = pool.find((b) => (b.addr || b.email || "").toLowerCase() === want) || (want ? null : pool[0]);
@@ -933,7 +941,8 @@ async function sendReply(input, cfg = loadConfig(), deps = {}) {
   if (box.hasPassword && !box.hasPassword()) throw new Error(`No password is set on the server for ${box.addr}.`);
   const refs = [...new Set([lead.first_message_id, lead.last_message_id].filter(Boolean))];
   try {
-    await box.send({ to: lead.email, subject, text, inReplyTo: refs[refs.length - 1], references: refs.length ? refs : undefined, listUnsubscribe: false });
+    await box.send({ to: lead.email, subject, text, html: html ? richtext.wrapEmail(html) : undefined, attachments: attachments.length ? richtext.forMail(attachments) : undefined,
+      inReplyTo: refs[refs.length - 1], references: refs.length ? refs : undefined, listUnsubscribe: false });
   } finally { box.close && box.close(); }
   log(`REPLY sent ${box.addr} -> ${lead.email} (${lead.store})`);
   try { store.appendSentLog({ date: new Date().toISOString(), mode: "reply", mailbox: box.addr, email: lead.email, store: lead.store, step: "reply", variant: "", subject }); } catch (e) { /* the log is optional */ }
@@ -946,18 +955,19 @@ function writeScheduled(items) {
   const keep = items.filter((i) => i.status === "pending" || i.status === "sending" || Date.parse(i.sentAt || i.createdAt) > cut).slice(-500);
   store.writeJson(SCHEDULE_FILE, { items: keep });
 }
-const publicItem = (i) => ({ id: i.id, email: i.email, subject: i.subject, text: i.text, sendAt: i.sendAt, status: i.status, error: i.error || "", sentAt: i.sentAt || "" });
+const publicItem = (i) => ({ id: i.id, email: i.email, subject: i.subject, text: i.text, sendAt: i.sendAt, status: i.status, error: i.error || "", sentAt: i.sentAt || "",
+  files: (i.attachments || []).filter((a) => !a.cid).map((a) => a.filename), images: (i.attachments || []).filter((a) => a.cid).length });
 /** Pending and recent messages, soonest first. */
 function listScheduled() {
   return readScheduled().map(publicItem).sort((a, b) => (a.status === "pending" ? 0 : 1) - (b.status === "pending" ? 0 : 1) || a.sendAt.localeCompare(b.sendAt));
 }
-function scheduleReply({ email, subject, text, sendAt }, now = new Date()) {
-  const { lead, subject: subj, text: body } = checkReply({ email, subject, text });
+function scheduleReply({ email, subject, text, html, files, sendAt }, now = new Date()) {
+  const { lead, subject: subj, text: body, html: rich, attachments } = checkReply({ email, subject, text, html, files });
   const when = new Date(sendAt);
   if (isNaN(when)) throw new Error("Pick a date and time to send.");
   if (when.getTime() < now.getTime() - 60 * 1000) throw new Error("That time is in the past. Pick a later time, or send it now.");
   if (when.getTime() > now.getTime() + SCHEDULE_MAX_DAYS * 864e5) throw new Error("Pick a date within the next year.");
-  const item = { id: require("crypto").randomBytes(6).toString("hex"), email: lead.email, subject: subj, text: body, sendAt: when.toISOString(), status: "pending", tries: 0, createdAt: now.toISOString() };
+  const item = { id: require("crypto").randomBytes(6).toString("hex"), email: lead.email, subject: subj, text: body, ...(rich ? { html: rich } : {}), ...(attachments.length ? { attachments } : {}), sendAt: when.toISOString(), status: "pending", tries: 0, createdAt: now.toISOString() };
   writeScheduled(readScheduled().concat(item));
   log(`Scheduled a reply to ${lead.email} for ${item.sendAt}`);
   return publicItem(item);
@@ -968,6 +978,8 @@ function cancelScheduled(id) {
   writeScheduled(items.filter((x) => x !== i));
   return true;
 }
+// Once a message is finished its file contents are no longer needed; keep only the names for the list.
+const lighten = (i) => (i.attachments ? { attachments: i.attachments.map((a) => ({ filename: a.filename, contentType: a.contentType, content: "", ...(a.cid ? { cid: a.cid } : {}) })) } : {});
 let processing = false;
 /** Sends every scheduled message that is due. Safe to call often. Returns how many were sent. */
 async function processScheduled(cfg = loadConfig(), deps = {}, now = new Date()) {
@@ -979,15 +991,15 @@ async function processScheduled(cfg = loadConfig(), deps = {}, now = new Date())
       const update = (patch) => writeScheduled(readScheduled().map((x) => (x.id === due.id ? { ...x, ...patch } : x)));
       update({ status: "sending" }); // write-ahead: a crash mid-send never causes a second send
       try {
-        await sendReply(due, cfg, deps);
-        update({ status: "sent", sentAt: new Date().toISOString(), error: "" });
+        await sendReply(due, cfg, deps, true);
+        update({ status: "sent", sentAt: new Date().toISOString(), error: "", ...lighten(due) });
         sent++;
       } catch (e) {
         const unsure = ["ETIMEDOUT", "ESOCKET"].includes(e.code);
         const tries = (due.tries || 0) + 1, msg = String(e.message).slice(0, 160);
-        if (unsure) update({ status: "failed", tries, error: `Unsure whether it was sent (${e.code}). Check your Sent folder before resending.` });
+        if (unsure) update({ status: "failed", tries, ...lighten(due), error: `Unsure whether it was sent (${e.code}). Check your Sent folder before resending.` });
         else if (tries < SCHEDULE_TRIES && !/not in your lead list|Not sending|not set up|No password/.test(msg)) update({ status: "pending", tries, error: msg });
-        else update({ status: "failed", tries, error: msg });
+        else update({ status: "failed", tries, ...lighten(due), error: msg });
         log(`Scheduled reply to ${due.email} not sent: ${msg}`);
       }
     }

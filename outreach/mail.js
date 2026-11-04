@@ -37,12 +37,13 @@ class Mailbox {
     return this.transport;
   }
 
-  /** msg: { to, subject, text, html, inReplyTo, references[], listUnsubscribe } -> adds messageId */
+  /** msg: { to, subject, text, html, attachments[], inReplyTo, references[], listUnsubscribe } -> adds messageId */
   build(msg) {
     const domain = this.addr.split("@")[1];
     return {
       from: { name: this.name, address: this.addr },
       to: msg.to, subject: msg.subject, text: msg.text, html: msg.html || undefined,
+      attachments: msg.attachments && msg.attachments.length ? msg.attachments : undefined,
       messageId: `<${crypto.randomBytes(12).toString("hex")}@${domain}>`,
       date: new Date(),
       inReplyTo: msg.inReplyTo || undefined,
