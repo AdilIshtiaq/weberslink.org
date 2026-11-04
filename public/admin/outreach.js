@@ -166,10 +166,130 @@
     replyTo = r.email;
     $("rmTo").value = r.email; $("rmFrom").value = r.mailbox || "";
     $("rmSubject").value = /^re:/i.test(r.subject || "") ? r.subject : "Re: " + (r.subject || "your free video for " + (r.domain || ""));
-    $("rmText").value = r.firstName ? "Hi " + r.firstName + ",\n\n" : "";
+    ed.innerHTML = r.firstName ? "<div>Hi " + esc(r.firstName) + ",</div><div><br></div><div><br></div>" : "";
+    rmFiles = []; renderFiles();
     $("rmLater").checked = false; $("rmWhen").value = ""; syncLater();
-    $("replyModal").hidden = false; $("rmText").focus(); $("rmText").setSelectionRange($("rmText").value.length, $("rmText").value.length);
+    $("replyModal").hidden = false; ed.focus();
+    if (ed.lastChild) { var rg = document.createRange(); rg.selectNodeContents(ed.lastChild); rg.collapse(true); var sl = getSelection(); sl.removeAllRanges(); sl.addRange(rg); }
   }
+
+  // ---- rich editor: pasted links/bold/lists/images survive; everything is cleaned here and again on the server.
+  var ed = $("rmEditor"), rmFiles = [], savedRange = null;
+  var MAX_BYTES = 10 * 1024 * 1024;
+  try { document.execCommand("defaultParagraphSeparator", false, "div"); } catch (e) {}
+  var KEEP = { A: 1, B: 1, STRONG: 1, I: 1, EM: 1, U: 1, S: 1, BR: 1, P: 1, DIV: 1, UL: 1, OL: 1, LI: 1, BLOCKQUOTE: 1, IMG: 1, H1: 1, H2: 1, H3: 1, HR: 1 };
+  var DROP = { SCRIPT: 1, STYLE: 1, META: 1, LINK: 1, TITLE: 1, HEAD: 1, NOSCRIPT: 1, TEMPLATE: 1, IFRAME: 1, OBJECT: 1, SVG: 1 };
+  var okHref = function (h) { h = String(h || "").trim(); if (/^www\./i.test(h)) h = "https://" + h; return /^(https?:|mailto:)/i.test(h) ? h : ""; };
+  var okImg = function (src) { return /^data:image\/(png|jpeg|gif|webp);base64,/i.test(src || ""); };
+  // Copies a pasted DOM into clean nodes. Styled spans (Google Docs, Word) become <b>/<i>/<u>.
+  function cleanNode(n, doc) {
+    if (n.nodeType === 3) return doc.createTextNode(n.nodeValue.replace(/\u00a0/g, " "));
+    if (n.nodeType !== 1 || DROP[n.tagName]) return null;
+    var tag = n.tagName, out, st = n.getAttribute("style") || "";
+    if (tag === "A") { var h = okHref(n.getAttribute("href")); out = doc.createElement(h ? "a" : "span"); if (h) out.setAttribute("href", h); }
+    else if (tag === "IMG") { if (!okImg(n.getAttribute("src"))) return null; out = doc.createElement("img"); out.setAttribute("src", n.getAttribute("src")); out.setAttribute("alt", n.getAttribute("alt") || ""); return out; }
+    else if (KEEP[tag]) out = doc.createElement(tag === "P" ? "div" : tag.toLowerCase());
+    else if (/^(H[4-6]|TR|TABLE|SECTION|ARTICLE|HEADER|FOOTER)$/.test(tag)) out = doc.createElement("div");
+    else out = doc.createDocumentFragment();
+    var inner = out;
+    if (tag !== "B" && tag !== "STRONG" && /font-weight\s*:\s*(bold|[6-9]00)/i.test(st) && !/^H[1-3]$/.test(tag)) { var b = doc.createElement("b"); inner.appendChild(b); inner = b; }
+    if (/font-style\s*:\s*italic/i.test(st)) { var i = doc.createElement("i"); inner.appendChild(i); inner = i; }
+    if (/text-decoration[^;]*underline/i.test(st) && tag !== "A") { var u = doc.createElement("u"); inner.appendChild(u); inner = u; }
+    for (var c = n.firstChild; c; c = c.nextSibling) { var k = cleanNode(c, doc); if (k) inner.appendChild(k); }
+    return out;
+  }
+  function cleanHtml(html) {
+    var src = new DOMParser().parseFromString(html, "text/html").body;
+    var frag = document.createDocumentFragment();
+    for (var c = src.firstChild; c; c = c.nextSibling) { var k = cleanNode(c, document); if (k) frag.appendChild(k); }
+    return frag;
+  }
+  var URL_RE = /\b((?:https?:\/\/|www\.)[^\s<>"']+[^\s<>"'.,;:!?)\]])/gi;
+  function textToHtml(t) {
+    return t.split(/\r?\n/).map(function (line) {
+      var h = esc(line).replace(URL_RE, function (u) { var d = u.replace(/&amp;/g, "&"); return '<a href="' + esc(okHref(d)) + '">' + u + "</a>"; });
+      return "<div>" + (h || "<br>") + "</div>";
+    }).join("");
+  }
+  // Bare URLs typed into the message become links when it is sent.
+  function autoLink(root) {
+    var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT), list = [], n;
+    while ((n = w.nextNode())) { URL_RE.lastIndex = 0; if (!(n.parentNode.closest && n.parentNode.closest("a")) && URL_RE.test(n.nodeValue)) list.push(n); }
+    list.forEach(function (t) { URL_RE.lastIndex = 0; var span = document.createElement("span"); span.innerHTML = esc(t.nodeValue).replace(URL_RE, function (u) { return '<a href="' + esc(okHref(u.replace(/&amp;/g, "&"))) + '">' + u + "</a>"; }); t.parentNode.replaceChild(span, t); });
+    URL_RE.lastIndex = 0;
+  }
+  function insertNode(frag) {
+    var sel = getSelection(); if (!sel.rangeCount || !ed.contains(sel.anchorNode)) { ed.focus(); restoreRange(); sel = getSelection(); }
+    if (!sel.rangeCount) { ed.appendChild(frag); return; }
+    var r = sel.getRangeAt(0); r.deleteContents(); var last = frag.lastChild; r.insertNode(frag);
+    if (last) { r.setStartAfter(last); r.collapse(true); sel.removeAllRanges(); sel.addRange(r); }
+  }
+  function readFile(f) { return new Promise(function (ok, no) { var fr = new FileReader(); fr.onload = function () { ok(fr.result); }; fr.onerror = function () { no(new Error("Could not read " + f.name)); }; fr.readAsDataURL(f); }); }
+  function usedBytes() {
+    var n = rmFiles.reduce(function (a, f) { return a + f.size; }, 0);
+    ed.querySelectorAll("img").forEach(function (i) { n += Math.floor((i.getAttribute("src") || "").length * 0.75); });
+    return n;
+  }
+  function addImage(f) {
+    if (!/^image\/(png|jpeg|gif|webp)$/.test(f.type)) return fail(new Error("Images must be PNG, JPG, GIF or WebP."));
+    if (usedBytes() + f.size > MAX_BYTES) return fail(new Error("Attachments and images can be 10 MB at most together."));
+    readFile(f).then(function (url) { var img = document.createElement("img"); img.src = url; img.alt = f.name.replace(/\.[a-z0-9]+$/i, ""); var fr = document.createDocumentFragment(); fr.appendChild(img); insertNode(fr); }).catch(fail);
+  }
+  ed.addEventListener("paste", function (e) {
+    var cd = e.clipboardData; if (!cd) return;
+    var imgs = Array.prototype.filter.call(cd.files || [], function (f) { return /^image\//.test(f.type); });
+    var html = cd.getData("text/html"), text = cd.getData("text/plain");
+    e.preventDefault();
+    if (html) insertNode(cleanHtml(html));
+    else if (text) insertNode(cleanHtml(textToHtml(text)));
+    else imgs.forEach(addImage);
+  });
+  ed.addEventListener("drop", function (e) {
+    var fs = e.dataTransfer && e.dataTransfer.files; if (!fs || !fs.length) return;
+    e.preventDefault(); Array.prototype.forEach.call(fs, function (f) { /^image\//.test(f.type) ? addImage(f) : addFile(f); });
+  });
+  function saveRange() { var s = getSelection(); if (s.rangeCount && ed.contains(s.anchorNode)) savedRange = s.getRangeAt(0).cloneRange(); }
+  function restoreRange() { if (!savedRange) return; var s = getSelection(); s.removeAllRanges(); s.addRange(savedRange); }
+  ed.addEventListener("keyup", saveRange); ed.addEventListener("mouseup", saveRange); ed.addEventListener("input", saveRange);
+  function syncTools() { document.querySelectorAll(".rt[data-cmd]").forEach(function (b) { var on = false; try { on = /bold|italic|underline|List/.test(b.dataset.cmd) && document.queryCommandState(b.dataset.cmd); } catch (e) {} b.classList.toggle("on", on); }); }
+  document.addEventListener("selectionchange", function () { if (!$("replyModal").hidden) syncTools(); });
+  document.querySelector(".rt-tools").addEventListener("mousedown", function (e) { if (e.target.closest(".rt")) e.preventDefault(); }); // keep the selection in the editor
+  document.querySelector(".rt-tools").addEventListener("click", function (e) {
+    var b = e.target.closest(".rt[data-cmd]"); if (!b) return;
+    ed.focus(); document.execCommand(b.dataset.cmd, false, null);
+    if (b.dataset.cmd === "removeFormat") document.execCommand("unlink", false, null);
+    syncTools();
+  });
+  function editLink() {
+    ed.focus(); restoreRange();
+    var sel = getSelection(), node = sel.anchorNode, a = node && (node.nodeType === 1 ? node : node.parentNode).closest("a");
+    var url = prompt("Link address (https://…). Leave empty to remove the link.", a ? a.getAttribute("href") : "https://");
+    if (url === null) return;
+    url = url.trim();
+    if (!url) { if (a) { var r = document.createRange(); r.selectNode(a); sel.removeAllRanges(); sel.addRange(r); } document.execCommand("unlink", false, null); return; }
+    var h = okHref(url); if (!h) return fail(new Error("Links must start with https://, http:// or mailto:"));
+    if (a) { a.setAttribute("href", h); return; }
+    if (sel.isCollapsed) { var t = document.createElement("a"); t.href = h; t.textContent = url; var fr = document.createDocumentFragment(); fr.appendChild(t); insertNode(fr); }
+    else document.execCommand("createLink", false, h);
+  }
+  $("rmLink").addEventListener("click", editLink);
+  ed.addEventListener("keydown", function (e) { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); saveRange(); editLink(); } });
+  // attachments
+  function addFile(f) {
+    if (rmFiles.length + ed.querySelectorAll("img").length >= 10) return fail(new Error("At most 10 attachments and images per message."));
+    if (usedBytes() + f.size > MAX_BYTES) return fail(new Error("Attachments and images can be 10 MB at most together."));
+    rmFiles.push({ name: f.name, type: f.type || "application/octet-stream", size: f.size, file: f }); renderFiles();
+  }
+  var kb = function (n) { return n < 1048576 ? Math.max(1, Math.round(n / 1024)) + " KB" : (n / 1048576).toFixed(1) + " MB"; };
+  function renderFiles() {
+    $("rmFiles").innerHTML = rmFiles.map(function (f, i) { return '<span class="chip">📎 ' + esc(f.name) + " · " + kb(f.size) + '<button type="button" data-rmfile="' + i + '" aria-label="Remove ' + esc(f.name) + '">✕</button></span>'; }).join("");
+  }
+  $("rmFiles").addEventListener("click", function (e) { var b = e.target.closest("button[data-rmfile]"); if (b) { rmFiles.splice(Number(b.dataset.rmfile), 1); renderFiles(); } });
+  $("rmAttach").addEventListener("click", function () { saveRange(); $("rmFileInput").click(); });
+  $("rmImage").addEventListener("click", function () { saveRange(); $("rmImageInput").click(); });
+  $("rmFileInput").addEventListener("change", function () { Array.prototype.forEach.call(this.files, addFile); this.value = ""; });
+  $("rmImageInput").addEventListener("change", function () { Array.prototype.forEach.call(this.files, addImage); this.value = ""; });
+  function editorHtml() { var box = document.createElement("div"); box.innerHTML = ed.innerHTML; autoLink(box); return box.innerHTML; }
   function closeReply() { $("replyModal").hidden = true; replyTo = null; }
   $("replyList").addEventListener("click", function (e) { var b = e.target.closest("button[data-reply]"); if (b) openReply(b.dataset.reply); });
   $("rmLater").addEventListener("change", syncLater);
@@ -178,10 +298,16 @@
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("replyModal").hidden) closeReply(); });
   $("replyForm").addEventListener("submit", function (e) {
     e.preventDefault(); if (!replyTo) return;
-    var body = { email: replyTo, subject: $("rmSubject").value, text: $("rmText").value }, later = $("rmLater").checked;
-    if (later) { var d = new Date($("rmWhen").value); if (isNaN(d)) return fail(new Error("Pick a date and time to send.")); body.sendAt = d.toISOString(); }
+    if (!ed.innerText.trim() && !ed.querySelector("img") && !rmFiles.length) return fail(new Error("Write a message first."));
+    var body = { email: replyTo, subject: $("rmSubject").value, html: editorHtml(), text: ed.innerText }, later = $("rmLater").checked;
+    if (later) {
+      var d = new Date($("rmWhen").value); if (isNaN(d)) return fail(new Error("Pick a date and time to send."));
+      if (d.getHours() === 0 && d.getMinutes() === 0 && !confirm("That is 12:00 AM (midnight) on " + d.toLocaleDateString() + ". Schedule it for midnight?")) return;
+      body.sendAt = d.toISOString();
+    }
     $("rmSend").disabled = true;
-    api("POST", "/api/outreach/reply", body).then(function () { toast(later ? "Scheduled for " + new Date(body.sendAt).toLocaleString() : "Reply sent"); closeReply(); refresh(); })
+    Promise.all(rmFiles.map(function (f) { return readFile(f.file).then(function (u) { return { name: f.name, type: f.type, data: u.slice(u.indexOf(",") + 1) }; }); }))
+      .then(function (files) { body.files = files; return api("POST", "/api/outreach/reply", body); }).then(function () { toast(later ? "Scheduled for " + new Date(body.sendAt).toLocaleString() : "Reply sent"); closeReply(); refresh(); })
       .catch(fail).then(function () { $("rmSend").disabled = false; });
   });
   function renderScheduled() {
@@ -190,7 +316,7 @@
     $("schedList").innerHTML = items.map(function (i) {
       var st = i.status === "pending" ? "Waiting · " + new Date(i.sendAt).toLocaleString() : i.status === "sending" ? "Sending…" : i.status === "sent" ? "Sent " + ago(i.sentAt) : "Not sent";
       return '<div class="sched"><div><div class="who">' + esc(i.email) + ' <span class="chip ' + (i.status === "failed" ? "bounced" : i.status === "sent" ? "active" : "") + '">' + esc(st) + '</span></div>' +
-        '<div class="meta">' + esc(i.subject) + '</div><div class="snip">' + esc(i.text.replace(/\s+/g, " ")) + "</div>" +
+        '<div class="meta">' + esc(i.subject) + ((i.files || []).length ? " · 📎 " + esc(i.files.join(", ")) : "") + (i.images ? " · " + i.images + " image" + (i.images > 1 ? "s" : "") : "") + '</div><div class="snip">' + esc(i.text.replace(/\s+/g, " ")) + "</div>" +
         (i.error ? '<div class="bad" style="font-size:13px">' + esc(i.error) + "</div>" : "") + '</div><div class="acts">' +
         (i.status === "pending" ? '<button class="btn sm danger" data-unsched="' + esc(i.id) + '">Cancel</button>' : "") + "</div></div>";
     }).join("");
