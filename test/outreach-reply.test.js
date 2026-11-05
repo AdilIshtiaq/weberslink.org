@@ -133,7 +133,7 @@ test("a scheduled rich reply keeps its links and attachments, sent as HTML", asy
   const box = fakeBox("hassan@weberslink.org");
   assert.strictEqual(await eng.processScheduled(cfg, { mailboxes: [box] }, new Date(now.getTime() + 5000)), 1);
   const m = box.sent[0];
-  assert.match(m.html, /<a href="https:\/\/loom.com\/v"[^>]*>demo video<\/a>/);
+  assert.match(m.html, /<a href="https:\/\/weberslink\.org\/r\/[A-Za-z0-9]+"[^>]*>demo video<\/a>/); // click-tracked
   assert.strictEqual(m.text, "Watch: demo video (https://loom.com/v)");
   assert.strictEqual(m.attachments[0].content.toString(), "hello");
   assert.strictEqual(store.readJson("scheduled.json").items[0].attachments[0].content, ""); // contents dropped once sent

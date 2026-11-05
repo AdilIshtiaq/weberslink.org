@@ -14,6 +14,7 @@ const research = require("./research");
 const { Mailbox, passwordFor } = require("./mail");
 const { stripOurFooter } = require("./inbound");
 const richtext = require("./richtext");
+const clicks = require("./clicks");
 
 const VERSION = "2.4";
 const MAX_PER_MAILBOX_PER_DAY = 100; // hard cap per mailbox (raised from 40 so one mailbox can send every 15-20 minutes around the clock)
@@ -41,7 +42,7 @@ const DEFAULT_CONFIG = {
   sending: {
     dry_run: true, countries: ["US", "UK"], send_days: ["Mon", "Tue", "Wed", "Thu", "Fri"], timezone: "America/New_York",
     daily_limit: 20, ramp: [5, 10, 15, 20], followup_gaps_days: [3, 4, 7], min_delay_seconds: 600, max_delay_seconds: 1200,
-    notify_email: "", html_emails: true, check_mx: true, bounce_pause_percent: 3, check_inbox_in_dry_run: false, auto_run: true,
+    notify_email: "", html_emails: true, check_mx: true, bounce_pause_percent: 3, check_inbox_in_dry_run: false, auto_run: true, track_clicks: true,
     window_enabled: true, window_start: "19:00", window_end: "07:00",
   },
   mailboxes: [{ id: 1, email: "hassan@weberslink.org", from_name: "Hassan Ali", enabled: true, smtp_host: "smtp.hostinger.com", smtp_port: 465, imap_host: "imap.hostinger.com", imap_port: 993 }],
@@ -86,7 +87,7 @@ function sanitizeConfig(input) {
       min_delay_seconds: minD,
       max_delay_seconds: Math.max(minD, intIn(s.max_delay_seconds, 0, 7200, d.sending.max_delay_seconds)),
       notify_email: str(s.notify_email, 200), html_emails: s.html_emails !== false, check_mx: s.check_mx !== false,
-      bounce_pause_percent: intIn(s.bounce_pause_percent, 1, 50, 3), check_inbox_in_dry_run: Boolean(s.check_inbox_in_dry_run), auto_run: s.auto_run !== false,
+      bounce_pause_percent: intIn(s.bounce_pause_percent, 1, 50, 3), check_inbox_in_dry_run: Boolean(s.check_inbox_in_dry_run), auto_run: s.auto_run !== false, track_clicks: s.track_clicks !== false,
       window_enabled: s.window_enabled === true, window_start: hhmm(s.window_start, d.sending.window_start), window_end: hhmm(s.window_end, d.sending.window_end),
     },
     mailboxes: sanitizeMailboxes(input.mailboxes),
@@ -627,7 +628,7 @@ async function runOnce(opts = {}, deps = {}) {
 
       const variant = tpl.pickVariant(t, step);
       const r = tpl.render(step, t, cfg, variant);
-      const html = cfg.sending.html_emails ? r.html : undefined;
+      let html = cfg.sending.html_emails ? r.html : undefined;
       const subject = step > 1 ? (/^re:/i.test(t.subject) ? t.subject : "Re: " + t.subject) : r.subject;
       const refs = [...new Set([t.first_message_id, t.last_message_id].filter(Boolean))];
       const tag = `email ${step}${variant !== "a" ? variant : ""}`;
@@ -642,6 +643,9 @@ async function runOnce(opts = {}, deps = {}) {
       // held for a human check instead of being emailed twice.
       t.sending = String(step);
       store.saveRow(t);
+      if (html && cfg.sending.track_clicks) {
+        try { html = clicks.trackHtml(html, { email: t.email, source: `email ${step}`, cfg }); } catch (e) { log(`  (click tracking off for ${t.email}: ${e.message})`); }
+      }
       let sent;
       try {
         sent = await box.send({ to: t.email, subject, text: r.text, html, inReplyTo: step > 1 ? refs[refs.length - 1] : undefined, references: step > 1 ? refs : undefined });
@@ -837,7 +841,9 @@ function status(cfg = loadConfig(), now = new Date()) {
     furthestStep: count(started.filter((t) => Number(t.step)), (t) => `email ${t.step}`), mailboxes, remaining,
     daysLeft: remaining && daily ? Math.ceil(remaining / daily) : 0,
     replied: track.filter((t) => t.status === "replied").sort((a, b) => String(b.replied_at).localeCompare(String(a.replied_at))).map((t) => ({
-      email: t.email, store: t.store, mailbox: t.mailbox, note: t.note, repliedAt: t.replied_at, loomSent: t.loom_sent === "1", domain: t.domain, firstName: t.first_name, subject: t.subject })),
+      email: t.email, store: t.store, mailbox: t.mailbox, note: t.note, repliedAt: t.replied_at, loomSent: t.loom_sent === "1", domain: t.domain, firstName: t.first_name, subject: t.subject, clicks: clicks.forLead(t.email) })),
+    clicks: (() => { const ls = Object.fromEntries(track.map((t) => [t.email.toLowerCase(), t])); return clicks.recent(40).map((c) => ({ ...c, store: (ls[c.email] || {}).store || "", status: (ls[c.email] || {}).status || "" })); })(),
+    trackingBase: clicks.baseUrl(cfg), trackClicks: cfg.sending.track_clicks && cfg.sending.html_emails,
     scheduled: listScheduled(),
     held: track.filter((t) => t.sending).map((t) => ({ email: t.email, store: t.store, step: t.sending, mailbox: t.mailbox })),
     problems: readiness(cfg, cfg.mailboxes.filter((m) => m.enabled && m.email).map((m) => new Mailbox(m)), { live: !cfg.sending.dry_run }),
@@ -940,8 +946,12 @@ async function sendReply(input, cfg = loadConfig(), deps = {}, prepared = false)
   if (!box) throw new Error(`The mailbox ${lead.mailbox} is not set up in Settings, so this reply can't be sent from it.`);
   if (box.hasPassword && !box.hasPassword()) throw new Error(`No password is set on the server for ${box.addr}.`);
   const refs = [...new Set([lead.first_message_id, lead.last_message_id].filter(Boolean))];
+  let body = html ? richtext.wrapEmail(html) : undefined;
+  if (body && cfg.sending.track_clicks) {
+    try { body = clicks.trackHtml(body, { email: lead.email, source: "reply", cfg }); } catch (e) { log(`(click tracking off for this reply: ${e.message})`); }
+  }
   try {
-    await box.send({ to: lead.email, subject, text, html: html ? richtext.wrapEmail(html) : undefined, attachments: attachments.length ? richtext.forMail(attachments) : undefined,
+    await box.send({ to: lead.email, subject, text, html: body, attachments: attachments.length ? richtext.forMail(attachments) : undefined,
       inReplyTo: refs[refs.length - 1], references: refs.length ? refs : undefined, listUnsubscribe: false });
   } finally { box.close && box.close(); }
   log(`REPLY sent ${box.addr} -> ${lead.email} (${lead.store})`);

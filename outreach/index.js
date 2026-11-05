@@ -16,6 +16,7 @@ const eng = require("./engine");
 const xlsx = require("./xlsx");
 const cleaner = require("./cleaner");
 const research = require("./research");
+const clicks = require("./clicks");
 const backup = require("./backup");
 
 const PASSWORD = process.env.ADMIN_PASSWORD || "";
@@ -212,9 +213,10 @@ async function route(req, res, url, method) {
     const st = url.searchParams.get("status") || "";
     const limit = Math.min(500, Math.max(1, parseInt(url.searchParams.get("limit"), 10) || 100));
     const offset = Math.max(0, parseInt(url.searchParams.get("offset"), 10) || 0);
-    const all = store.loadTracking().filter((t) => (!st || t.status === st) && (!q || `${t.email} ${t.store} ${t.domain}`.toLowerCase().includes(q)));
+    const cl = clicks.allLeads();
+    const all = store.loadTracking().filter((t) => (!st || (st === "clicked" ? ((cl[t.email.toLowerCase()] || {}).clicks || 0) > 0 : t.status === st)) && (!q || `${t.email} ${t.store} ${t.domain}`.toLowerCase().includes(q)));
     const cfg = eng.loadConfig();
-    return send(res, 200, { ok: true, total: all.length, rows: all.slice(offset, offset + limit).map((t) => ({ ...Object.fromEntries(LEAD_VIEW.map((f) => [f, t[f]])), next: eng.nextEmail(t, cfg) })) });
+    return send(res, 200, { ok: true, total: all.length, rows: all.slice(offset, offset + limit).map((t) => ({ ...Object.fromEntries(LEAD_VIEW.map((f) => [f, t[f]])), next: eng.nextEmail(t, cfg), clicks: (cl[t.email.toLowerCase()] || {}).clicks || 0 })) });
   }
   if (p === "/leads/import" && method === "POST") {
     const body = await readJson(req, 8 * 1024 * 1024);
@@ -336,6 +338,7 @@ async function route(req, res, url, method) {
 function handle(req, res) {
   let url;
   try { url = new URL(req.url, "http://x"); } catch (e) { return false; }
+  if (url.pathname.startsWith("/r/") && (req.method === "GET" || req.method === "HEAD")) return clicks.handle(req, res); // tracked email links
   if (url.pathname !== "/api/outreach" && !url.pathname.startsWith("/api/outreach/")) return false;
   if (!enabled) { send(res, 503, { ok: false, error: "Outreach is off. Set ADMIN_PASSWORD (10+ characters) on the server to turn it on." }); return true; }
   route(req, res, url, req.method).catch((e) => {
