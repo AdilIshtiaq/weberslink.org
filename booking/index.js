@@ -33,9 +33,13 @@ function send(res, code, obj, headers = {}) {
 const fail = (res, code, error) => send(res, code, { ok: false, error });
 function readJson(req, limit = 64 * 1024) {
   return new Promise((resolve, reject) => {
-    let size = 0; const chunks = [];
-    req.on("data", (c) => { size += c.length; if (size > limit) { reject(Object.assign(new Error("Request too large"), { status: 413 })); req.destroy(); } else chunks.push(c); });
-    req.on("end", () => { const raw = Buffer.concat(chunks).toString("utf8"); if (!raw.trim()) return resolve({}); try { resolve(JSON.parse(raw)); } catch (e) { reject(Object.assign(new Error("Invalid JSON"), { status: 400 })); } });
+    let size = 0, tooBig = false; const chunks = [];
+    req.on("data", (c) => {
+      size += c.length;
+      if (tooBig) { if (size > limit + 1024 * 1024) req.destroy(); return; } // drain a little so the 413 answer arrives, then hang up
+      if (size > limit) { tooBig = true; chunks.length = 0; reject(Object.assign(new Error("That request is too large."), { status: 413 })); } else chunks.push(c);
+    });
+    req.on("end", () => { if (tooBig) return; const raw = Buffer.concat(chunks).toString("utf8"); if (!raw.trim()) return resolve({}); try { resolve(JSON.parse(raw)); } catch (e) { reject(Object.assign(new Error("Invalid JSON"), { status: 400 })); } });
     req.on("error", reject);
   });
 }
@@ -87,6 +91,11 @@ function getBiz(slug) {
 function notify(kind, biz, b, slug) {
   mail.send(kind, biz.settings, b, slug).then((ok) => { if (!ok) return; const fresh = store.loadBiz(slug); const x = fresh && fresh.bookings.find((y) => y.id === b.id); if (x) { (x.mails = x.mails || []).push(kind); store.saveBiz(slug, fresh); } });
 }
+function uniqueCode(biz) {
+  let c;
+  do c = core.newCode(biz.settings); while (biz.bookings.some((b) => b.code === c));
+  return c;
+}
 function findByCode(biz, code, email) {
   const c = String(code || "").trim().toUpperCase(), e = String(email || "").trim().toLowerCase();
   return biz.bookings.find((b) => b.code === c && b.email === e) || null;
@@ -131,7 +140,7 @@ async function businessApi(req, res, slug, rest) {
       const upcoming = biz.bookings.filter((b) => b.email === who.email && b.status === "booked" && Date.parse(b.start) > Date.now()).length;
       if (upcoming >= 5) throw new Error("You already have 5 upcoming bookings. Please call us to book more.");
       const slot = core.resolveSlot(s, biz.bookings, body);
-      const b = { id: crypto.randomBytes(8).toString("hex"), code: core.newCode(s), serviceId: body.serviceId, ...slot, ...who, status: "booked", source: "online", createdAt: new Date().toISOString() };
+      const b = { id: crypto.randomBytes(8).toString("hex"), code: uniqueCode(biz), serviceId: body.serviceId, ...slot, ...who, status: "booked", source: "online", createdAt: new Date().toISOString() };
       biz.bookings.push(b); store.saveBiz(slug, biz);
       notify("confirm", biz, b, slug); notify("owner-new", biz, b, slug);
       return send(res, 200, { ok: true, booking: core.customerView(b) });
@@ -192,7 +201,15 @@ async function businessApi(req, res, slug, rest) {
   }
   if (what === "settings" && m === "PUT") {
     const body = await readJson(req);
-    try { biz.settings = core.sanitizeSettings(body.settings, s); } catch (e) { return fail(res, 400, e.message); }
+    let next;
+    try { next = core.sanitizeSettings(body.settings, s); } catch (e) { return fail(res, 400, e.message); }
+    // Never strand a customer: a service or person with upcoming bookings can't be removed.
+    const ahead = biz.bookings.filter((b) => b.status === "booked" && Date.parse(b.start) > Date.now());
+    const lostSvc = ahead.find((b) => !next.services.some((x) => x.id === b.serviceId));
+    const lostPerson = ahead.find((b) => !next.staff.some((x) => x.id === b.staffId));
+    if (lostSvc) return fail(res, 400, `"${(s.services.find((x) => x.id === lostSvc.serviceId) || {}).name || "A service"}" has upcoming bookings. Cancel or move them before removing it.`);
+    if (lostPerson) return fail(res, 400, `${(s.staff.find((x) => x.id === lostPerson.staffId) || {}).name || "That person"} has upcoming bookings. Cancel or move them before removing them.`);
+    biz.settings = next;
     store.saveBiz(slug, biz);
     return send(res, 200, { ok: true, settings: biz.settings });
   }
@@ -202,7 +219,7 @@ async function businessApi(req, res, slug, rest) {
       const who = core.cleanCustomer({ ...body, email: body.email || `no-email+${Date.now()}@invalid.local` }, s);
       if (!body.email) who.email = "";
       const slot = core.resolveSlot(s, biz.bookings, body, { owner: true });
-      const b = { id: crypto.randomBytes(8).toString("hex"), code: core.newCode(s), serviceId: body.serviceId, ...slot, ...who, status: "booked", source: body.source === "walk-in" ? "walk-in" : "phone", createdAt: new Date().toISOString(), seen: true };
+      const b = { id: crypto.randomBytes(8).toString("hex"), code: uniqueCode(biz), serviceId: body.serviceId, ...slot, ...who, status: "booked", source: body.source === "walk-in" ? "walk-in" : "phone", createdAt: new Date().toISOString(), seen: true };
       biz.bookings.push(b); store.saveBiz(slug, biz);
       if (b.email && body.sendConfirmation !== false) notify("confirm", biz, b, slug);
       return send(res, 200, { ok: true, booking: ownerBooking(b) });

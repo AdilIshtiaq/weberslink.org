@@ -96,7 +96,7 @@
   var mins = function (n) { return n >= 60 ? Math.floor(n / 60) + " h" + (n % 60 ? " " + (n % 60) + " min" : "") : n + " min"; };
   var initials = function (name) { return String(name).replace(/^Dr\.\s*/, "").split(/\s+/).map(function (w) { return w[0] || ""; }).join("").slice(0, 2).toUpperCase(); };
   var uid = function () { return Math.random().toString(36).slice(2, 10); };
-  function toast(msg, bad) { var t = document.createElement("div"); t.className = "toast"; if (bad) t.style.background = "#c23b32"; t.setAttribute("role", "status"); t.textContent = msg; document.body.appendChild(t); setTimeout(function () { t.remove(); }, bad ? 4500 : 2600); }
+  function toast(msg, bad) { document.querySelectorAll(".toast").forEach(function (x) { x.remove(); }); var t = document.createElement("div"); t.className = "toast"; if (bad) t.style.background = "#c23b32"; t.setAttribute("role", "status"); t.textContent = msg; document.body.appendChild(t); setTimeout(function () { t.remove(); }, bad ? 4500 : 2600); }
   var store = {
     get: function (k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
     set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* private window */ } },
@@ -262,7 +262,7 @@
   }
   function stepService() {
     return "<h1>" + (flow.moving ? "Pick a new time" : "Book an appointment") + '</h1><p class="hint">Choose a service. You can book any time, day or night.' + (flow.moving ? "" : ' Already booked? <a href="#" data-act="manage">Change or cancel it</a>.') + "</p>" +
-      '<div class="cards">' + biz.services.map(function (s) {
+      '<div class="cards">' + biz.services.filter(function (s) { return eligible(s.id).length; }).map(function (s) {
         return '<button type="button" class="card" data-act="svc" data-id="' + esc(s.id) + '" aria-pressed="' + (flow.serviceId === s.id) + '"><b>' + esc(s.name) + "</b>" + (s.desc ? '<span class="hint">' + esc(s.desc) + "</span>" : "") + '<span class="meta"><span>' + mins(s.mins) + '</span><span class="price">' + money(s.price) + "</span></span></button>";
       }).join("") + "</div>";
   }
@@ -573,7 +573,7 @@
     if (ds.set) {
       var k = ds.set, v = t.type === "checkbox" ? t.checked : t.value;
       if (k === "noticeH") { biz.notice = Math.max(0, Math.min(336, +v || 0)) * 60; }
-      else if (["buffer", "daysAhead", "cancelHours", "reminderHours", "step"].indexOf(k) >= 0) biz[k] = Math.max(0, Math.round(+v || 0));
+      else if (["buffer", "daysAhead", "cancelHours", "reminderHours", "step"].indexOf(k) >= 0) biz[k] = Math.min(k === "daysAhead" ? 365 : k === "buffer" ? 240 : 336, Math.max(k === "daysAhead" ? 1 : k === "step" ? 5 : 0, Math.round(+v || 0)));
       else biz[k] = v;
       if (k === "accent" || k === "name" || k === "tag") applyBrand();
       return markDirty();

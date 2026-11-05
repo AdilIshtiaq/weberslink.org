@@ -61,18 +61,28 @@ Without SMTP everything still works; emails are skipped and logged.
 | `ADMIN_PASSWORD` | yes | Your login for /admin/booking.html (shared with Outreach). |
 | `SMTP_USER`, `SMTP_PASS` | for emails | Mailbox that sends booking emails. |
 | `BOOKING_PUBLIC_URL` | no | Address used in email links (default `https://weberslink.org`). |
-| `BOOKING_DATA_DIR` | no | Where booking data lives (default: `booking/` inside the Outreach data folder, so the same backup covers it). |
+| `BOOKING_DATA_DIR` | no | Where booking data lives (default: `booking/` inside the Outreach data folder). |
 | `BOOKING_SECRET` | no | 32+ characters to sign owner logins (default: a random key saved in the data folder). |
 
 ## Data and safety
 
 - Files: `<data>/booking/businesses.json` (accounts, scrypt-hashed passwords) and `b-<name>.json` per business.
+  The Outreach **Download backup** includes them (not the login-signing key), and restoring puts them back.
   Writes are atomic. Bookings that ended more than 400 days ago are dropped.
 - Owner logins are HttpOnly, SameSite=Strict cookies scoped to that business only, 12 hours; changing or resetting
   the password signs out every session. Login attempts are throttled.
 - Customers see only free times, never other people's bookings. Booking, lookup and slot requests are rate-limited
   per connection, there is a hidden anti-bot field, and one email can hold at most 5 upcoming bookings.
 - The owner dashboard can't be embedded in other sites; the booking page can (that's how it goes on their website).
+
+## Tested
+
+`npm test` runs `test/booking.test.js` and `test/booking-edge.test.js`: time zones and daylight-saving changes,
+settings limits, availability (hours, notice, gaps, existing bookings), double-booking races, "anyone" sharing work,
+validation, honeypot and rate limits, change/cancel cut-offs, rescheduling, owner sessions (isolation, logout,
+password change), protected removal of booked services/people, phone bookings, CSV formula safety, page framing
+rules, email escaping and time zone, reminders, backup/restore. The pages were also checked in a browser (demo,
+customer, owner and admin flows; phone size; dark mode; embedding in another site; hostile input shown as text).
 
 ## Not included (yet)
 

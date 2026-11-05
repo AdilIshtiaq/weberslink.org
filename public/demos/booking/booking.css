@@ -118,7 +118,7 @@ textarea{min-height:80px;resize:vertical}
 .notice pre{white-space:pre-wrap;font:13px/1.5 var(--font);margin:6px 0 0;color:var(--dim)}
 
 /* dashboard */
-.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 0 16px;overflow-x:auto}
+.tabs{display:flex;flex-wrap:wrap;gap:0 4px;border-bottom:1px solid var(--line);margin:0 0 16px}
 .tabs button{border:0;background:none;padding:10px 14px;font-weight:600;color:var(--dim);border-bottom:2px solid transparent;white-space:nowrap}
 .tabs button[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent)}
 .kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:16px}

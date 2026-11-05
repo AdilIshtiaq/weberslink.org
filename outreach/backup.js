@@ -16,6 +16,8 @@ const FORMAT = "weberslink-outreach-backup";
 const FILES = ["config.json", "tracking.csv", "sent_log.csv", "do_not_contact.csv", "mailboxes.json", "research_state.json", "backup_state.json", "scheduled.json", "links.json", "clicks.json"];
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const TEMPLATE = /^templates\/(email[1-4][b-z]?\.txt)$/;
+const BOOKING = /^booking\/(businesses\.json|b-[a-z0-9-]{3,40}\.json)$/; // client booking pages (accounts + bookings)
+const bookingDir = () => require("../booking/store").DIR();
 
 const readText = (p) => { try { return fs.readFileSync(p, "utf8"); } catch (e) { return null; } };
 
@@ -24,6 +26,7 @@ function create({ markDone = true } = {}) {
   if (markDone) store.writeJson("backup_state.json", { lastBackup: new Date().toISOString() }); // first, so the file carries its own date
   const files = {};
   for (const name of FILES) { const t = readText(store.P(name)); if (t != null) files[name] = t; }
+  try { for (const n of fs.readdirSync(bookingDir())) if (BOOKING.test("booking/" + n)) files["booking/" + n] = fs.readFileSync(path.join(bookingDir(), n), "utf8"); } catch (e) { /* no booking data */ }
   try { for (const n of fs.readdirSync(tpl.OVERRIDE)) if (tpl.FILE_RE.test(n)) files["templates/" + n] = fs.readFileSync(path.join(tpl.OVERRIDE, n), "utf8"); } catch (e) { /* no edited templates */ }
   return { format: FORMAT, version: 1, createdAt: new Date().toISOString(), files };
 }
@@ -40,7 +43,7 @@ function validate(bundle) {
   for (const [name, text] of Object.entries(bundle.files)) {
     if (typeof text !== "string" || text.length > MAX_FILE_BYTES) throw bad(`"${name}" is missing or too large.`);
     const t = TEMPLATE.exec(name);
-    if (!t && !FILES.includes(name)) throw bad(`The backup contains an unexpected file ("${String(name).slice(0, 40)}").`);
+    if (!t && !FILES.includes(name) && !BOOKING.test(name)) throw bad(`The backup contains an unexpected file ("${String(name).slice(0, 40)}").`);
     if (name === "config.json") { try { eng.sanitizeConfig(JSON.parse(text)); } catch (e) { throw bad("The settings in the backup are not valid: " + e.message); } }
     else if (name === "tracking.csv") {
       const rows = store.parseCsv(text);
@@ -71,6 +74,7 @@ function restore(bundle) {
   for (const [name, text] of entries) {
     const t = TEMPLATE.exec(name);
     if (t) { fs.mkdirSync(tpl.OVERRIDE, { recursive: true }); store.atomicWrite(path.join(tpl.OVERRIDE, t[1]), text); }
+    else if (BOOKING.test(name)) { fs.mkdirSync(bookingDir(), { recursive: true }); store.atomicWrite(path.join(bookingDir(), name.slice(8)), text); }
     else store.atomicWrite(store.P(name), text);
   }
   return { restored: entries.map(([n]) => n), safetyCopy };
