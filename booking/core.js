@@ -64,6 +64,7 @@ function sanitizeSettings(s, prev = {}) {
     step: [5, 10, 15, 20, 30, 60].includes(+s.step) ? +s.step : 15,
     cancelHours: int(s.cancelHours, 0, 14 * 24, 24),
     reminderHours: int(s.reminderHours, 0, 7 * 24, 24),
+    setupDone: s.setupDone === undefined ? prev.setupDone !== false : Boolean(s.setupDone), // false until the owner finishes the setup steps
   };
   const svcIn = Array.isArray(s.services) ? s.services.slice(0, 40) : [];
   out.services = svcIn.map((x) => ({

@@ -73,6 +73,10 @@ test("site owner creates a business; customers book, look up, move, cancel; owne
     assert.strictEqual((await call(sv, "POST", "/api/booking-admin/create", { slug: "nova", ownerEmail: "o@x.com" })).status, 400);
     assert.strictEqual((await call(sv, "GET", "/api/booking-admin/list")).json.businesses[0].slug, "nova");
 
+    const first = await call(sv, "POST", "/api/booking/nova/login", { password: pw });
+    const draft = (await call(sv, "GET", "/api/booking/nova/admin/data", null, first.cookie)).json.settings;
+    assert.strictEqual((await call(sv, "GET", "/api/booking/nova/slots?service=s1")).status, 404); // not live until set up
+    await call(sv, "PUT", "/api/booking/nova/admin/settings", { settings: { ...draft, setupDone: true } }, first.cookie);
     const page = await call(sv, "GET", "/book/nova");
     assert.strictEqual(page.status, 200); assert.match(page.text, /data-slug="nova"/);
     assert.strictEqual((await call(sv, "GET", "/book/nobody")).status, 404);

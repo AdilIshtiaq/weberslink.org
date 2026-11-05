@@ -110,7 +110,8 @@
 
   // ------------------------------------------------------------------ state
   var niche = "salon", biz = null, view = LIVE && ADMIN_PATH ? "admin" : "book";
-  var flow = null, adminTab = "agenda", adminDay = null, dirty = false, owner = { signedIn: false, mailOn: false };
+  var flow = null, adminTab = "agenda", adminDay = null, dirty = false, owner = { signedIn: false, mailOn: false, email: "" };
+  var wiz = { step: 0, done: false };
   var API = "/api/booking/" + SLUG + "/";
   var KEY = function () { return "wl-booking-demo-v2-" + niche; };
   function money(n) { return n ? biz.currency + Number(n).toLocaleString("en-US") : "Free"; }
@@ -216,7 +217,7 @@
     // owner
     load: function () {
       if (!LIVE) return Promise.resolve();
-      return http("GET", API + "admin/data").then(function (j) { setSettings(j.settings); biz.bookings = j.bookings; owner.signedIn = true; owner.mailOn = j.mailOn; });
+      return http("GET", API + "admin/data").then(function (j) { setSettings(j.settings); biz.bookings = j.bookings; owner.signedIn = true; owner.mailOn = j.mailOn; owner.email = j.ownerEmail || ""; });
     },
     status: function (id, status) {
       var b = bookingById(id);
@@ -251,6 +252,7 @@
   function startFlow(prefill) { flow = Object.assign({ step: 0, serviceId: "", staffId: "", date: "", t: null, days: null, loading: false }, prefill || {}); }
 
   function renderBook() {
+    if (LIVE && biz.setupDone === false) { $("main").innerHTML = '<div class="panel done"><h1>Online booking opens soon</h1><p class="hint">' + esc(biz.name) + " is still setting up this page." + (biz.phone ? ' To book now, call <a href="tel:' + esc(biz.phone.replace(/[^\d+]/g, "")) + '">' + esc(biz.phone) + "</a>." : "") + "</p></div>"; return; }
     if (!flow) startFlow();
     if (flow.step === 4) return renderDone();
     if (flow.step === "manage") return renderManage();
@@ -406,13 +408,14 @@
 
   // ------------------------------------------------------------------ business dashboard
   function renderLogin(msg) {
-    $("main").innerHTML = '<div class="panel" style="max-width:420px;margin:30px auto"><h1 tabindex="-1">Business sign in</h1><p class="hint">' + esc(biz ? biz.name : "") + ' dashboard. Forgot your password? Ask Weberslink to reset it.</p>' +
+    $("main").innerHTML = '<div class="panel" style="max-width:420px;margin:30px auto"><h1 tabindex="-1">Business sign in</h1><p class="hint">' + esc(biz ? biz.name : "") + ' dashboard. <a href="/book/forgot">Forgot your password?</a></p>' +
       '<form class="details" id="loginForm" style="grid-template-columns:1fr"><div class="field"><label for="lpw">Password</label><input type="password" id="lpw" autocomplete="current-password" required></div>' +
       '<p class="err" id="loginErr" role="alert"' + (msg ? "" : " hidden") + ">" + esc(msg || "") + '</p><button type="submit" class="btn primary">Sign in</button></form></div>';
     $("lpw").focus();
   }
   function renderAdmin() {
     if (LIVE && !owner.signedIn) return renderLogin();
+    if (LIVE && (biz.setupDone === false || wiz.done)) return renderWizard();
     var tabs = [["agenda", "Appointments"], ["newbk", "Add booking"], ["numbers", "Numbers"], ["setup", "Settings"], ["messages", LIVE ? "Share & emails" : "Reminders"]];
     var html = '<div class="tabs" role="tablist">' + tabs.map(function (t) { return '<button type="button" role="tab" data-tab="' + t[0] + '" aria-selected="' + (adminTab === t[0]) + '">' + t[1] + "</button>"; }).join("") + "</div>";
     if (LIVE) html += '<div class="row" style="margin:-8px 0 12px"><span class="hint">Signed in</span><span class="spacer"></span><a class="btn sm ghost" href="/book/' + esc(SLUG) + '" target="_blank" rel="noopener">Open booking page ↗</a><button type="button" class="btn sm ghost" data-act="logout">Sign out</button></div>';
@@ -510,7 +513,11 @@
       }).join("") + "</tbody></table></div>";
   }
   function setup() {
+    var x = sections();
     var saveBar = LIVE ? '<div class="row" style="position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0;margin-bottom:8px"><h1 style="flex:1">Settings</h1><span class="hint" id="dirtyNote">' + (dirty ? "Unsaved changes" : "All changes saved") + '</span><button type="button" class="btn primary" data-act="savesettings"' + (dirty ? "" : " disabled") + ">Save changes</button></div>" : '<h1 style="margin-bottom:12px">Settings <span class="hint" style="font-weight:400">(demo: changes apply straight away)</span></h1>';
+    return saveBar + '<div class="grid2">' + x.general + x.hours + "</div>" + x.svcs + x.team + x.pw + x.danger;
+  }
+  function sections() {
     var f = function (id, label, val, type, extra) { return '<div class="field"><label for="' + id + '">' + label + '</label><input type="' + (type || "text") + '" id="' + id + '" data-set="' + id + '" value="' + esc(val) + '" ' + (extra || "") + "></div>"; };
     var zones = ZONES.indexOf(biz.tz) < 0 && biz.tz ? [biz.tz].concat(ZONES) : ZONES;
     var general = '<div class="panel"><h2>Business</h2><form class="details" onsubmit="return false" style="margin-top:8px">' +
@@ -540,14 +547,81 @@
       }).join("") + '</tbody></table></div><button type="button" class="btn sm" data-act="addsvc" style="margin-top:10px">+ Add service</button></div>';
     var team = '<div class="panel" style="margin-top:16px"><h2>Team</h2><p class="hint">Which days each person works and which services they offer.</p><div class="scroll"><table><thead><tr><th>Name</th><th>Role</th><th>Works</th><th>Offers</th><th></th></tr></thead><tbody>' +
       biz.staff.map(function (st) {
-        return '<tr><td><input type="text" aria-label="Name" data-pname="' + esc(st.id) + '" value="' + esc(st.name) + '" maxlength="50" style="min-width:130px"></td><td><input type="text" aria-label="Role" data-prole="' + esc(st.id) + '" value="' + esc(st.role || "") + '" maxlength="50" style="min-width:110px"></td><td>' +
+        return '<tr><td><input type="text" aria-label="Name" data-pname="' + esc(st.id) + '" value="' + esc(/^your name$/i.test(st.name) ? "" : st.name) + '" placeholder="Name" maxlength="50" style="min-width:130px"></td><td><input type="text" aria-label="Role" data-prole="' + esc(st.id) + '" value="' + esc(st.role || "") + '" maxlength="50" style="min-width:110px"></td><td>' +
           ORDER.map(function (d) { return '<label class="check" style="display:inline-flex;margin-right:6px;font-size:13px"><input type="checkbox" data-pday="' + esc(st.id) + '" value="' + d + '"' + (st.days.indexOf(d) >= 0 ? " checked" : "") + ">" + DAYS[d].slice(0, 2) + "</label>"; }).join("") + "</td><td>" +
           biz.services.map(function (s) { return '<label class="check" style="display:inline-flex;margin-right:8px;font-size:13px"><input type="checkbox" data-psvc="' + esc(st.id) + '" value="' + esc(s.id) + '"' + (st.services.indexOf(s.id) >= 0 ? " checked" : "") + ">" + esc(s.name) + "</label>"; }).join("") +
           '</td><td><button type="button" class="btn sm ghost" data-act="delstaff" data-id="' + esc(st.id) + '" aria-label="Remove ' + esc(st.name) + '">✕</button></td></tr>';
       }).join("") + '</tbody></table></div><button type="button" class="btn sm" data-act="addstaff" style="margin-top:10px">+ Add person</button></div>';
     var pw = LIVE ? '<div class="panel" style="margin-top:16px;max-width:520px"><h2>Password</h2><form class="details" id="pwForm" novalidate style="grid-template-columns:1fr"><div class="field"><label for="pwOld">Current password</label><input type="password" id="pwOld" autocomplete="current-password"></div><div class="field"><label for="pwNew">New password (10+ characters)</label><input type="password" id="pwNew" autocomplete="new-password" minlength="10"></div><p class="err" id="pwErr" role="alert" hidden></p><div><button type="submit" class="btn">Change password</button></div></form></div>' : "";
-    return saveBar + '<div class="grid2">' + general + hours + "</div>" + svcs + team + pw;
+    var danger = LIVE ? '<div class="panel" style="margin-top:16px;max-width:520px;border-color:#c23b32"><h2>Delete your booking page</h2><p class="hint">Closes your page for good and deletes your settings and all bookings. Download your bookings first (Numbers tab) if you want to keep them. This can\'t be undone.</p><form class="details" id="delForm" novalidate style="grid-template-columns:1fr"><div class="field"><label for="delPw">Your password</label><input type="password" id="delPw" autocomplete="current-password"></div><p class="err" id="delErr" role="alert" hidden></p><div><button type="submit" class="btn danger">Delete my booking page</button></div></form></div>' : "";
+    return { general: general, hours: hours, svcs: svcs, team: team, pw: pw, danger: danger };
   }
+  // ------------------------------------------------------------------ first-time setup (live only)
+  var WIZ = [["business", "Your business"], ["services", "Services"], ["team", "Who takes bookings"], ["hours", "Opening hours"], ["review", "Go live"]];
+  function renderWizard() {
+    if (wiz.done) return renderLaunched();
+    var x = sections(), st = WIZ[wiz.step][0];
+    var intro = {
+      business: "Welcome! A few quick steps and your booking page is ready. You can change everything later in Settings.",
+      services: "What can customers book? Change the examples to your real services, lengths and prices. Remove the ones you don't offer.",
+      team: "Who do customers book with? Add yourself and anyone else, the days they work and what they do. Customers can pick a person or “anyone”.",
+      hours: "When can customers book? Untick the days you're closed. The gap gives you time between appointments; minimum notice stops last-minute surprises.",
+      review: "Check everything looks right, then go live. Your page only takes bookings after this step.",
+    }[st];
+    var body = st === "business" ? x.general : st === "services" ? x.svcs : st === "team" ? x.team : st === "hours" ? x.hours : review();
+    $("main").innerHTML = '<div style="max-width:900px;margin:0 auto"><ol class="steps">' + WIZ.map(function (w, i) { return '<li class="' + (i === wiz.step ? "on" : i < wiz.step ? "done" : "") + '"' + (i === wiz.step ? ' aria-current="step"' : "") + '><span class="n">' + (i < wiz.step ? "✓" : i + 1) + "</span>" + w[1] + "</li>"; }).join("") + "</ol>" +
+      '<h1 tabindex="-1">' + WIZ[wiz.step][1] + '</h1><p class="hint" style="margin:6px 0 14px">' + intro + "</p>" + body.replace('style="margin-top:16px"', "") +
+      '<p class="err" id="wizErr" role="alert" hidden></p><div class="row" style="margin-top:16px">' + (wiz.step ? '<button type="button" class="btn ghost" data-act="wizback">← Back</button>' : '<button type="button" class="btn ghost" data-act="logout">Sign out</button>') +
+      '<span class="spacer"></span><button type="button" class="btn primary" data-act="wiznext">' + (st === "review" ? "Go live" : "Save and continue →") + "</button></div></div>";
+    $("main").querySelector("h1").focus();
+  }
+  function review() {
+    var openDays = ORDER.filter(function (d) { return biz.hours[d]; });
+    var li = function (k, v) { return "<dt>" + k + "</dt><dd>" + v + "</dd>"; };
+    return '<div class="panel summary"><dl>' + li("Business", esc(biz.name)) + li("Time zone", esc(biz.tz.replace(/_/g, " "))) + li("Services", biz.services.map(function (s) { return esc(s.name) + " (" + mins(s.mins) + ", " + money(s.price) + ")"; }).join("<br>")) +
+      li("Team", biz.staff.map(function (p) { return esc(p.name); }).join(", ")) + li("Open", openDays.map(function (d) { return DAYS[d] + " " + biz.hours[d][0] + "–" + biz.hours[d][1]; }).join("<br>")) +
+      li("New bookings go to", esc(biz.notifyEmail || owner.email)) + "</dl></div>";
+  }
+  function wizCheck(st) {
+    if (st === "business") { if (!String(biz.name).trim()) return "Enter your business name."; if (biz.notifyEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(biz.notifyEmail)) return "The alert email doesn't look right."; }
+    if (st === "services") { if (!biz.services.length) return "Add at least one service."; if (biz.services.some(function (s) { return !String(s.name).trim() || s.name === "New service"; })) return "Give every service a name (or remove it)."; }
+    if (st === "team") {
+      if (biz.staff.some(function (p) { return !String(p.name).trim() || /^(your name|new person)$/i.test(p.name); })) return "Enter a real name for every person (customers see it).";
+      if (biz.staff.some(function (p) { return !p.days.length; })) return "Tick at least one working day for every person.";
+      if (biz.staff.some(function (p) { return !p.services.length; })) return "Tick at least one service for every person.";
+      var orphan = biz.services.filter(function (s) { return !eligible(s.id).length; })[0];
+      if (orphan) return "Nobody offers “" + orphan.name + "”. Tick it for someone, or remove it under Services.";
+    }
+    if (st === "hours") {
+      var open = ORDER.filter(function (d) { return biz.hours[d]; });
+      if (!open.length) return "Open at least one day.";
+      if (!biz.staff.some(function (p) { return p.days.some(function (d) { return biz.hours[d]; }); })) return "Nobody works on your open days. Check the days under the team step.";
+      var longest = Math.max.apply(null, open.map(function (d) { return toMin(biz.hours[d][1]) - toMin(biz.hours[d][0]); }));
+      var tooLong = biz.services.filter(function (s) { return s.mins > longest; })[0];
+      if (tooLong) return "“" + tooLong.name + "” (" + mins(tooLong.mins) + ") is longer than any opening day, so it could never be booked.";
+    }
+    return "";
+  }
+  function wizNext() {
+    var st = WIZ[wiz.step][0], problem = wizCheck(st);
+    if (problem) { var e = $("wizErr"); e.textContent = problem; e.hidden = false; return; }
+    if (st === "review") biz.setupDone = true;
+    var btn = document.querySelector('[data-act="wiznext"]'); btn.disabled = true; btn.textContent = "Saving…";
+    data.saveSettings().then(function () {
+      dirty = false;
+      if (st === "review") { wiz.done = true; } else wiz.step++;
+      renderAdmin(); window.scrollTo(0, 0);
+    }).catch(function (err) { if (st === "review") biz.setupDone = false; btn.disabled = false; btn.textContent = st === "review" ? "Go live" : "Save and continue →"; var e = $("wizErr"); e.textContent = err.message; e.hidden = false; });
+  }
+  function renderLaunched() {
+    var url = location.origin + "/book/" + SLUG;
+    $("main").innerHTML = '<div class="panel done" style="max-width:640px"><div class="tick" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><h1 tabindex="-1">Your booking page is live!</h1>' +
+      '<p class="hint">Share this link with your customers:</p><div class="row" style="justify-content:center;margin:8px 0 16px"><input type="text" readonly id="shareUrl" value="' + esc(url) + '" style="max-width:380px"><button type="button" class="btn sm" data-act="copy" data-src="shareUrl">Copy</button></div>' +
+      '<div class="notice"><b>Next steps</b><ol style="margin:8px 0 0;padding-left:20px"><li>Make a test booking with your own email, to see what customers see and get.</li><li>Add the link to your Google Business Profile, Instagram bio and Facebook page.</li><li>Put it on your website: <b>Share &amp; emails</b> in your dashboard has the code to paste.</li></ol></div>' +
+      '<div class="row" style="justify-content:center;margin-top:18px"><a class="btn" href="' + esc(url) + '" target="_blank" rel="noopener">Open my booking page ↗</a><button type="button" class="btn primary" data-act="todash">Go to my dashboard</button></div></div>';
+    $("main").querySelector("h1").focus();
+  }
+
   function shareTab() {
     var next = (biz.bookings || []).filter(function (b) { return b.status === "booked" && Date.parse(b.start) > Date.now(); }).sort(function (a, b) { return a.start.localeCompare(b.start); })[0];
     var box = function (title, text) { return '<div class="panel"><h3>' + title + '</h3><div class="notice" style="margin-top:8px"><pre>' + esc(text) + "</pre></div></div>"; };
@@ -654,6 +728,9 @@
       return data.saveSettings().then(function () { dirty = false; toast("Settings saved"); renderAdmin(); }).catch(function (err) { el.disabled = false; toast(err.message, true); });
     }
     else if (a === "copy") { var src = $(el.dataset.src); src.select(); try { navigator.clipboard.writeText(src.value).then(function () { toast("Copied"); }, function () { document.execCommand("copy"); toast("Copied"); }); } catch (err) { document.execCommand("copy"); toast("Copied"); } return; }
+    else if (a === "wiznext") return wizNext();
+    else if (a === "wizback") { wiz.step = Math.max(0, wiz.step - 1); }
+    else if (a === "todash") { wiz.done = false; adminTab = "messages"; }
     else if (a === "logout") { http("POST", API + "logout").then(function () { owner.signedIn = false; render(); }); return; }
     render();
   });
@@ -667,6 +744,10 @@
     else if (id === "loginForm") {
       http("POST", API + "login", { password: $("lpw").value }).then(function () { return data.load(); }).then(function () { adminTab = "agenda"; render(); })
         .catch(function (err) { renderLogin(err.message); });
+    } else if (id === "delForm") {
+      if (!window.confirm("Delete your booking page and all its bookings for good?")) return;
+      http("POST", API + "admin/delete", { password: $("delPw").value }).then(function () { location.href = "/book/new?deleted=1"; })
+        .catch(function (err) { var el = $("delErr"); el.textContent = err.message; el.hidden = false; });
     } else if (id === "pwForm") {
       http("POST", API + "admin/password", { current: $("pwOld").value, next: $("pwNew").value }).then(function () { toast("Password changed"); $("pwOld").value = ""; $("pwNew").value = ""; })
         .catch(function (err) { var el = $("pwErr"); el.textContent = err.message; el.hidden = false; });
@@ -674,7 +755,7 @@
   });
   $("main").addEventListener("change", function (e) {
     if (view !== "admin") return;
-    if (adminTab === "setup") return onSetupChange(e);
+    if (adminTab === "setup" || (LIVE && biz.setupDone === false)) return onSetupChange(e);
     if (adminTab === "newbk") {
       var t = e.target.id;
       if (t === "nbSvc") { nb.serviceId = e.target.value; nb.staffId = ""; nb.days = null; renderAdmin(); }

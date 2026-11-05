@@ -11,7 +11,7 @@
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok || j.ok === false) { var e = new Error(j.error || "Error " + r.status); e.status = r.status; throw e; } return j; }); });
   }
   function toast(msg, bad) { var t = document.createElement("div"); t.className = "toast"; if (bad) t.style.background = "#c23b32"; t.textContent = msg; document.body.appendChild(t); setTimeout(function () { t.remove(); }, 3500); }
-  var slugify = function (s) { return String(s).toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40); };
+  var slugify = function (s) { return String(s).toLowerCase().replace(/['’`]/g, "").normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40); };
 
   function showSecret(title, b, password) {
     var url = base + "/book/" + b;
@@ -31,7 +31,7 @@
       $("mailNote").innerHTML = j.mailOn ? "Emails are <b>on</b>: customers get confirmations and reminders, owners get alerts." : "Emails are <b>off</b>: set SMTP_USER and SMTP_PASS on the server so customers get confirmations and reminders. Bookings work without them.";
       $("list").innerHTML = j.businesses.length ? j.businesses.map(function (b) {
         var url = base + "/book/" + b.slug;
-        return '<div class="biz' + (b.disabled ? " off" : "") + '"><div><b>' + esc(b.name) + "</b>" + (b.disabled ? ' <span class="pill">switched off</span>' : "") + '<div class="meta"><a href="' + esc(url) + '" target="_blank" rel="noopener">/book/' + esc(b.slug) + "</a> · " + esc(b.ownerEmail) + "</div>" +
+        return '<div class="biz' + (b.disabled ? " off" : "") + '"><div><b>' + esc(b.name) + "</b>" + (b.disabled ? ' <span class="pill">switched off</span>' : "") + (!b.verified ? ' <span class="pill">email not confirmed</span>' : !b.setupDone ? ' <span class="pill">setting up</span>' : "") + (b.source === "signup" ? ' <span class="pill">signed up</span>' : "") + '<div class="meta"><a href="' + esc(url) + '" target="_blank" rel="noopener">/book/' + esc(b.slug) + "</a> · " + esc(b.ownerEmail) + "</div>" +
           '<div class="meta">' + b.upcoming + " upcoming · " + b.total + " bookings in total · since " + esc((b.createdAt || "").slice(0, 10)) + "</div></div>" +
           '<div class="acts"><a class="btn sm" href="' + esc(url) + '/admin" target="_blank" rel="noopener">Dashboard ↗</a><button type="button" class="btn sm" data-reset="' + esc(b.slug) + '" data-name="' + esc(b.name) + '">New password</button>' +
           '<button type="button" class="btn sm ' + (b.disabled ? "" : "danger") + '" data-toggle="' + esc(b.slug) + '" data-off="' + (b.disabled ? "0" : "1") + '">' + (b.disabled ? "Switch on" : "Switch off") + "</button></div></div>";

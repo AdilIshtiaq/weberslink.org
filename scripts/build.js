@@ -1206,6 +1206,7 @@ ${d.feats.map((f) => `    <li>${esc(f)}</li>`).join("\n")}
     <a class="btn btn-dark" href="/demos/${d.slug}/" data-track="Demo open" data-loc="${loc}-${d.slug}">Try the customer side →</a>
     <a class="btn btn-outline" href="/demos/${d.slug}/?view=admin" data-track="Demo open" data-loc="${loc}-${d.slug}-admin">See the business dashboard →</a>
   </div>
+  <p style="margin:18px 0 0"><strong>Ready to use it?</strong> <a href="/book/new" data-track="Booking signup" data-loc="${loc}">Create your own booking page</a> in about 5 minutes: sign up, confirm your email, add your services, team and hours, and share your link. Already have one? <a href="/book/login">Sign in</a>.</p>
 </div>`;
 write("/demos/", render({
   path: "/demos/", type: "hub", kicker: "Demos",
@@ -1216,10 +1217,10 @@ write("/demos/", render({
   card: { title: "Demos" },
   heroCta: `<div class="hero-cta">
       <a href="/demos/booking/" class="btn btn-light" data-track="Demo open" data-loc="hero-booking">Open the booking demo →</a>
-      <a href="/#book" class="btn btn-ghost" data-track="Book CTA" data-loc="demos-hero">Get it for your business</a>
+      <a href="/book/new" class="btn btn-ghost" data-track="Booking signup" data-loc="demos-hero">Create your booking page</a>
     </div>`,
   faqs: [
-    ["Is the booking system ready to use for my business?", "Yes. We set it up with your services, prices, team, opening hours and time zone, give you your own booking link and dashboard, and help you add it to your website, Google Business Profile and social pages."],
+    ["Can I start using the booking system now?", "Yes. Create your booking page, confirm your email, then a short setup asks for your services, prices, team, opening hours and time zone. When you finish, your page is live with its own link and dashboard. Prefer us to set it up for you? Book a walkthrough."],
     ["Can it go on my existing website?", "Yes. You get a link to share and a short code to paste into any website (WordPress, Wix, Squarespace or custom). It matches your brand colour."],
     ["Do my customers get reminders?", "Yes. Customers get a confirmation email with a calendar file and a reminder before the appointment, and you get an alert for every new, moved or cancelled booking. Text-message reminders can be added."],
     ["Is the demo data real?", "No. The demo businesses are made up, and anything you book in the demo stays in your own browser. Use “Reset demo data” at the bottom of the demo to start again."],

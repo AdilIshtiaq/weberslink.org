@@ -21,6 +21,10 @@ const mail = require("./mail");
 const presets = require("./presets");
 
 const PAGE = path.join(__dirname, "..", "public", "demos", "booking", "index.html");
+const ACCOUNT_PAGE = path.join(__dirname, "..", "public", "demos", "booking", "account.html");
+const ACCOUNT_PAGES = ["new", "login", "forgot", "reset", "verify"]; // /book/<these> are sign-up and sign-in pages
+const RESERVED = ["admin", "api", "demo", "demos", "start", "signup", "help", "www", ...ACCOUNT_PAGES];
+const UNVERIFIED_DAYS = 7;
 const SESSION_MS = 12 * 3600 * 1000;
 let isSiteAdmin = () => false; // set by server.js (Outreach login)
 function setSiteAdminCheck(fn) { isSiteAdmin = fn; }
@@ -82,9 +86,10 @@ function ownerOf(req, slug) {
 const sessionCookie = (req, slug, value, maxAge) => `${cookieName(slug)}=${encodeURIComponent(value)}; Path=/api/booking/${slug}; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${isHttps(req) ? "; Secure" : ""}`;
 
 // ------------------------------------------------------------------ business helpers
+const active = (acc) => Boolean(acc && !acc.disabled && acc.verified !== false); // signed-up pages count once the email is confirmed
 function getBiz(slug) {
   const acc = store.account(slug);
-  if (!acc || acc.disabled) return null;
+  if (!active(acc)) return null;
   const biz = store.loadBiz(slug);
   return biz ? { acc, ...biz } : null;
 }
@@ -105,11 +110,11 @@ const ownerBooking = (b) => ({ id: b.id, code: b.code, serviceId: b.serviceId, s
 
 // ------------------------------------------------------------------ pages
 function servePage(req, res, slug) {
-  const acc = store.account(slug);
-  const page = fs.readFileSync(PAGE, "utf8").replace("<html lang=\"en\">", `<html lang="en" data-slug="${acc && !acc.disabled ? slug : ""}">`)
+  const acc = active(store.account(slug)) ? store.account(slug) : null;
+  const page = fs.readFileSync(PAGE, "utf8").replace("<html lang=\"en\">", `<html lang="en" data-slug="${acc ? slug : ""}">`)
     .replace(/<meta name="robots"[^>]*>/, '<meta name="robots" content="noindex, nofollow">');
   const admin = /\/admin\/?$/.test(req.url.split("?")[0]);
-  res.writeHead(acc && !acc.disabled ? 200 : 404, {
+  res.writeHead(acc ? 200 : 404, {
     "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "same-origin",
     "Content-Security-Policy": `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors ${admin ? "'none'" : "*"}`,
     ...(admin ? { "X-Frame-Options": "DENY" } : {}),
@@ -125,6 +130,8 @@ async function businessApi(req, res, slug, rest) {
   const s = biz.settings;
 
   if (rest === "config" && m === "GET") return send(res, 200, { ok: true, settings: core.publicSettings(s) });
+  const notYet = s.setupDone === false && ["slots", "book", "lookup", "cancel", "reschedule"].includes(rest);
+  if (notYet) return fail(res, 404, "This business isn't taking online bookings yet.");
   if (rest === "slots" && m === "GET") {
     if (!allow("slots:" + ip, 240, 600e3)) return fail(res, 429, "Too many requests. Please wait a moment.");
     const q = new URL(req.url, "http://x").searchParams;
@@ -182,7 +189,7 @@ async function businessApi(req, res, slug, rest) {
 
   if (what === "data" && m === "GET") {
     const from = Date.now() - 90 * 864e5;
-    return send(res, 200, { ok: true, settings: s, slug, mailOn: Boolean(process.env.SMTP_USER && process.env.SMTP_PASS),
+    return send(res, 200, { ok: true, settings: s, slug, ownerEmail: biz.acc.ownerEmail, mailOn: mail.canSend(),
       bookings: biz.bookings.filter((b) => Date.parse(b.end) > from).map(ownerBooking) });
   }
   if (what === "seen" && m === "POST") { biz.bookings.forEach((b) => { b.seen = true; }); store.saveBiz(slug, biz); return send(res, 200, { ok: true }); }
@@ -233,6 +240,13 @@ async function businessApi(req, res, slug, rest) {
     Object.assign(acc, hashPassword(body.next), { pwv: (acc.pwv || 1) + 1 }); store.saveAccounts(list);
     return send(res, 200, { ok: true }, { "Set-Cookie": sessionCookie(req, slug, makeSession(acc), SESSION_MS / 1000) });
   }
+  if (what === "delete" && m === "POST") { // the owner closes their booking page for good
+    const body = await readJson(req);
+    if (!checkPassword(biz.acc, body.password)) return fail(res, 400, "Your password is wrong.");
+    store.deleteBiz(slug);
+    store.saveAccounts(store.accounts().filter((a) => a.slug !== slug));
+    return send(res, 200, { ok: true }, { "Set-Cookie": sessionCookie(req, slug, "", 0) });
+  }
   if (what === "export.csv" && m === "GET") {
     const q = (v) => `"${String(v == null ? "" : v).replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`;
     const svc = (id) => (s.services.find((x) => x.id === id) || {}).name || id, who = (id) => (s.staff.find((x) => x.id === id) || {}).name || id;
@@ -254,6 +268,7 @@ async function siteAdminApi(req, res, rest) {
       const b = store.loadBiz(a.slug) || { settings: {}, bookings: [] };
       const now = Date.now();
       return { slug: a.slug, name: b.settings.name || a.slug, ownerEmail: a.ownerEmail, disabled: Boolean(a.disabled), createdAt: a.createdAt,
+        source: a.source || "admin", verified: a.verified !== false, setupDone: b.settings.setupDone !== false,
         upcoming: b.bookings.filter((x) => x.status === "booked" && Date.parse(x.start) > now).length, total: b.bookings.length };
     }) });
   }
@@ -261,16 +276,16 @@ async function siteAdminApi(req, res, rest) {
   if (rest === "create" && m === "POST") {
     const slug = String(body.slug || "").trim().toLowerCase();
     if (!store.SLUG.test(slug)) return fail(res, 400, "Web address: 3–40 lowercase letters, numbers or dashes (e.g. studio-nova).");
-    if (["admin", "api", "demo", "new"].includes(slug) || store.account(slug)) return fail(res, 400, "That web address is taken.");
+    if (RESERVED.includes(slug) || store.account(slug)) return fail(res, 400, "That web address is taken.");
     const ownerEmail = core.email(body.ownerEmail);
     if (!ownerEmail) return fail(res, 400, "Enter the owner's email.");
     const preset = presets[body.preset] || presets.other;
     let settings;
-    try { settings = core.sanitizeSettings({ ...preset, name: body.name, tag: body.tag || preset.tag, tz: body.tz, currency: body.currency, phone: body.phone, notifyEmail: ownerEmail }); }
+    try { settings = core.sanitizeSettings({ ...preset, name: body.name, tag: body.tag || preset.tag, tz: body.tz, currency: body.currency, phone: body.phone, notifyEmail: ownerEmail, setupDone: false }); }
     catch (e) { return fail(res, 400, e.message); }
     const password = newPassword();
     store.saveBiz(slug, { settings, bookings: [] });
-    store.saveAccounts(store.accounts().concat({ slug, ownerEmail, ...hashPassword(password), pwv: 1, createdAt: new Date().toISOString() }));
+    store.saveAccounts(store.accounts().concat({ slug, ownerEmail, ...hashPassword(password), pwv: 1, createdAt: new Date().toISOString(), source: "admin" }));
     return send(res, 200, { ok: true, slug, password, url: `${mail.base()}/book/${slug}` });
   }
   const list = store.accounts(), acc = list.find((a) => a.slug === body.slug);
@@ -284,9 +299,127 @@ async function siteAdminApi(req, res, rest) {
   return fail(res, 404, "Not found");
 }
 
+// ------------------------------------------------------------------ owner accounts: sign up, confirm email, sign in, reset password
+const tokenHash = (t) => crypto.createHash("sha256").update(String(t)).digest("hex");
+const newToken = () => crypto.randomBytes(24).toString("hex");
+function slugify(name) {
+  return String(name || "").toLowerCase().replace(/['’`]/g, "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 36).replace(/-+$/, "");
+}
+function freeSlug(base) {
+  let s = store.SLUG.test(base) && !RESERVED.includes(base) ? base : (base + "-booking").replace(/^-+/, "").slice(0, 40);
+  if (!store.SLUG.test(s)) s = "booking-" + crypto.randomBytes(3).toString("hex");
+  if (!store.account(s)) return s;
+  for (let i = 2; i < 100; i++) { const t = `${s.slice(0, 36)}-${i}`; if (!store.account(t)) return t; }
+  return `${s.slice(0, 30)}-${crypto.randomBytes(3).toString("hex")}`;
+}
+function loggedIn(req, res, acc, extra = {}) {
+  return send(res, 200, { ok: true, slug: acc.slug, ...extra }, { "Set-Cookie": sessionCookie(req, acc.slug, makeSession(acc), SESSION_MS / 1000) });
+}
+function updateAccount(slug, fn) { const list = store.accounts(), a = list.find((x) => x.slug === slug); if (!a) return null; fn(a); store.saveAccounts(list); return a; }
+async function sendVerify(acc, name) {
+  const token = newToken();
+  updateAccount(acc.slug, (a) => { a.verifyHash = tokenHash(token); a.verifyExp = Date.now() + 48 * 3600e3; });
+  return mail.sendAccount("verify", acc.ownerEmail, { name, link: `${mail.base()}/book/verify?token=${token}` });
+}
+const bizName = (slug) => ((store.loadBiz(slug) || {}).settings || {}).name || slug;
+
+async function accountApi(req, res, what) {
+  if (req.method !== "POST") return fail(res, 405, "Use POST.");
+  const ip = clientIp(req), body = await readJson(req);
+  const email = core.email(body.email);
+  if (what === "signup") {
+    if (process.env.BOOKING_SIGNUP === "off") return fail(res, 403, "New sign-ups are closed at the moment. Please contact us.");
+    if (!mail.canSend()) return fail(res, 503, "Sign-up isn't open yet (email isn't set up on the server). Please contact us.");
+    if (body.website) return send(res, 200, { ok: true, email }); // honeypot
+    if (!allow("signup:" + ip, 3, 3600e3) || !allow("signup-day:" + ip, 10, 864e5) || !allow("signup-all", 60, 864e5)) return fail(res, 429, "Too many sign-ups from this connection. Please try again later.");
+    const name = core.str(body.name, 80);
+    if (name.length < 2) return fail(res, 400, "Enter your business name.");
+    if (!email) return fail(res, 400, "Enter a valid email address.");
+    if (String(body.password || "").length < 10) return fail(res, 400, "Choose a password of at least 10 characters.");
+    if (String(body.password).length > 200) return fail(res, 400, "That password is too long.");
+    const mine = store.accounts().filter((a) => a.ownerEmail === email && !a.disabled);
+    if (mine.some((a) => a.verified !== false)) return fail(res, 409, "There's already a booking page for this email. Sign in, or reset your password.");
+    for (const a of mine) { store.deleteBiz(a.slug); store.saveAccounts(store.accounts().filter((x) => x.slug !== a.slug)); } // an older unconfirmed try: start again
+    let slug;
+    if (body.slug) {
+      slug = String(body.slug).trim().toLowerCase();
+      if (!store.SLUG.test(slug)) return fail(res, 400, "Web address: 3–40 lowercase letters, numbers or dashes.");
+      if (RESERVED.includes(slug) || store.account(slug)) return fail(res, 409, "That web address is taken. Try another.");
+    } else slug = freeSlug(slugify(name));
+    const preset = presets[body.type] || presets.other;
+    let settings;
+    try { settings = core.sanitizeSettings({ ...preset, name, tz: body.tz, currency: body.currency, notifyEmail: email, setupDone: false }); }
+    catch (e) { return fail(res, 400, e.message); }
+    store.saveBiz(slug, { settings, bookings: [] });
+    const acc = { slug, ownerEmail: email, ...hashPassword(body.password), pwv: 1, createdAt: new Date().toISOString(), source: "signup", verified: false };
+    store.saveAccounts(store.accounts().concat(acc));
+    if (!(await sendVerify(acc, name))) return fail(res, 502, "We couldn't send the confirmation email. Please try again in a few minutes.");
+    return send(res, 200, { ok: true, email, slug });
+  }
+  if (what === "resend") {
+    if (!allow("resend:" + ip, 5, 3600e3)) return fail(res, 429, "Too many requests. Please wait a while.");
+    const acc = email && store.accounts().find((a) => a.ownerEmail === email && a.verified === false && !a.disabled);
+    if (acc) await sendVerify(acc, bizName(acc.slug));
+    return send(res, 200, { ok: true });
+  }
+  if (what === "verify") {
+    if (!allow("verify:" + ip, 20, 3600e3)) return fail(res, 429, "Too many attempts. Please wait a while.");
+    const h = tokenHash(body.token || "");
+    const acc = store.accounts().find((a) => a.verifyHash && a.verifyHash === h);
+    if (!acc || acc.disabled) return fail(res, 400, "This link has already been used or isn't valid. Sign in, or sign up again.");
+    if (acc.verifyExp < Date.now()) return fail(res, 400, "This link has expired. Sign in to get a new one.");
+    const done = updateAccount(acc.slug, (a) => { a.verified = true; a.verifiedAt = new Date().toISOString(); delete a.verifyHash; delete a.verifyExp; });
+    return loggedIn(req, res, done);
+  }
+  if (what === "login") {
+    if (!allow("acct-login:" + ip, 10, 900e3)) return fail(res, 429, "Too many attempts. Try again in 15 minutes.");
+    const list = email ? store.accounts().filter((a) => a.ownerEmail === email && !a.disabled) : [];
+    const acc = list.find((a) => checkPassword(a, body.password));
+    if (!acc) { await new Promise((r) => setTimeout(r, 400)); return fail(res, 401, "Wrong email or password."); }
+    if (acc.verified === false) return fail(res, 403, "Please confirm your email first. We've sent you a link (check spam too).");
+    return loggedIn(req, res, acc);
+  }
+  if (what === "forgot") {
+    if (!allow("forgot:" + ip, 5, 3600e3)) return fail(res, 429, "Too many requests. Please wait a while.");
+    const acc = email && store.accounts().filter((a) => a.ownerEmail === email && !a.disabled).pop();
+    if (acc) {
+      const token = newToken();
+      updateAccount(acc.slug, (a) => { a.resetHash = tokenHash(token); a.resetExp = Date.now() + 3600e3; });
+      await mail.sendAccount("reset", email, { name: bizName(acc.slug), link: `${mail.base()}/book/reset?token=${token}` });
+    }
+    return send(res, 200, { ok: true }); // same answer either way: nobody can test which emails have accounts
+  }
+  if (what === "reset") {
+    if (!allow("reset:" + ip, 20, 3600e3)) return fail(res, 429, "Too many attempts. Please wait a while.");
+    if (String(body.password || "").length < 10) return fail(res, 400, "Choose a password of at least 10 characters.");
+    const h = tokenHash(body.token || "");
+    const acc = store.accounts().find((a) => a.resetHash && a.resetHash === h && !a.disabled);
+    if (!acc || acc.resetExp < Date.now()) return fail(res, 400, "This reset link has expired or was already used. Ask for a new one.");
+    const done = updateAccount(acc.slug, (a) => { Object.assign(a, hashPassword(body.password)); a.pwv = (a.pwv || 1) + 1; a.verified = true; delete a.resetHash; delete a.resetExp; });
+    return loggedIn(req, res, done);
+  }
+  return fail(res, 404, "Not found");
+}
+/** Removes sign-ups that never confirmed their email. */
+function cleanupUnverified(now = Date.now()) {
+  const old = store.accounts().filter((a) => a.verified === false && now - Date.parse(a.createdAt) > UNVERIFIED_DAYS * 864e5);
+  for (const a of old) store.deleteBiz(a.slug);
+  if (old.length) store.saveAccounts(store.accounts().filter((a) => !old.some((o) => o.slug === a.slug)));
+  return old.length;
+}
+function serveAccountPage(req, res) {
+  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer",
+    "X-Frame-Options": "DENY", "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" });
+  res.end(req.method === "HEAD" ? undefined : fs.readFileSync(ACCOUNT_PAGE, "utf8"));
+}
+
 // ------------------------------------------------------------------ entry point + reminders
 function handle(req, res) {
   const p = String(req.url || "").split("?")[0];
+  const ap = /^\/book\/([a-z]+)\/?$/.exec(p);
+  if (ap && ACCOUNT_PAGES.includes(ap[1]) && (req.method === "GET" || req.method === "HEAD")) { serveAccountPage(req, res); return true; }
+  const acct = /^\/api\/booking-account\/([a-z]+)$/.exec(p);
+  if (acct) { accountApi(req, res, acct[1]).catch((e) => { if (!res.headersSent) fail(res, e.status || 500, e.status ? e.message : "Server error"); if (!e.status) console.error("booking account error:", e); }); return true; }
   let mm = /^\/book\/([a-z0-9-]{3,40})(\/admin)?\/?$/.exec(p);
   if (mm && (req.method === "GET" || req.method === "HEAD")) { servePage(req, res, mm[1]); return true; }
   mm = /^\/api\/booking\/([a-z0-9-]{3,40})\/([a-z/.]+)$/.exec(p);
@@ -301,7 +434,7 @@ function handle(req, res) {
 async function sendReminders(now = Date.now()) {
   let n = 0;
   for (const acc of store.accounts()) {
-    if (acc.disabled) continue;
+    if (!active(acc)) continue;
     const biz = store.loadBiz(acc.slug);
     if (!biz || !biz.settings.reminderHours) continue;
     const due = biz.bookings.filter((b) => b.status === "booked" && b.email && !b.remindedAt && Date.parse(b.start) > now && Date.parse(b.start) - now <= biz.settings.reminderHours * 3600e3 && now - Date.parse(b.createdAt) > 3600e3);
@@ -316,9 +449,9 @@ async function sendReminders(now = Date.now()) {
   return n;
 }
 function startScheduler() {
-  const tick = () => sendReminders().catch((e) => console.error("booking reminders:", e.message));
+  const tick = () => { try { cleanupUnverified(); } catch (e) { console.error("booking cleanup:", e.message); } sendReminders().catch((e) => console.error("booking reminders:", e.message)); };
   setInterval(tick, 5 * 60 * 1000).unref();
   setTimeout(tick, 40 * 1000).unref();
 }
 
-module.exports = { handle, startScheduler, sendReminders, setSiteAdminCheck, hashPassword, checkPassword };
+module.exports = { handle, startScheduler, sendReminders, cleanupUnverified, setSiteAdminCheck, hashPassword, checkPassword, slugify };

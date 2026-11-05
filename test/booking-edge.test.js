@@ -35,6 +35,10 @@ async function make(slug, extra = {}) {
   const r = await call("POST", "/api/booking-admin/create", { slug, name: "Biz " + slug, ownerEmail: "owner@" + slug + ".test", preset: "other", tz: "UTC", ...extra });
   assert.strictEqual(r.status, 200, r.text);
   const login = await call("POST", `/api/booking/${slug}/login`, { password: r.json.password }, null, fresh());
+  const cfg = (await call("GET", `/api/booking/${slug}/admin/data`, undefined, login.cookie)).json.settings;
+  assert.strictEqual(cfg.setupDone, false); // new pages wait for the owner's setup
+  assert.strictEqual((await call("GET", `/api/booking/${slug}/slots?service=s1`, undefined, null, fresh())).status, 404);
+  assert.strictEqual((await call("PUT", `/api/booking/${slug}/admin/settings`, { settings: { ...cfg, setupDone: true } }, login.cookie)).status, 200);
   return { pw: r.json.password, cookie: login.cookie };
 }
 async function firstSlots(slug, n = 1, skipDays = 3, svc = "s1") {
