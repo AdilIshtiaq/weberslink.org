@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Online Booking Demo | Weberslink</title>
+<meta name="description" content="Try an online booking system: customers pick a service, a person and a time; the business sees every appointment in one dashboard. A live demo by Weberslink.">
+<meta name="robots" content="noindex, follow">
+<meta name="theme-color" content="#7a4fe0">
+<link rel="icon" href="/favicon-32.png" sizes="32x32">
+<link rel="stylesheet" href="/demos/booking/booking.css?v=3">
+</head>
+<body>
+<div class="demobar" role="region" aria-label="About this demo">
+  <span><b>Live demo</b> by <a href="/">Weberslink</a>. Bookings are stored only in your browser. Try it as a customer, then open the business dashboard.</span>
+  <span class="niches" role="group" aria-label="Type of business">
+    <button type="button" data-niche="salon">Salon</button>
+    <button type="button" data-niche="clinic">Dental clinic</button>
+    <button type="button" data-niche="home">Home services</button>
+  </span>
+</div>
+
+<header class="top">
+  <div class="top-in">
+    <div class="logo" id="logo" aria-hidden="true"></div>
+    <div class="brand"><b id="bizName"></b><span id="bizTag"></span></div>
+    <div class="switch" role="group" aria-label="View">
+      <button type="button" data-view="book" aria-pressed="true">Book online</button>
+      <button type="button" data-view="admin" aria-pressed="false">Business dashboard</button>
+    </div>
+  </div>
+</header>
+
+<main id="main"></main>
+
+<footer class="foot">
+  <span id="footNote">Want this for your business, on your own website, with email confirmations and reminders? <a href="/contact">Talk to Weberslink</a>.</span>
+  <br><button type="button" class="btn ghost sm" id="resetDemo">Reset demo data</button>
+</footer>
+
+<script src="/demos/booking/booking.js?v=3"></script>
+</body>
+</html>
