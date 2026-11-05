@@ -123,6 +123,7 @@
       return '<div class="' + cls + '">' + esc(line) + "</div>";
     }).join("") : "No activity yet.";
     if (atEnd) lg.scrollTop = lg.scrollHeight;
+    renderClicks();
     if (state.view === "replies") renderReplies();
   }
 
@@ -141,12 +142,27 @@
     api("POST", "/api/outreach/leads/action", { email: b.dataset.email, action: b.dataset.held }).then(function () { toast("Updated"); refresh(); }).catch(fail);
   });
 
+  // ---------------------------------------------------------------- link clicks
+  function clickLine(c) {
+    if (!c || !c.clicks) return "";
+    var parts = Object.keys(c.links || {}).map(function (k) { return "“" + k + "”" + (c.links[k] > 1 ? " ×" + c.links[k] : ""); });
+    return '<div class="clicked">Clicked ' + esc(parts.join(", ")) + " · last " + esc(ago(c.last)) + "</div>";
+  }
+  function renderClicks() {
+    var s = state.status, cs = s.clicks || [], on = s.trackClicks !== false;
+    $("clickList").innerHTML = cs.length ? cs.slice(0, 15).map(function (c) {
+      return '<div class="click-row"><div><div class="who">' + esc(c.store || c.email) + '</div><div class="meta">' + esc(c.email) + " · clicked “" + esc(c.label || c.url) + "” in " + esc(c.source || "an email") + " · " + esc(c.url) + "</div></div>" +
+        '<div class="meta">' + esc(ago(c.at)) + "</div></div>";
+    }).join("") : '<p class="empty">' + (!on ? "Click tracking is off: tick Track link clicks and HTML emails in Settings." : !s.trackingBase ? "Click tracking needs your website address in Settings > signature (or OUTREACH_PUBLIC_URL on the server)." : "No clicks yet. Links in emails sent from now on are tracked.") + "</p>";
+  }
+
   // ---------------------------------------------------------------- replies
   function renderReplies() {
     var rs = state.status.replied;
     $("replyList").innerHTML = rs.length ? rs.map(function (r) {
       var late = !r.loomSent && r.repliedAt && Date.now() - new Date(r.repliedAt).getTime() > 24 * 36e5;
       return '<div class="reply"><div><div class="who">' + esc(r.store || r.domain) + '</div><div class="meta">' + esc(r.email) + " · via " + esc(r.mailbox || "?") + (r.repliedAt ? " · " + esc(ago(r.repliedAt)) : "") + "</div>" +
+        clickLine(r.clicks) +
         (late ? '<div class="bad" style="font-size:13px">Over 24 hours — send the video now</div>' : "") + '</div><div class="acts">' +
         '<button class="btn sm" data-reply="' + esc(r.email) + '">Reply</button>' +
         '<label class="check" style="font-size:13px"><input type="checkbox" data-loom="' + esc(r.email) + '"' + (r.loomSent ? " checked" : "") + "> Video sent</label></div></div>";
@@ -332,13 +348,13 @@
 
   // ---------------------------------------------------------------- leads
   var STATUSES = ["new", "active", "finished", "replied", "unsubscribed", "bounced", "do-not-contact", "skipped-bad-address", "skipped-country", "skipped-no-mailserver"];
-  $("leadStatus").innerHTML += STATUSES.map(function (s) { return '<option value="' + s + '">' + s + "</option>"; }).join("");
+  $("leadStatus").innerHTML += STATUSES.map(function (s) { return '<option value="' + s + '">' + s + "</option>"; }).join("") + '<option value="clicked">clicked a link</option>';
   function loadLeads() {
     var q = new URLSearchParams({ q: $("leadQ").value, status: $("leadStatus").value, limit: PAGE, offset: state.leadPage * PAGE });
     api("GET", "/api/outreach/leads?" + q).then(function (r) {
-      $("leadTable").innerHTML = r.rows.length ? "<tr><th>Store</th><th>Email</th><th>Country</th><th>Status</th><th>Emails sent</th><th>Last sent</th><th>Next</th><th>Mailbox</th><th>Ver.</th></tr>" + r.rows.map(function (t) {
+      $("leadTable").innerHTML = r.rows.length ? "<tr><th>Store</th><th>Email</th><th>Country</th><th>Status</th><th>Emails sent</th><th>Last sent</th><th>Next</th><th>Clicks</th><th>Mailbox</th><th>Ver.</th></tr>" + r.rows.map(function (t) {
         var sent = Number(t.step) || 0;
-        return "<tr><td>" + esc(t.store || t.domain) + "</td><td>" + esc(t.email) + "</td><td>" + esc(t.country) + '</td><td><span class="chip ' + esc(t.status) + '">' + esc(t.status === "skipped-bad-address" ? "set aside" : t.status) + "</span></td><td>" + (sent ? sent + " of 4" : "–") + "</td><td>" + esc((t.last_sent || "").slice(0, 10) || "–") + "</td><td class='hint'>" + esc(t.next || "") + (t.status === "skipped-bad-address" ? ' <button class="btn sm" data-restore="' + esc(t.email) + '">Restore</button>' : "") + "</td><td>" + esc(t.mailbox) + "</td><td>" + esc((t.variant || "").toUpperCase()) + "</td></tr>";
+        return "<tr><td>" + esc(t.store || t.domain) + "</td><td>" + esc(t.email) + "</td><td>" + esc(t.country) + '</td><td><span class="chip ' + esc(t.status) + '">' + esc(t.status === "skipped-bad-address" ? "set aside" : t.status) + "</span></td><td>" + (sent ? sent + " of 4" : "–") + "</td><td>" + esc((t.last_sent || "").slice(0, 10) || "–") + "</td><td class='hint'>" + esc(t.next || "") + (t.status === "skipped-bad-address" ? ' <button class="btn sm" data-restore="' + esc(t.email) + '">Restore</button>' : "") + "</td><td>" + (t.clicks ? '<span class="clicked">' + t.clicks + "</span>" : "–") + "</td><td>" + esc(t.mailbox) + "</td><td>" + esc((t.variant || "").toUpperCase()) + "</td></tr>";
       }).join("") : '<tr><td class="empty">No leads match.</td></tr>';
       var from = r.total ? state.leadPage * PAGE + 1 : 0;
       $("pgInfo").textContent = from + "–" + Math.min(r.total, (state.leadPage + 1) * PAGE) + " of " + r.total;
@@ -550,7 +566,7 @@
       $("s_name").value = g.name; $("s_title").value = g.title; $("s_company").value = g.company; $("s_website").value = g.website; $("s_postal").value = g.postal_address; $("s_accent").value = g.accent_color; $("s_logo").checked = g.logo !== false;
       $("x_notify").value = s.notify_email; $("x_days").value = s.send_days.join(","); $("x_tz").value = s.timezone; $("x_countries").value = s.countries.join(",");
       $("x_ramp").value = s.ramp.join(","); $("x_limit").value = s.daily_limit; $("x_gaps").value = s.followup_gaps_days.join(","); $("x_bounce").value = s.bounce_pause_percent;
-      $("x_win").checked = s.window_enabled; $("x_wstart").value = s.window_start; $("x_wend").value = s.window_end; $("x_min").value = s.min_delay_seconds; $("x_max").value = s.max_delay_seconds; $("x_html").checked = s.html_emails; $("x_mx").checked = s.check_mx; $("x_live").checked = !s.dry_run; $("x_auto").checked = s.auto_run !== false;
+      $("x_win").checked = s.window_enabled; $("x_wstart").value = s.window_start; $("x_wend").value = s.window_end; $("x_min").value = s.min_delay_seconds; $("x_max").value = s.max_delay_seconds; $("x_html").checked = s.html_emails; $("x_mx").checked = s.check_mx; $("x_live").checked = !s.dry_run; $("x_auto").checked = s.auto_run !== false; $("x_track").checked = s.track_clicks !== false;
       $("mbList").innerHTML = c.mailboxes.map(mbBlock).join("");
     }).catch(fail);
   }
@@ -567,7 +583,7 @@
       signature: { name: $("s_name").value, title: $("s_title").value, company: $("s_company").value, website: $("s_website").value, postal_address: $("s_postal").value, accent_color: $("s_accent").value, logo: $("s_logo").checked },
       sending: { notify_email: $("x_notify").value, send_days: $("x_days").value, timezone: $("x_tz").value, countries: $("x_countries").value, ramp: $("x_ramp").value, daily_limit: $("x_limit").value,
         followup_gaps_days: $("x_gaps").value, bounce_pause_percent: $("x_bounce").value, min_delay_seconds: $("x_min").value, max_delay_seconds: $("x_max").value,
-        window_enabled: $("x_win").checked, window_start: $("x_wstart").value, window_end: $("x_wend").value, html_emails: $("x_html").checked, check_mx: $("x_mx").checked, dry_run: !live, auto_run: $("x_auto").checked, check_inbox_in_dry_run: state.config ? state.config.sending.check_inbox_in_dry_run : false },
+        window_enabled: $("x_win").checked, window_start: $("x_wstart").value, window_end: $("x_wend").value, html_emails: $("x_html").checked, check_mx: $("x_mx").checked, dry_run: !live, auto_run: $("x_auto").checked, track_clicks: $("x_track").checked, check_inbox_in_dry_run: state.config ? state.config.sending.check_inbox_in_dry_run : false },
       mailboxes: boxes
     };
     api("PUT", "/api/outreach/config", body).then(function (r) { state.config = r.config; toast("Settings saved"); loadSettings(); refresh(); }).catch(fail);

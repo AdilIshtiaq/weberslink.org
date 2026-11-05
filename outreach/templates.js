@@ -116,6 +116,10 @@ function fieldsFor(lead, cfg) {
 
 const SAMPLE_LEAD = { custom_line: "I saw that Example Store sells organic cotton basics with free returns.", research_status: "approved", store: "Example Store", domain: "example.com", psi: "34", lcp: "6.1", first_name: "", country: "US", category: "Apparel", niche: "Fashion & Apparel", email: "owner@example.com" };
 
+// Web addresses written in a template become real links in the HTML part (so they can be click-tracked).
+const URL_IN_TEXT = /\b(https?:\/\/[^\s<>"']+[^\s<>"'.,;:!?)\]])/gi;
+const linkify = (escaped, accent) => escaped.replace(URL_IN_TEXT, (u) => `<a href="${u}" style="color:${accent};">${u}</a>`);
+
 function renderHtml(main, cfg) {
   const sig = cfg.signature;
   const accent = /^#[0-9a-f]{3,8}$/i.test(sig.accent_color || "") ? sig.accent_color : "#5B2EE5";
@@ -125,9 +129,9 @@ function renderHtml(main, cfg) {
   const blocks = paras.map((p) => {
     const lines = p.split("\n");
     if (lines.every((l) => l.trim().startsWith("- "))) {
-      return `<ul style="margin:0 0 16px 0;padding-left:20px;">${lines.map((l) => `<li style="margin:0 0 6px 0;">${esc(l.trim().slice(2))}</li>`).join("")}</ul>`;
+      return `<ul style="margin:0 0 16px 0;padding-left:20px;">${lines.map((l) => `<li style="margin:0 0 6px 0;">${linkify(esc(l.trim().slice(2)), accent)}</li>`).join("")}</ul>`;
     }
-    return `<p style="margin:0 0 16px 0;">${lines.map(esc).join("<br>")}</p>`;
+    return `<p style="margin:0 0 16px 0;">${lines.map((l) => linkify(esc(l), accent)).join("<br>")}</p>`;
   });
   const site = String(sig.website || "").trim();
   const href = /^https?:/i.test(site) ? site : "https://" + site;

@@ -31,7 +31,17 @@ emailed them, in the same thread. The message box keeps links, bold/italic/under
 Docs, Word, Gmail…); the toolbar adds links (Ctrl+K), lists, images and file attachments (10 MB in total), and bare
 https:// addresses become links. It is sent as HTML with a plain-text copy. Tick **Send later** to schedule it; scheduled
 messages are checked every minute while the server is awake (and on every cron call, which also wakes a sleeping app),
-listed under the replies, and can be cancelled until they go out. Leads who unsubscribe/bounce are never emailed.
+listed under the replies, and can be cancelled until they go out.
+
+**Link clicks.** With *Track link clicks* on (Settings, on by default; needs HTML emails), every http(s) link in the HTML
+part of live campaign emails and dashboard replies is swapped for `https://<your site>/r/<token>`, unique per lead and
+link. A click is recorded and the visitor is sent straight on to the real address. You see it on the Dashboard (*Link
+clicks*), on each reply (*Clicked "demo video" ×2*), and in the Leads table (*Clicks* column, filter *clicked a link*).
+Web addresses written in templates become links in the HTML part so they can be tracked; the plain-text copy always
+keeps the real addresses. Mail security scanners click links by themselves: clicks from known scanners, link checks
+(HEAD) and clicks in the first minute after sending are counted as "scanner", not as a person. No IP addresses are
+stored. The links use the website in Settings > signature (it must be this app's domain), or set `OUTREACH_PUBLIC_URL`.
+Data: `links.json` (token -> address, needed for old links to keep working) and `clicks.json`; both are in backups. Leads who unsubscribe/bounce are never emailed.
 
 Safety behaviour worth knowing:
 - Before every send the lead is re-read from disk, so anyone you mark do-not-contact (or who replies) while a run is in
@@ -50,6 +60,7 @@ Safety behaviour worth knowing:
 | `ADMIN_PASSWORD` | yes (10+ chars) | Dashboard login. Unset or shorter = feature off. |
 | `ADMIN_USERNAME` | optional | If set, the sign-in page asks for this username too (not case-sensitive). |
 | `OUTREACH_PASSWORD_<n>` | to send | Password of mailbox number `<n>`. The number is shown under each mailbox in Settings and never changes, even if you remove or reorder mailboxes. |
+| `OUTREACH_PUBLIC_URL` | no | Address of this app for tracked links (default: the signature website). |
 | `OUTREACH_CRON_TOKEN` | for cron | 16+ random characters; lets a cron job start a run. |
 | `OUTREACH_DATA_DIR` | **strongly recommended** | Absolute path to a folder OUTSIDE the app folder, e.g. `/home/USER/outreach-data` (your home folder is shown in Hostinger's File Manager). This is where your settings, leads, history and login key live. Default if unset: `outreach-data` in the account's home folder. The dashboard shows the folder in use and warns if it is inside the app. |
 | `OUTREACH_ALLOWED_HOSTS` | optional | Comma-separated mail servers allowed besides Hostinger's. Mailbox passwords are only ever sent to allowed servers. |

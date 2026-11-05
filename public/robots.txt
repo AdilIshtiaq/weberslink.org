@@ -13,6 +13,7 @@ User-agent: Applebot-Extended
 Allow: /
 Disallow: /admin/
 Disallow: /api/
+Disallow: /r/
 
 Sitemap: https://weberslink.org/sitemap.xml
 # AI-readable site summary: https://weberslink.org/llms.txt
