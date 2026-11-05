@@ -703,7 +703,7 @@
   document.querySelector(".demobar").hidden = true;
   document.querySelector(".switch").hidden = true;
   $("resetDemo").hidden = true;
-  $("footNote").innerHTML = 'Online booking by <a href="https://weberslink.org/" target="_blank" rel="noopener">Weberslink</a>';
+  $("footNote").innerHTML = 'Online booking by <a href="https://weberslink.org/" target="_blank" rel="noopener">WebersLink</a>';
   if (!SLUG) { $("main").innerHTML = '<div class="panel done"><h1>Booking page not found</h1><p class="hint">Check the link, or contact the business directly.</p></div>'; return; }
   http("GET", API + "config").then(function (j) {
     setSettings(j.settings); biz.bookings = [];

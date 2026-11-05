@@ -19,8 +19,14 @@ a{color:var(--accent)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* demo bar */
-.demobar{background:#1d1c1a;color:#e9e6df;font-size:13px;padding:8px 16px;display:flex;gap:10px 16px;align-items:center;flex-wrap:wrap;justify-content:space-between}
-.demobar a{color:#c9b8ff}
+.demobar{background:#090807;color:#e9e6df;font-size:13px;padding:8px 16px;display:flex;gap:8px 16px;align-items:center;flex-wrap:wrap}
+.demobar a{color:#e9e6df;text-decoration:none}
+.demobar .db-logo{display:flex;align-items:center}.demobar .db-logo img{display:block;height:22px;width:auto}
+.demobar .db-back:hover{text-decoration:underline}
+.demobar .db-note{color:#9c978d;flex:1;min-width:160px}
+.demobar .db-cta{background:#d9251c;color:#fff;font-weight:600;border-radius:99px;padding:5px 14px;white-space:nowrap}
+.demobar .db-cta:hover{filter:brightness(1.08)}
+@media (max-width:640px){.demobar .db-note{display:none}.demobar .niches{order:5;width:100%}}
 .demobar .niches{display:flex;gap:6px;flex-wrap:wrap}
 .demobar .niches button{background:transparent;border:1px solid #4a4741;color:#e9e6df;border-radius:99px;padding:3px 12px;font-size:13px}
 .demobar .niches button[aria-pressed="true"]{background:#e9e6df;color:#1d1c1a;border-color:#e9e6df}

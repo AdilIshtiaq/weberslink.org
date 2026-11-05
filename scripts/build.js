@@ -64,6 +64,7 @@ function nav(cls = "nav scrolled", logoHref = "/") {
       <div class="nav-dd"><a href="/offers/" class="dd-t">Offers <i aria-hidden="true"></i></a><div class="dd-menu">${OFFERS.map((o) => `<a href="${o.path}"><b>${o.n}</b>${esc(o.name)}</a>`).join("")}</div></div>
       <a href="/#work">Work</a>
       <a href="/#pricing">Pricing</a>
+      <a href="/demos/">Demos</a>
       <a href="/plugins/">Free resources</a>
       <a href="/blog/">Guides</a>
       <a href="/contact">Contact</a>
@@ -91,7 +92,7 @@ function footer() {
       ${col("Guides", GUIDES.slice(0, 5))}
     </div>
     <div class="foot-big" aria-hidden="true">WebersLink</div>
-    <div class="copy"><span>© <span id="yr">${new Date().getFullYear()}</span> WebersLink · Lahore, Pakistan · Serving clients in the US &amp; Europe</span><span><a href="/plugins/">Plugins</a> · <a href="/privacy">Privacy</a> · <a href="mailto:hassan@weberslink.org">hassan@weberslink.org</a></span></div>
+    <div class="copy"><span>© <span id="yr">${new Date().getFullYear()}</span> WebersLink · Lahore, Pakistan · Serving clients in the US &amp; Europe</span><span><a href="/demos/">Demos</a> · <a href="/plugins/">Plugins</a> · <a href="/privacy">Privacy</a> · <a href="mailto:hassan@weberslink.org">hassan@weberslink.org</a></span></div>
   </div>
 </footer>`;
 }
@@ -1119,7 +1120,7 @@ write("/privacy", pageShell({
     <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a><span>/</span><span aria-current="page">Privacy Policy</span></nav>
     <div class="kicker">Legal</div>
     <h1>Privacy <em>Policy.</em></h1>
-    <p class="lead">Last updated: October 2026</p>
+    <p class="lead">Last updated: November 2026</p>
   </div>
 </section>
 <article class="white page-body">
@@ -1182,6 +1183,50 @@ function enhanceHome(html) {
   return html;
 }
 
+// ---------- Live demos (/demos/) ----------
+// Each demo is a working system a prospect can try. The demo apps live in public/demos/<name>/ (not generated).
+const DEMOS = [
+  {
+    slug: "booking", name: "Online Booking System", badge: "Live demo",
+    text: "A booking page your customers use day or night, and a dashboard where you run the day. Customers pick a service, a person and a free time; they get a confirmation and a reminder, and can move or cancel online. You see every appointment, add phone bookings, and track no-shows.",
+    feats: ["Only free times shown, in your time zone", "Pick a person or “anyone available”", "Confirmation and reminder emails", "Customers move or cancel online", "Phone and walk-in bookings", "Numbers and CSV export", "Embeds on your own website", "No double bookings, ever"],
+    tries: [["Salon", "?type=salon"], ["Dental clinic", "?type=clinic"], ["Home services", "?type=home"]],
+    who: "Salons, barbers, clinics, dentists, physios, trainers, tutors, plumbers, electricians, cleaners: anyone who books appointments.",
+  },
+];
+const demoCard = (d, loc) => `<div class="plugin-card">
+  <div class="plugin-head"><span class="plugin-badge">${esc(d.badge)}</span><span class="plugin-ver">Works on phone and desktop · nothing to install</span></div>
+  <h2>${esc(d.name)}</h2>
+  <p>${esc(d.text)}</p>
+  <ul class="plugin-feats">
+${d.feats.map((f) => `    <li>${esc(f)}</li>`).join("\n")}
+  </ul>
+  <p><strong>Try it as:</strong> ${d.tries.map(([n, q]) => `<a href="/demos/${d.slug}/${q}" data-track="Demo open" data-loc="${loc}-${d.slug}">${esc(n)}</a>`).join(" · ")}<br><strong>Good for:</strong> ${esc(d.who)}</p>
+  <div class="plugin-actions">
+    <a class="btn btn-dark" href="/demos/${d.slug}/" data-track="Demo open" data-loc="${loc}-${d.slug}">Try the customer side →</a>
+    <a class="btn btn-outline" href="/demos/${d.slug}/?view=admin" data-track="Demo open" data-loc="${loc}-${d.slug}-admin">See the business dashboard →</a>
+  </div>
+</div>`;
+write("/demos/", render({
+  path: "/demos/", type: "hub", kicker: "Demos",
+  title: "Live Demos: Try Our Systems | WebersLink",
+  description: "Try WebersLink systems in your browser before you talk to us. Start with the online booking system: the customer booking page and the business dashboard, for salons, clinics and home services.",
+  h1: "Try it before <em>we build it.</em>",
+  lead: "Working demos of systems we set up for clients. Click around as a customer and as the business owner. Nothing to sign up for, and nothing you do here reaches a real business.",
+  card: { title: "Demos" },
+  heroCta: `<div class="hero-cta">
+      <a href="/demos/booking/" class="btn btn-light" data-track="Demo open" data-loc="hero-booking">Open the booking demo →</a>
+      <a href="/#book" class="btn btn-ghost" data-track="Book CTA" data-loc="demos-hero">Get it for your business</a>
+    </div>`,
+  faqs: [
+    ["Is the booking system ready to use for my business?", "Yes. We set it up with your services, prices, team, opening hours and time zone, give you your own booking link and dashboard, and help you add it to your website, Google Business Profile and social pages."],
+    ["Can it go on my existing website?", "Yes. You get a link to share and a short code to paste into any website (WordPress, Wix, Squarespace or custom). It matches your brand colour."],
+    ["Do my customers get reminders?", "Yes. Customers get a confirmation email with a calendar file and a reminder before the appointment, and you get an alert for every new, moved or cancelled booking. Text-message reminders can be added."],
+    ["Is the demo data real?", "No. The demo businesses are made up, and anything you book in the demo stays in your own browser. Use “Reset demo data” at the bottom of the demo to start again."],
+  ],
+  body: DEMOS.map((d) => demoCard(d, "demos-hub")).join("\n"),
+}).replace('<div class="wrap prose-wrap">', '<div class="wrap prose-wrap hub">'));
+
 // ---------- Shared footer on the homepage ----------
 const homeFile = path.join(PUBLIC, "index.html");
 const home = fs.readFileSync(homeFile, "utf8");
@@ -1198,6 +1243,7 @@ const urls = [
   ...INDUSTRIES.map((p) => [p.path, "0.8"]),
   ...GUIDES.map((p) => [p.path, "0.7"]),
   ["/plugins/", "0.7"], ["/plugins/weberslink-forms-pro", "0.7"], ["/plugins/weberslink-smtp", "0.7"], ["/plugins/weberslink-redirects", "0.7"], ["/plugins/weberslink-security", "0.7"], ["/plugins/weberslink-seo", "0.7"], ["/plugins/weberslink-cookies", "0.7"], ["/plugins/weberslink-images", "0.7"], ["/plugins/weberslink-popups", "0.7"],
+  ["/demos/", "0.7"],
   ["/privacy", "0.2"],
 ];
 fs.writeFileSync(path.join(PUBLIC, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>
@@ -1224,6 +1270,9 @@ ${INDUSTRIES.map((p) => llmLink(p.path, p.card.title, p.description)).join("\n")
 
 ## Guides
 ${GUIDES.map((p) => llmLink(p.path, p.card.title, p.description)).join("\n")}
+
+## Demos
+- [Live demos](${SITE}/demos/): Systems you can try in the browser, starting with online booking for appointment businesses (salons, clinics, home services).
 
 ## Free resources
 - [Free WordPress plugins](${SITE}/plugins/): Free, GPL-licensed WordPress plugins for forms, email, redirects, security and SEO.
