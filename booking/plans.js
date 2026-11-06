@@ -6,13 +6,13 @@
 module.exports = {
   free: {
     name: "Free", price: "$0", note: "For one person getting started",
-    staff: 1, bookingsPerMonth: 100, questions: 2, poweredBy: true,
+    staff: 1, bookingsPerMonth: 100, questions: 2, poweredBy: true, logins: 0,
     perks: ["1 team member", "100 online bookings a month", "Email confirmations and reminders", "Clients, notes and history", "2 booking questions"],
   },
   pro: {
     name: "Pro", price: "$19 / month", note: "For a growing team",
-    staff: null, bookingsPerMonth: null, questions: null, poweredBy: false,
-    perks: ["Unlimited team members", "Unlimited bookings", "Unlimited booking questions", "No WebersLink branding on your page", "Priority email support"],
+    staff: null, bookingsPerMonth: null, questions: null, poweredBy: false, logins: null,
+    perks: ["Unlimited team members", "Logins for your team (manager or staff)", "Unlimited bookings", "Unlimited booking questions", "No WebersLink branding on your page", "Priority email support"],
   },
 };
 /** Paid help sold alongside the plans (shown in the dashboard; requests come to you). */

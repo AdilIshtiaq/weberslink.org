@@ -52,6 +52,7 @@ function sanitizeSettings(s, prev = {}) {
     tag: str(s.tag, 120),
     tz: validTz(s.tz) ? String(s.tz) : prev.tz || "America/New_York",
     currency: str(s.currency, 4, "$") || "$",
+    currencyCode: /^[a-z]{3}$/.test(String(s.currencyCode || "").toLowerCase()) ? String(s.currencyCode).toLowerCase() : SYMBOL_CODE[str(s.currency, 4, "$")] || prev.currencyCode || "usd", // for card payments
     accent: /^#[0-9a-f]{6}$/i.test(s.accent || "") ? s.accent : prev.accent || "#7a4fe0",
     who: str(s.who, 30) || "team member",
     needAddress: Boolean(s.needAddress),
@@ -73,6 +74,7 @@ function sanitizeSettings(s, prev = {}) {
     category: str(x && x.category, 40),
     buffer: x && x.buffer !== undefined && x.buffer !== null && x.buffer !== "" ? int(x.buffer, 0, 240, 0) : null, // null = the business default
     online: !(x && x.online === false), // false = staff can book it, customers can't (phone only)
+    deposit: cleanDeposit(x && x.deposit),
   }));
   const ids = new Set();
   out.services = out.services.filter((x) => (ids.has(x.id) ? false : ids.add(x.id)));
@@ -97,6 +99,20 @@ function sanitizeSettings(s, prev = {}) {
   })).filter((q) => q.label && !(q.type === "select" && !q.options.length) && (qids.has(q.id) ? false : qids.add(q.id)));
   out.poweredBy = s.poweredBy !== false; // set by the plan, never by the owner (see plans.js)
   return out;
+}
+const SYMBOL_CODE = { "$": "usd", "US$": "usd", "£": "gbp", "€": "eur", "Rs": "pkr", "₨": "pkr", "₹": "inr", "AED": "aed", "A$": "aud", "C$": "cad", "NZ$": "nzd", "S$": "sgd", "R": "zar" };
+/** { type: none | fixed | percent | full, value }: what a customer pays online to secure a booking. */
+function cleanDeposit(d) {
+  const type = d && ["fixed", "percent", "full"].includes(d.type) ? d.type : "none";
+  const value = type === "fixed" ? Math.round(Math.min(1e6, Math.max(0, Number(d.value) || 0)) * 100) / 100 : type === "percent" ? int(d.value, 1, 100, 20) : 0;
+  return type === "fixed" && !value ? { type: "none", value: 0 } : { type, value };
+}
+/** Deposit amount (major units, e.g. 12.5) for a service; 0 = nothing to pay online. */
+function depositFor(svc) {
+  const d = svc && svc.deposit;
+  if (!d || d.type === "none") return 0;
+  const amt = d.type === "fixed" ? d.value : d.type === "full" ? svc.price : Math.round(svc.price * d.value) / 100;
+  return Math.round(Math.max(0, amt) * 100) / 100;
 }
 /** { 0..6: [from, to] | null }. sparse=true keeps only the days given (a person's overrides). */
 function cleanHours(h, sparse) {
@@ -125,7 +141,8 @@ function cleanAnswers(s, answers) {
 function publicSettings(s) { const { notifyEmail, ...rest } = s; return rest; }
 
 // ------------------------------------------------------------------ availability
-const live = (b) => b.status !== "cancelled";
+// "pending" = waiting for the customer's deposit (holds the time); "expired" = they never paid (time released).
+const live = (b) => b.status !== "cancelled" && b.status !== "expired";
 /** Clean-up time after a booking: its service's own gap, else the business gap. Time off ("block") has none. */
 function gapAfter(s, x) {
   if (x.block) return 0;
@@ -225,7 +242,7 @@ function newCode(s) {
   return (s.name.replace(/[^A-Za-z]/g, "").slice(0, 4).toUpperCase() || "BOOK") + "-" + tail;
 }
 /** The fields a customer may see about their own booking. */
-const customerView = (b) => ({ code: b.code, serviceId: b.serviceId, staffId: b.staffId, start: b.start, end: b.end, status: b.status, name: b.name, email: b.email, phone: b.phone, address: b.address || "", notes: b.notes || "", answers: b.answers || {} });
+const customerView = (b) => ({ payment: b.payment ? { amount: b.payment.amount, currency: b.payment.currency, status: b.payment.status } : null, holdUntil: b.status === "pending" ? b.holdUntil : undefined, code: b.code, serviceId: b.serviceId, staffId: b.staffId, start: b.start, end: b.end, status: b.status, name: b.name, email: b.email, phone: b.phone, address: b.address || "", notes: b.notes || "", answers: b.answers || {} });
 /** Time off from the owner: whole days (in the business time zone) or a time range. Returns { id, staffId, start, end, note }. */
 function cleanBlock(s, b) {
   const staffId = b.staffId === "all" || s.staff.some((p) => p.id === b.staffId) ? b.staffId : null;
@@ -249,7 +266,7 @@ function clientList(biz, now = Date.now()) {
   for (const [key, r] of Object.entries(biz.clients || {})) map.set(key, { key, name: r.name || "", email: r.email || "", phone: r.phone || "", notes: r.notes || "", tags: r.tags || [], blocked: Boolean(r.blocked), visits: 0, upcoming: 0, noShows: 0, cancelled: 0, spent: 0, first: "", last: "", source: r.source || "added" });
   for (const b of biz.bookings.slice().sort((a, c) => a.start.localeCompare(c.start))) {
     const key = clientKey(b.email, b.phone);
-    if (!key) continue;
+    if (!key || b.status === "pending" || b.status === "expired") continue;
     const c = map.get(key) || { key, name: "", email: "", phone: "", notes: "", tags: [], blocked: false, visits: 0, upcoming: 0, noShows: 0, cancelled: 0, spent: 0, first: "", last: "", source: "booking" };
     c.name = b.name || c.name; c.email = b.email || c.email; c.phone = b.phone || c.phone;
     const past = Date.parse(b.start) < now;
@@ -261,4 +278,4 @@ function clientList(biz, now = Date.now()) {
   }
   return [...map.values()].sort((a, b) => (b.last || "").localeCompare(a.last || "") || a.name.localeCompare(b.name));
 }
-module.exports = { clientKey, clientList, busy, cleanBlock, cleanAnswers, personHours, gapAfter, STATUSES, partsIn, validTz, offsetMin, zonedToUtc, keyOf, weekday, addDaysKey, toMin, sanitizeSettings, publicSettings, availability, freeStarts, resolveSlot, pickPerson, cleanCustomer, newCode, customerView, clashes, email, str };
+module.exports = { live, depositFor, cleanDeposit, SYMBOL_CODE, clientKey, clientList, busy, cleanBlock, cleanAnswers, personHours, gapAfter, STATUSES, partsIn, validTz, offsetMin, zonedToUtc, keyOf, weekday, addDaysKey, toMin, sanitizeSettings, publicSettings, availability, freeStarts, resolveSlot, pickPerson, cleanCustomer, newCode, customerView, clashes, email, str };
