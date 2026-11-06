@@ -16,7 +16,7 @@ const FORMAT = "weberslink-outreach-backup";
 const FILES = ["config.json", "tracking.csv", "sent_log.csv", "do_not_contact.csv", "mailboxes.json", "research_state.json", "backup_state.json", "scheduled.json", "links.json", "clicks.json"];
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const TEMPLATE = /^templates\/(email[1-4][b-z]?\.txt)$/;
-const BOOKING = /^booking\/(businesses\.json|b-[a-z0-9-]{3,40}\.json)$/; // client booking pages (accounts + bookings)
+const BOOKING = /^booking\/(businesses\.json|requests\.json|b-[a-z0-9-]{3,40}\.json)$/; // client booking pages (accounts + bookings)
 const bookingDir = () => require("../booking/store").DIR();
 
 const readText = (p) => { try { return fs.readFileSync(p, "utf8"); } catch (e) { return null; } };

@@ -27,11 +27,14 @@ const account = (slug) => accounts().find((a) => a.slug === slug) || null;
 function loadBiz(slug) {
   if (!SLUG.test(slug)) return null;
   const d = read(`b-${slug}.json`, null);
-  return d && d.settings ? { settings: d.settings, bookings: Array.isArray(d.bookings) ? d.bookings : [] } : null;
+  if (!d || !d.settings) return null;
+  return { settings: d.settings, bookings: Array.isArray(d.bookings) ? d.bookings : [], blocks: Array.isArray(d.blocks) ? d.blocks : [],
+    clients: d.clients && typeof d.clients === "object" && !Array.isArray(d.clients) ? d.clients : {}, feedToken: d.feedToken || "" };
 }
 function saveBiz(slug, biz) {
   const cut = Date.now() - KEEP_DAYS * 864e5;
-  write(`b-${slug}.json`, { settings: biz.settings, bookings: biz.bookings.filter((b) => Date.parse(b.end) > cut) });
+  write(`b-${slug}.json`, { settings: biz.settings, bookings: biz.bookings.filter((b) => Date.parse(b.end) > cut),
+    blocks: (biz.blocks || []).filter((b) => Date.parse(b.end) > Date.now() - 30 * 864e5), clients: biz.clients || {}, feedToken: biz.feedToken || "" });
 }
 /** Erases a business's data file for good (owner deleted their page, or a sign-up was never confirmed). */
 function deleteBiz(slug) { if (SLUG.test(slug)) try { fs.unlinkSync(file(`b-${slug}.json`)); } catch (e) { /* already gone */ } }
@@ -46,4 +49,6 @@ function key() {
   return (secret = k);
 }
 
-module.exports = { DIR, SLUG, accounts, saveAccounts, account, loadBiz, saveBiz, deleteBiz, key };
+const requests = () => { const d = read("requests.json", {}); return Array.isArray(d.list) ? d.list : []; };
+const saveRequests = (list) => write("requests.json", { list });
+module.exports = { requests, saveRequests, DIR, SLUG, accounts, saveAccounts, account, loadBiz, saveBiz, deleteBiz, key };
