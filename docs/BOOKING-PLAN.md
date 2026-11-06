@@ -52,7 +52,8 @@ Legend: ✅ have · 🔨 phase 1 (built, Nov 2026) · 2️⃣ phase 2 · 3️⃣
 **Staff**
 - ✅ Working days, "anyone available" (T)
 - 🔨 Each person's own hours and breaks; time off and holidays (T)
-- 2️⃣ Staff logins with roles (owner / manager / staff), per-staff prices
+- ✅ Staff logins with roles (owner / manager / staff) (phase 2, Nov 2026)
+- 2️⃣ Per-staff prices
 - 3️⃣ Commissions
 
 **Scheduling rules**
@@ -71,7 +72,8 @@ Legend: ✅ have · 🔨 phase 1 (built, Nov 2026) · 2️⃣ phase 2 · 3️⃣
 - 3️⃣ Two-way Google/Outlook sync
 
 **Payments**
-- 2️⃣ Stripe prepay and deposits, no-show and late-cancel fees, coupons
+- ✅ Stripe deposits / prepayment via Connect, refunds on cancel, no-shows keep the deposit (phase 2, Nov 2026)
+- 2️⃣ No-show and late-cancel fees charged to a saved card, coupons
 - 3️⃣ Gift cards, invoices, tax
 
 **Notifications**

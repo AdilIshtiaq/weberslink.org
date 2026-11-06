@@ -118,6 +118,8 @@
   function service(id) { return biz.services.filter(function (s) { return s.id === id; })[0]; }
   function person(id) { return biz.staff.filter(function (s) { return s.id === id; })[0] || { id: id, name: "(removed)", role: "", days: [], services: [] }; }
   function live(b) { return b.status !== "cancelled"; }
+  var ROLE = function () { return LIVE ? (owner.me && owner.me.role) || "owner" : "owner"; };
+  var MY_STAFF = function () { return ROLE() === "staff" ? owner.me.staffId : ""; };
   function eligible(serviceId) { return biz.staff.filter(function (s) { return s.services.indexOf(serviceId) >= 0; }); }
   function bookingById(id) { return (biz.bookings || []).filter(function (x) { return x.id === id; })[0]; }
 
@@ -170,12 +172,14 @@
       return run(function () { return E.availability(biz, occ(), { serviceId: serviceId, staffId: staffId, days: Math.min(biz.daysAhead, 62), ignoreId: ignoreId, owner: ownerView }); });
     },
     book: function (p) {
-      if (LIVE) return http("POST", API + "book", p).then(function (j) { return j.booking; });
+      if (LIVE) return http("POST", API + "book", p).then(function (j) { return { booking: j.booking, payUrl: j.payUrl }; });
       return run(function () {
         p.answers = E.cleanAnswers(biz, p.answers);
         var rec = (biz.clients || {})[E.clientKey(p.email)];
         if (rec && rec.blocked) throw new Error("Online booking isn't available for you. Please contact us.");
-        return newBookingFrom(p, E.resolveSlot(biz, occ(), p), "online");
+        var b = newBookingFrom(p, E.resolveSlot(biz, occ(), p), "online"), dep = E.depositFor(service(p.serviceId));
+        if (dep) { b.status = "pending"; b.holdUntil = new Date(Date.now() + 35 * 60000).toISOString(); b.payment = { amount: dep, currency: biz.currencyCode || "usd", status: "pending" }; demoSave(); }
+        return { booking: b };
       });
     },
     lookup: function (code, email) {
@@ -203,15 +207,17 @@
       return http("GET", API + "admin/data").then(function (j) {
         setSettings(j.settings); biz.bookings = j.bookings; biz.blocks = j.blocks || [];
         owner.signedIn = true; owner.mailOn = j.mailOn; owner.email = j.ownerEmail || ""; owner.plan = j.plan; owner.plans = j.plans; owner.services = j.services; owner.requests = j.requests || []; owner.feedUrl = j.feedUrl;
+        owner.me = j.me || { role: "owner" }; owner.team = j.team || []; owner.payments = j.payments || {};
       });
     },
-    status: function (id, status) {
+    status: function (id, status, refund) {
       var b = bookingById(id);
       if (!LIVE) return run(function () {
+        if (status === "cancelled" && refund && b.payment && b.payment.status === "paid") b.payment.status = "refunded";
         if (b.status === "cancelled" && status !== "cancelled") E.resolveSlot(biz, occ(), { serviceId: b.serviceId, staffId: b.staffId, start: b.start }, { owner: true, ignoreId: b.id });
         b.status = status; b.isNew = false; demoSave();
       }).catch(function () { throw new Error("That time has been booked by someone else since, so it can't be restored."); });
-      return http("POST", API + "admin/status", { id: id, status: status }).then(function () { b.status = status; b.isNew = false; });
+      return http("POST", API + "admin/status", { id: id, status: status, refund: refund !== false }).then(function () { b.status = status; b.isNew = false; if (status === "cancelled" && refund !== false && b.payment && b.payment.status === "paid") b.payment.status = "refunded"; });
     },
     saveSettings: function () {
       if (!LIVE) { demoSave(); return Promise.resolve(); }
@@ -297,6 +303,8 @@
     if (LIVE && biz.setupDone === false) { $("main").innerHTML = '<div class="panel done"><h1>Online booking opens soon</h1><p class="hint">' + esc(biz.name) + " is still setting up this page." + (biz.phone ? ' To book now, call <a href="tel:' + esc(biz.phone.replace(/[^\d+]/g, "")) + '">' + esc(biz.phone) + "</a>." : "") + "</p></div>"; return; }
     if (!flow) startFlow();
     if (flow.step === 4) return renderDone();
+    if (flow.step === "pay") return renderDemoPay();
+    if (flow.step === "unpaid") { $("main").innerHTML = '<div class="panel done"><h1 tabindex="-1">Payment not finished</h1><p class="hint">Your booking isn\'t confirmed because the payment wasn\'t completed. Nothing was charged. The time is held for a few minutes; you can book again.</p><button type="button" class="btn primary" data-act="again">Book again</button></div>'; return; }
     if (flow.step === "manage") return renderManage();
     var html = '<div class="flow"><div class="panel">' +
       '<ol class="steps">' + STEPS.map(function (s, i) { return '<li class="' + (i === flow.step ? "on" : i < flow.step ? "done" : "") + '"' + (i === flow.step ? ' aria-current="step"' : "") + '><span class="n">' + (i < flow.step ? "✓" : i + 1) + "</span>" + s + "</li>"; }).join("") + "</ol>";
@@ -368,15 +376,19 @@
       }).join("") +
       '<div class="sr" aria-hidden="true"><label for="fweb">Leave this empty</label><input type="text" id="fweb" tabindex="-1" autocomplete="off"></div>' +
       '<p class="err full" id="formErr" role="alert" hidden></p>' +
-      '<div class="row full"><button type="button" class="btn ghost" data-act="back">← Back</button><span class="spacer"></span><button type="submit" class="btn primary" id="confirmBtn">Confirm booking</button></div></form>';
+      '<div class="row full"><button type="button" class="btn ghost" data-act="back">← Back</button><span class="spacer"></span><button type="submit" class="btn primary" id="confirmBtn">' + (depositOf(service(flow.serviceId)) ? "Continue to payment" : "Confirm booking") + "</button></div></form>";
   }
   function back(extra) { return '<div class="row" style="margin-top:18px"><button type="button" class="btn ghost" data-act="back">← Back</button><span class="spacer"></span>' + (extra || "") + "</div>"; }
+  // Deposit a customer pays online for a service (0 = nothing). Live: only when the business has Stripe connected.
+  function depositOf(s) { return s && (LIVE ? biz.payments : true) ? E.depositFor(s) : 0; }
   function summary() {
+    var dep = depositOf(service(flow.serviceId));
     var s = service(flow.serviceId), who = flow.staffId === "any" ? "Anyone available" : flow.staffId ? person(flow.staffId).name : "";
     var when = flow.t ? fmtDate(new Date(flow.t)) + ", " + fmtTime(new Date(flow.t)) : "";
     return '<aside class="panel summary" aria-label="Your booking"><h3>Your booking</h3>' +
       (s ? "<dl><dt>Service</dt><dd>" + esc(s.name) + "</dd><dt>Length</dt><dd>" + mins(s.mins) + "</dd>" + (who ? "<dt>With</dt><dd>" + esc(who) + "</dd>" : "") + (when ? "<dt>When</dt><dd>" + esc(when) + "</dd>" : "") + "</dl>" +
-        '<div class="total"><span>Price</span><span>' + money(s.price) + "</span></div>" : '<p class="empty">Choose a service to start.</p>') +
+        '<div class="total"><span>Price</span><span>' + money(s.price) + "</span></div>" +
+        (dep ? '<dl style="margin-top:10px"><dt>Pay online now</dt><dd>' + money(dep) + "</dd>" + (dep < s.price ? "<dt>Pay at your appointment</dt><dd>" + money(Math.round((s.price - dep) * 100) / 100) + "</dd>" : "") + '</dl><p class="hint" style="margin-top:6px">Secure card payment by Stripe. Refunded if you cancel in time.</p>' : "") : '<p class="empty">Choose a service to start.</p>') +
       (biz.policy ? '<p class="hint policy">' + esc(biz.policy) + "</p>" : "") + (biz.phone ? '<p class="hint">Questions? Call <a href="tel:' + esc(biz.phone.replace(/[^\d+]/g, "")) + '">' + esc(biz.phone) + "</a></p>" : "") + "</aside>";
   }
 
@@ -390,10 +402,14 @@
     if (err) { var e = $("formErr"); e.textContent = err; e.hidden = false; return; }
     $("confirmBtn").disabled = true; $("confirmBtn").textContent = "Booking…";
     data.book({ serviceId: flow.serviceId, staffId: flow.staffId, start: flow.t, name: flow.form.fname, email: flow.form.femail, phone: flow.form.fphone, address: flow.form.faddr, notes: flow.form.fnotes, answers: flow.form.answers, website: get("fweb") })
-      .then(function (b) { flow = { step: 4, booking: b }; render(); })
+      .then(function (r) {
+        if (r.payUrl) { $("confirmBtn").textContent = "Opening secure payment…"; location.href = r.payUrl; return; }
+        if (r.booking.status === "pending") { flow = { step: "pay", booking: r.booking }; return render(); } // demo: simulated payment
+        flow = { step: 4, booking: r.booking }; render();
+      })
       .catch(function (e) {
         if (/taken/.test(e.message)) { toast(e.message, true); flow.step = 2; flow.t = null; flow.days = null; return render(); }
-        var el = $("formErr"); el.textContent = e.message; el.hidden = false; $("confirmBtn").disabled = false; $("confirmBtn").textContent = "Confirm booking";
+        var el = $("formErr"); el.textContent = e.message; el.hidden = false; $("confirmBtn").disabled = false; $("confirmBtn").textContent = depositOf(service(flow.serviceId)) ? "Continue to payment" : "Confirm booking";
       });
   }
   function moveTo() {
@@ -402,11 +418,20 @@
       .catch(function (e) { toast(e.message, true); flow.days = null; flow.t = null; render(); });
   }
 
+  function renderDemoPay() {
+    var b = flow.booking, s = service(b.serviceId) || { name: "" };
+    $("main").innerHTML = '<div class="panel" style="max-width:460px;margin:0 auto"><p class="hint" style="margin:0 0 6px"><span class="pill">Demo</span> This stands in for Stripe\'s secure payment page. No card is charged.</p><h1 tabindex="-1">Pay ' + money(b.payment.amount) + "</h1>" +
+      '<p class="hint">' + (b.payment.amount < (s.price || 0) ? "Deposit for " : "") + esc(s.name) + ", " + esc(fmtDate(new Date(b.start))) + " " + esc(fmtTime(new Date(b.start))) + "</p>" +
+      '<form class="details" id="demoPayForm" style="grid-template-columns:1fr" novalidate><div class="field"><label for="dpCard">Card number</label><input type="text" id="dpCard" value="4242 4242 4242 4242" inputmode="numeric"></div>' +
+      '<div class="row"><button type="button" class="btn ghost" data-act="demopaycancel">Cancel</button><span class="spacer"></span><button type="submit" class="btn primary">Pay ' + money(b.payment.amount) + "</button></div></form></div>";
+    $("main").querySelector("h1").focus();
+  }
   function renderDone() {
     var b = flow.booking, s = service(b.serviceId) || { name: "", mins: 0 }, st = person(b.staffId), start = new Date(b.start);
     $("main").innerHTML = '<div class="panel done"><div class="tick" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>' +
       '<h1 tabindex="-1">' + (flow.moved ? "Your booking has moved" : "You're booked in!") + "</h1>" +
       '<p class="hint">' + esc(s.name) + " with " + esc(st.name) + "<br><b>" + esc(fmtDate(start)) + " at " + esc(fmtTime(start)) + "</b> · " + mins(s.mins) + "</p>" +
+      (b.payment && b.payment.status === "paid" ? '<p class="hint"><span class="pill paid">Paid ' + money(b.payment.amount) + "</span>" + (b.payment.amount < s.price ? " · " + money(Math.round((s.price - b.payment.amount) * 100) / 100) + " to pay at your appointment" : "") + "</p>" : "") +
       '<p class="hint" style="margin-bottom:0">Your booking code</p><div class="code">' + esc(b.code) + "</div>" +
       '<div class="row" style="justify-content:center"><button type="button" class="btn" data-act="ics">Add to calendar (.ics)</button><a class="btn" target="_blank" rel="noopener" href="' + esc(gcal(b)) + '">Google Calendar</a></div>' +
       (LIVE ? '<p class="hint" style="margin-top:16px">A confirmation is on its way to <b>' + esc(b.email) + "</b>. Keep your code to change or cancel online.</p>"
@@ -465,7 +490,7 @@
 
   // ------------------------------------------------------------------ business dashboard
   function renderLogin(msg) {
-    $("main").innerHTML = '<div class="panel" style="max-width:420px;margin:30px auto"><h1 tabindex="-1">Business sign in</h1><p class="hint">' + esc(biz ? biz.name : "") + ' dashboard. <a href="/book/forgot">Forgot your password?</a></p>' +
+    $("main").innerHTML = '<div class="panel" style="max-width:420px;margin:30px auto"><h1 tabindex="-1">Business sign in</h1><p class="hint">' + esc(biz ? biz.name : "") + ' dashboard (owner). <a href="/book/forgot">Forgot your password?</a></p><p class="hint">Team member? <a href="/book/login">Sign in with your email</a>.</p>' +
       '<form class="details" id="loginForm" style="grid-template-columns:1fr"><div class="field"><label for="lpw">Password</label><input type="password" id="lpw" autocomplete="current-password" required></div>' +
       '<p class="err" id="loginErr" role="alert"' + (msg ? "" : " hidden") + ">" + esc(msg || "") + '</p><button type="submit" class="btn primary">Sign in</button></form></div>';
     $("lpw").focus();
@@ -473,9 +498,11 @@
   function renderAdmin() {
     if (LIVE && !owner.signedIn) return renderLogin();
     if (LIVE && (biz.setupDone === false || wiz.done)) return renderWizard();
-    var tabs = [["agenda", "Calendar"], ["newbk", "Add booking"], ["clients", "Clients"], ["timeoff", "Time off"], ["numbers", "Reports"], ["setup", "Settings"], ["messages", LIVE ? "Share" : "Messages"], ["plan", "Plan & help"]];
+    var all = [["agenda", "Calendar"], ["newbk", "Add booking"], ["clients", "Clients"], ["timeoff", "Time off"], ["numbers", "Reports"], ["setup", "Settings"], ["messages", LIVE ? "Share" : "Messages"], ["plan", "Plan & help"]];
+    var role = ROLE(), tabs = role === "staff" ? all.filter(function (t) { return ["agenda", "newbk", "clients", "timeoff", "setup"].indexOf(t[0]) >= 0; }).map(function (t) { return t[0] === "setup" ? ["setup", "My account"] : t; }) : all;
+    if (!tabs.some(function (t) { return t[0] === adminTab; })) adminTab = "agenda";
     var html = '<div class="tabs" role="tablist">' + tabs.map(function (t) { return '<button type="button" role="tab" data-tab="' + t[0] + '" aria-selected="' + (adminTab === t[0]) + '">' + t[1] + "</button>"; }).join("") + "</div>";
-    if (LIVE) html += '<div class="row" style="margin:-8px 0 12px"><span class="hint">Signed in</span><span class="spacer"></span><a class="btn sm ghost" href="/book/' + esc(SLUG) + '" target="_blank" rel="noopener">Open booking page ↗</a><button type="button" class="btn sm ghost" data-act="logout">Sign out</button></div>';
+    if (LIVE) html += '<div class="row" style="margin:-8px 0 12px"><span class="hint">Signed in as <b>' + esc((owner.me && owner.me.name) || "Owner") + "</b> · " + esc(ROLE()) + '</span><span class="spacer"></span><a class="btn sm ghost" href="/book/' + esc(SLUG) + '" target="_blank" rel="noopener">Open booking page ↗</a><button type="button" class="btn sm ghost" data-act="logout">Sign out</button></div>';
     html += '<div role="tabpanel">' + ({ agenda: agenda, newbk: newBooking, clients: clientsTab, timeoff: timeOffTab, numbers: numbers, setup: setup, messages: shareTab, plan: planTab }[adminTab] || agenda)() + "</div>";
     $("main").innerHTML = html;
     if (adminTab === "newbk") nbLoad();
@@ -495,7 +522,8 @@
     html += "</div>";
     var list = dayBookings(adminDay);
     if (!biz.hours[wd] && !list.length) return html + '<p class="empty">Closed on ' + DAYS_LONG[wd] + "s. Change it in Settings.</p>";
-    return html + '<div class="cols">' + biz.staff.map(function (st) {
+    list = list.filter(function (b) { return b.status !== "expired"; });
+    return html + '<div class="cols">' + biz.staff.filter(function (st) { return !MY_STAFF() || st.id === MY_STAFF(); }).map(function (st) {
       var mine = list.filter(function (b) { return b.staffId === st.id; }), off = st.days.indexOf(wd) < 0;
       return '<section class="col"><h3><span class="avatar" aria-hidden="true">' + esc(initials(st.name)) + "</span>" + esc(st.name) + '<span class="hint" style="font-weight:400">' + (off ? "day off" : mine.filter(live).length + " appts") + "</span></h3>" +
         (mine.length ? mine.map(appt).join("") : '<p class="empty">' + (off ? "Not working today." : "Nothing booked yet.") + "</p>") + "</section>";
@@ -508,7 +536,9 @@
     return '<div class="appt ' + esc(b.status) + '"><div class="t">' + fmtTime(start) + " – " + fmtTime(new Date(b.end)) + (b.isNew ? '<span class="pill new">New</span>' : "") + (b.source && b.source !== "online" ? '<span class="pill">' + esc(b.source) + "</span>" : "") + (label ? '<span class="pill">' + label + "</span>" : "") + (b.rescheduled ? '<span class="pill">moved</span>' : "") + "</div>" +
       '<div class="who">' + esc(b.name) + " · " + esc(s ? s.name : "") + '</div><div class="meta"><a href="tel:' + esc(String(b.phone).replace(/[^\d+]/g, "")) + '">' + esc(b.phone) + "</a>" + (b.email ? " · " + esc(b.email) : "") + (b.address ? " · " + esc(b.address) : "") + (b.notes ? " · “" + esc(b.notes) + "”" : "") + " · " + esc(b.code) + "</div>" +
       (b.answers && Object.keys(b.answers).length ? '<div class="meta">' + (biz.questions || []).filter(function (q) { return b.answers[q.id]; }).map(function (q) { return esc(q.label) + ": <b>" + esc(b.answers[q.id]) + "</b>"; }).join(" · ") + "</div>" : "") +
-      (editId === b.id ? editPanel(b) : b.status === "booked" ? '<div class="acts"><button type="button" class="btn sm" data-act="edit" data-id="' + esc(b.id) + '">Edit / move</button>' + (past ? act("done", "Done") + act("no-show", "No-show") : "") + act("cancelled", "Cancel", "danger") + "</div>" : '<div class="acts">' + act("booked", "Undo", "ghost") + "</div>") + "</div>";
+      (b.payment ? '<div class="meta">' + (b.payment.status === "paid" ? '<span class="pill paid">Deposit paid ' + money(b.payment.amount) + "</span>" + (b.status !== "booked" && b.status !== "done" ? ' <button type="button" class="btn sm ghost" data-act="refund" data-id="' + esc(b.id) + '">Refund</button>' : "") : b.payment.status === "refunded" ? '<span class="pill">Refunded ' + money(b.payment.amount) + "</span>" : b.payment.status === "pending" ? '<span class="pill new">Waiting for ' + money(b.payment.amount) + " deposit</span>" : "") + (b.payment.refundError ? ' <span class="err">Refund failed: ' + esc(b.payment.refundError) + "</span>" : "") + "</div>" : "") +
+      (b.status === "pending" ? '<p class="hint" style="margin:6px 0 0">The customer is paying now. The time is held until ' + esc(fmtTime(new Date(b.holdUntil))) + ".</p>" :
+      editId === b.id ? editPanel(b) : b.status === "booked" ? '<div class="acts"><button type="button" class="btn sm" data-act="edit" data-id="' + esc(b.id) + '">Edit / move</button>' + (past ? act("done", "Done") + act("no-show", "No-show") : "") + act("cancelled", "Cancel", "danger") + "</div>" : '<div class="acts">' + act("booked", "Undo", "ghost") + "</div>") + "</div>";
   }
   // Move or edit a booking (owner)
   var editId = null;
@@ -585,7 +615,7 @@
       return whole ? (dayKey(s) === dayKey(new Date(e - 1)) ? fmtDate(s) : fmtShort(s) + " – " + fmtShort(new Date(e - 1))) : fmtShort(s) + " " + fmtTime(s) + " – " + (dayKey(s) === dayKey(e) ? "" : fmtShort(e) + " ") + fmtTime(e); };
     return '<h1>Time off &amp; closures</h1><p class="hint" style="margin:6px 0 14px">Holidays, days off, appointments of your own. Nobody can book these times. Existing bookings are not cancelled; you\'ll see which ones clash.</p>' +
       '<div class="grid2" style="align-items:start"><div class="panel"><h2>Add time off</h2><form class="details" id="toForm" novalidate style="grid-template-columns:1fr 1fr;margin-top:8px">' +
-      '<div class="field full"><label for="toWho">Who</label><select id="toWho">' + opt("all", "Everyone (business closed)") + biz.staff.map(function (p) { return opt(p.id, p.name); }).join("") + "</select></div>" +
+      '<div class="field full"><label for="toWho">Who</label><select id="toWho">' + (MY_STAFF() ? "" : opt("all", "Everyone (business closed)")) + biz.staff.filter(function (p) { return !MY_STAFF() || p.id === MY_STAFF(); }).map(function (p) { return opt(p.id, p.name); }).join("") + "</select></div>" +
       '<div class="field full"><label for="toKind">How long</label><select id="toKind"><option value="days">Whole day(s)</option><option value="time">Part of a day</option></select></div>' +
       '<div class="field"><label for="toFrom">From</label><input type="date" id="toFrom" value="' + today + '"></div><div class="field" id="toToWrap"><label for="toTo">To (incl.)</label><input type="date" id="toTo" value="' + today + '"></div>' +
       '<div class="field to-time" hidden><label for="toT1">Start</label><input type="time" id="toT1" value="12:00" step="300"></div><div class="field to-time" hidden><label for="toT2">End</label><input type="time" id="toT2" value="14:00" step="300"></div>' +
@@ -623,7 +653,7 @@
   var nb = { serviceId: "", staffId: "", date: "", t: "", days: null };
   function newBooking() {
     if (!nb.serviceId) nb.serviceId = biz.services[0].id;
-    var people = eligible(nb.serviceId);
+    var people = eligible(nb.serviceId).filter(function (p) { return !MY_STAFF() || p.id === MY_STAFF(); });
     if (!people.some(function (p) { return p.id === nb.staffId; })) nb.staffId = people[0] ? people[0].id : "";
     var opt = function (v, t, sel) { return '<option value="' + esc(v) + '"' + (sel ? " selected" : "") + ">" + esc(t) + "</option>"; };
     var day = nb.days && nb.days.filter(function (d) { return d.date === nb.date; })[0];
@@ -694,7 +724,9 @@
   function setup() {
     var x = sections();
     var saveBar = LIVE ? '<div class="row" style="position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0;margin-bottom:8px"><h1 style="flex:1">Settings</h1><span class="hint" id="dirtyNote">' + (dirty ? "Unsaved changes" : "All changes saved") + '</span><button type="button" class="btn primary" data-act="savesettings"' + (dirty ? "" : " disabled") + ">Save changes</button></div>" : '<h1 style="margin-bottom:12px">Settings <span class="hint" style="font-weight:400">(demo: changes apply straight away)</span></h1>';
-    return saveBar + '<div class="grid2">' + x.general + x.hours + "</div>" + x.svcs + x.team + x.questions + x.pw + x.danger;
+    var role = ROLE();
+    if (role === "staff") return '<h1>My account</h1><p class="hint" style="margin:6px 0 14px">Signed in as ' + esc(owner.me.name) + " (" + esc(owner.me.email) + "). You see your own calendar, clients and time off. The owner or a manager changes the business settings.</p>" + x.pw;
+    return saveBar + payPanel() + '<div class="grid2">' + x.general + x.hours + "</div>" + x.svcs + x.team + (role === "owner" ? loginsPanel() : "") + x.questions + x.pw + (role === "owner" ? x.danger : "");
   }
   function sections() {
     var f = function (id, label, val, type, extra) { return '<div class="field"><label for="' + id + '">' + label + '</label><input type="' + (type || "text") + '" id="' + id + '" data-set="' + id + '" value="' + esc(val) + '" ' + (extra || "") + "></div>"; };
@@ -719,10 +751,12 @@
         return '<div class="row" style="margin-top:8px"><label for="' + x[0] + '" style="flex:1">' + x[1] + '</label><input type="number" id="' + x[0] + '" data-set="' + x[0] + '" min="' + x[3] + '" max="' + x[4] + '" value="' + x[2] + '" style="width:90px"></div>';
       }).join("") +
       '<div class="row" style="margin-top:8px"><label for="step" style="flex:1">Start times every</label><select id="step" data-set="step" style="width:110px">' + [5, 10, 15, 20, 30, 60].map(function (n) { return '<option value="' + n + '"' + (n === biz.step ? " selected" : "") + ">" + n + " min</option>"; }).join("") + "</select></div></div>";
-    var svcs = '<div class="panel" style="margin-top:16px"><h2>Services</h2><p class="hint">Name, category, length and price. “Gap after” is clean-up time (blank = the default gap). Untick “Online” for services only you can book (phone only). Who offers each one is set under Team.</p><div class="scroll"><table><thead><tr><th>Service</th><th>Category</th><th>Description</th><th>Min</th><th>Price</th><th>Gap after</th><th>Online</th><th></th></tr></thead><tbody>' +
+    var svcs = '<div class="panel" style="margin-top:16px"><h2>Services</h2><p class="hint">Name, category, length and price. “Gap after” is clean-up time (blank = the default gap). Untick “Online” for services only you can book (phone only). Who offers each one is set under Team.</p><div class="scroll"><table><thead><tr><th>Service</th><th>Category</th><th>Description</th><th>Min</th><th>Price</th><th>Deposit online</th><th>Gap after</th><th>Online</th><th></th></tr></thead><tbody>' +
       biz.services.map(function (s) {
         return '<tr><td><input type="text" aria-label="Service name" data-sname="' + esc(s.id) + '" value="' + esc(s.name) + '" maxlength="60" style="min-width:150px"></td><td><input type="text" aria-label="Category" data-scat="' + esc(s.id) + '" value="' + esc(s.category || "") + '" maxlength="40" placeholder="e.g. Hair" style="min-width:100px"></td><td><input type="text" aria-label="Description" data-sdesc="' + esc(s.id) + '" value="' + esc(s.desc || "") + '" maxlength="200"></td><td><input type="number" aria-label="Minutes" data-smins="' + esc(s.id) + '" value="' + s.mins + '" min="5" max="720" step="5" style="width:76px"></td>' +
           '<td><input type="number" aria-label="Price" data-sprice="' + esc(s.id) + '" value="' + s.price + '" min="0" max="1000000" style="width:90px"></td>' +
+          '<td style="white-space:nowrap"><select aria-label="Deposit for ' + esc(s.name) + '" data-sdep="' + esc(s.id) + '">' + [["none", "None"], ["fixed", "Amount"], ["percent", "% of price"], ["full", "Full price"]].map(function (o) { return '<option value="' + o[0] + '"' + (((s.deposit || {}).type || "none") === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select>" +
+            (["fixed", "percent"].indexOf((s.deposit || {}).type) >= 0 ? ' <input type="number" aria-label="Deposit amount" data-sdepv="' + esc(s.id) + '" value="' + s.deposit.value + '" min="0" step="' + (s.deposit.type === "percent" ? 5 : 1) + '" style="width:70px">' : "") + "</td>" +
           '<td><input type="number" aria-label="Gap after (minutes, blank = default)" data-sbuf="' + esc(s.id) + '" value="' + (s.buffer === null || s.buffer === undefined ? "" : s.buffer) + '" min="0" max="240" step="5" placeholder="' + biz.buffer + '" style="width:72px"></td>' +
           '<td><input type="checkbox" aria-label="Customers can book ' + esc(s.name) + ' online" data-sonline="' + esc(s.id) + '"' + (s.online === false ? "" : " checked") + '></td><td><button type="button" class="btn sm ghost" data-act="delsvc" data-id="' + esc(s.id) + '" aria-label="Remove ' + esc(s.name) + '">✕</button></td></tr>';
       }).join("") + '</tbody></table></div><button type="button" class="btn sm" data-act="addsvc" style="margin-top:10px">+ Add service</button></div>';
@@ -811,6 +845,31 @@
     $("main").querySelector("h1").focus();
   }
 
+  // ------------------------------------------------------------------ online payments + team logins (settings)
+  function payPanel() {
+    var p = owner.payments || {}, anyDeposit = biz.services.some(function (s) { return s.deposit && s.deposit.type !== "none"; });
+    var body;
+    if (!LIVE) body = '<p class="hint">Customers pay a deposit (or the full price) when they book, by card, Apple Pay or Google Pay through Stripe. The money goes straight to your own Stripe account. In this demo, set a deposit on a service below, then book it as a customer: the payment step is simulated and no card is charged.</p>';
+    else if (!p.available) body = '<p class="hint">Card payments aren\'t switched on for this website yet. Ask WebersLink to enable them.</p>';
+    else if (!p.connected || !p.chargesEnabled) body = '<p class="hint">Take deposits when customers book (card, Apple Pay, Google Pay). Connect your own Stripe account: Stripe asks for your business and bank details and verifies your identity. Takes about 5 minutes. Money goes straight to you.' + (p.feePercent ? " WebersLink keeps " + p.feePercent + "% of each payment." : "") + "</p>" +
+      (p.connected ? '<p class="err">Stripe still needs some details before you can take payments.</p>' : "") + (ROLE() === "owner" ? '<button type="button" class="btn primary" data-act="stripeconnect">' + (p.connected ? "Finish Stripe setup" : "Connect Stripe") + "</button>" : '<p class="hint">The owner can connect Stripe.</p>');
+    else body = '<p class="hint"><span class="pill paid">Connected</span> ' + (p.test ? '<span class="pill">test mode</span> ' : "") + "Deposits are taken for services where you set one below. Customers who cancel in time are refunded automatically; no-shows keep the deposit.</p>" + (ROLE() === "owner" ? '<button type="button" class="btn" data-act="stripedash">Open your Stripe dashboard ↗</button>' : "");
+    return '<div class="panel" style="margin-bottom:16px"><h2>Online payments</h2>' + body + (anyDeposit && LIVE && !(p.connected && p.chargesEnabled) ? '<p class="hint" style="margin-top:8px">You\'ve set deposits on some services; until Stripe is connected, those are booked without payment.</p>' : "") + "</div>";
+  }
+  function loginsPanel() {
+    if (!LIVE) return "";
+    var plan = owner.plan || {}, team = owner.team || [], opt = function (v, t, sel) { return '<option value="' + esc(v) + '"' + (sel ? " selected" : "") + ">" + esc(t) + "</option>"; };
+    var staffOpts = function (sel) { return opt("", "(not linked)", !sel) + biz.staff.map(function (p) { return opt(p.id, p.name, p.id === sel); }).join(""); };
+    var head = '<div class="panel" style="margin-top:16px"><h2>Team logins</h2><p class="hint"><b>Managers</b> run the business (calendar, clients, settings, reports) but can\'t manage logins, payments or delete the page. <b>Staff</b> see and manage only their own calendar, clients and time off.</p>';
+    if (plan.logins === 0) return head + '<p class="hint" style="margin-top:8px">Team logins are part of Pro. <a href="#" data-act="gotoplan">See plans</a></p></div>';
+    return head + (team.length ? '<div class="scroll"><table><thead><tr><th>Name</th><th>Role</th><th>Calendar</th><th>Status</th><th></th></tr></thead><tbody>' + team.map(function (u) {
+      return "<tr><td><b>" + esc(u.name) + '</b><br><span class="hint">' + esc(u.email) + '</span></td><td><select aria-label="Role" data-urole="' + esc(u.id) + '">' + opt("manager", "Manager", u.role === "manager") + opt("staff", "Staff", u.role === "staff") + '</select></td><td><select aria-label="Calendar" data-ustaff="' + esc(u.id) + '">' + staffOpts(u.staffId) + "</select></td><td>" +
+        (u.status === "active" ? '<span class="pill paid">active</span>' : '<span class="pill new">invited</span> <button type="button" class="btn sm ghost" data-act="uresend" data-id="' + esc(u.id) + '">Resend</button>') + '</td><td><button type="button" class="btn sm ghost danger" data-act="uremove" data-id="' + esc(u.id) + '" data-name="' + esc(u.name) + '">Remove</button></td></tr>';
+    }).join("") + "</tbody></table></div>" : '<p class="empty">No team logins yet.</p>') +
+      '<form class="details" id="inviteForm" novalidate style="grid-template-columns:2fr 1.4fr 1fr 1.2fr auto;align-items:end;margin-top:10px"><div class="field"><label for="ivEmail">Email</label><input type="email" id="ivEmail" maxlength="160"></div><div class="field"><label for="ivName">Name</label><input type="text" id="ivName" maxlength="60"></div>' +
+      '<div class="field"><label for="ivRole">Role</label><select id="ivRole">' + opt("staff", "Staff", true) + opt("manager", "Manager") + '</select></div><div class="field"><label for="ivStaff">Their calendar</label><select id="ivStaff">' + biz.staff.map(function (p) { return opt(p.id, p.name); }).join("") + '</select></div><button type="submit" class="btn primary">Send invite</button><p class="err full" id="ivErr" role="alert" hidden></p></form></div>';
+  }
+
   function shareTab() {
     var next = (biz.bookings || []).filter(function (b) { return b.status === "booked" && Date.parse(b.start) > Date.now(); }).sort(function (a, b) { return a.start.localeCompare(b.start); })[0];
     var box = function (title, text) { return '<div class="panel"><h3>' + title + '</h3><div class="notice" style="margin-top:8px"><pre>' + esc(text) + "</pre></div></div>"; };
@@ -852,6 +911,8 @@
     if ((id = ds.scat)) { service(id).category = t.value.trim(); return markDirty(); }
     if ((id = ds.sbuf)) { service(id).buffer = t.value === "" ? null : Math.max(0, Math.min(240, Math.round(+t.value || 0))); return markDirty(); }
     if ((id = ds.sonline)) { service(id).online = t.checked; return markDirty(); }
+    if ((id = ds.sdep)) { var sv = service(id); sv.deposit = { type: t.value, value: t.value === "percent" ? 20 : t.value === "fixed" ? Math.max(1, Math.round(sv.price / 4)) : 0 }; markDirty(); return renderAdmin(); }
+    if ((id = ds.sdepv)) { var sd = service(id).deposit; sd.value = Math.max(sd.type === "percent" ? 1 : 0, Math.min(sd.type === "percent" ? 100 : 1e6, +t.value || 0)); return markDirty(); }
     if (ds.phfrom || ds.phto) {
       id = ds.phfrom || ds.phto; var pp = person(id), f = document.querySelector('[data-phfrom="' + id + '"]').value, to = document.querySelector('[data-phto="' + id + '"]').value;
       if (!f && !to) { pp.hours = {}; return markDirty(); }
@@ -922,7 +983,8 @@
     else if (a === "st") {
       var sb = bookingById(el.dataset.id);
       if (el.dataset.s === "cancelled" && !window.confirm("Cancel " + sb.name + "'s appointment?" + (LIVE && sb.email ? " They will get an email." : ""))) return;
-      return data.status(sb.id, el.dataset.s).then(render).catch(function (err) { toast(err.message, true); });
+      var giveBack = el.dataset.s === "cancelled" && sb.payment && sb.payment.status === "paid" ? window.confirm("Refund their " + money(sb.payment.amount) + " deposit?\n\nOK = refund · Cancel = keep it (e.g. late cancellation)") : false;
+      return data.status(sb.id, el.dataset.s, giveBack).then(render).catch(function (err) { toast(err.message, true); });
     }
     else if (a === "addsvc") { biz.services.push({ id: "s" + uid(), name: "New service", desc: "", mins: 30, price: 50 }); markDirty(); }
     else if (a === "delsvc") {
@@ -941,6 +1003,17 @@
       return data.saveSettings().then(function () { dirty = false; toast("Settings saved"); renderAdmin(); }).catch(function (err) { el.disabled = false; toast(err.message, true); });
     }
     else if (a === "copy") { var src = $(el.dataset.src); src.select(); try { navigator.clipboard.writeText(src.value).then(function () { toast("Copied"); }, function () { document.execCommand("copy"); toast("Copied"); }); } catch (err) { document.execCommand("copy"); toast("Copied"); } return; }
+    else if (a === "demopaycancel") { var cb2 = bookingById(flow.booking.id); cb2.status = "expired"; cb2.payment.status = "unpaid"; demoSave(); flow = { step: "unpaid" }; }
+    else if (a === "stripeconnect") { el.disabled = true; return http("POST", API + "admin/stripe/connect").then(function (j) { location.href = j.url; }).catch(function (e) { el.disabled = false; toast(e.message, true); }); }
+    else if (a === "stripedash") { return http("POST", API + "admin/stripe/dashboard").then(function (j) { window.open(j.url, "_blank", "noopener"); }).catch(function (e) { toast(e.message, true); }); }
+    else if (a === "refund") {
+      var rb = bookingById(el.dataset.id); if (!window.confirm("Refund " + money(rb.payment.amount) + " to " + rb.name + "?")) return;
+      if (!LIVE) { rb.payment.status = "refunded"; demoSave(); return renderAdmin(); }
+      return http("POST", API + "admin/refund", { id: rb.id }).then(function () { rb.payment.status = "refunded"; toast("Refunded"); renderAdmin(); }).catch(function (e) { toast(e.message, true); });
+    }
+    else if (a === "uresend") { return http("POST", API + "admin/team/resend", { id: el.dataset.id }).then(function (j) { toast(j.emailed ? "Invite sent again" : "Invite renewed, but the email couldn't be sent"); }).catch(function (e) { toast(e.message, true); }); }
+    else if (a === "uremove") { if (!window.confirm("Remove " + el.dataset.name + "'s login? They're signed out straight away.")) return; return http("POST", API + "admin/team/remove", { id: el.dataset.id }).then(function () { owner.team = owner.team.filter(function (u) { return u.id !== el.dataset.id; }); toast("Login removed"); renderAdmin(); }).catch(function (e) { toast(e.message, true); }); }
+    else if (a === "gotoplan") { adminTab = "plan"; }
     else if (a === "edit") { editId = el.dataset.id; }
     else if (a === "editcancel") { editId = null; }
     else if (a === "clclose") { cl.open = null; }
@@ -970,6 +1043,14 @@
     else if (id === "loginForm") {
       http("POST", API + "login", { password: $("lpw").value }).then(function () { return data.load(); }).then(function () { adminTab = "agenda"; render(); })
         .catch(function (err) { renderLogin(err.message); });
+    } else if (id === "demoPayForm") {
+      var pb = bookingById(flow.booking.id); pb.status = "booked"; pb.payment.status = "paid"; pb.payment.paidAt = new Date().toISOString(); pb.isNew = true; demoSave();
+      flow = { step: 4, booking: pb }; render();
+    } else if (id === "inviteForm") {
+      var iv = { email: $("ivEmail").value.trim(), name: $("ivName").value.trim(), role: $("ivRole").value, staffId: $("ivStaff").value };
+      if (iv.role === "manager") iv.staffId = "";
+      http("POST", API + "admin/team/invite", iv).then(function (j) { owner.team.push(j.user); toast(j.emailed ? "Invite sent to " + iv.email : "Login created, but the invite email couldn't be sent", !j.emailed); renderAdmin(); })
+        .catch(function (err) { var x = $("ivErr"); x.textContent = err.message; x.hidden = false; });
     } else if (id === "editForm") editSave(e.target);
     else if (id === "toForm") toSubmit();
     else if (id === "clForm") {
@@ -997,6 +1078,12 @@
       return file.text().then(function (txt) { var rows = parseCsv(txt); if (!rows.length) throw new Error("No rows found in that file."); return data.importClients(rows); })
         .then(function (r) { toast(r.added + " added, " + r.updated + " updated" + (r.skipped ? ", " + r.skipped + " skipped (no name, or no email/phone)" : "")); cl.list = null; loadClients(); })
         .catch(function (err) { toast(err.message, true); });
+    }
+    if (e.target.dataset.urole || e.target.dataset.ustaff) {
+      var uid2 = e.target.dataset.urole || e.target.dataset.ustaff, u = owner.team.filter(function (x) { return x.id === uid2; })[0];
+      var nr = document.querySelector('[data-urole="' + uid2 + '"]').value, ns = document.querySelector('[data-ustaff="' + uid2 + '"]').value;
+      if (nr === "staff" && !ns) { toast("Staff logins need a calendar (team member).", true); return renderAdmin(); }
+      return http("POST", API + "admin/team/update", { id: uid2, role: nr, staffId: ns }).then(function (j) { Object.assign(u, j.user); toast("Updated. " + u.name + " signs in again."); }).catch(function (err) { toast(err.message, true); renderAdmin(); });
     }
     if (e.target.id === "toKind") { var part = e.target.value === "time"; document.querySelectorAll(".to-time").forEach(function (x) { x.hidden = !part; }); $("toToWrap").hidden = part; return; }
     if (adminTab === "setup" || (LIVE && biz.setupDone === false)) return onSetupChange(e);
@@ -1037,7 +1124,16 @@
   http("GET", API + "config").then(function (j) {
     setSettings(j.settings); biz.bookings = [];
     if (j.settings.poweredBy === false && view !== "admin") $("footNote").hidden = true; // Pro plans: no WebersLink branding on the customer page
-    if (view === "admin") return data.load().catch(function (e) { if (e.status !== 401) throw e; });
+    if (view === "admin") return data.load().then(function () {
+      if (params.get("stripe")) { history.replaceState(null, "", location.pathname); adminTab = "setup"; return http("POST", API + "admin/stripe/status").then(function (j) { Object.assign(owner.payments, j.payments); toast(j.payments.chargesEnabled ? "Stripe is connected. You can take deposits now." : "Stripe still needs a few details. Use “Finish Stripe setup”."); }).catch(function () {}); }
+    }).catch(function (e) { if (e.status !== 401) throw e; });
     if (params.get("code")) flow = { step: "manage", manage: { code: params.get("code") } };
+    if (params.get("paid")) { // back from Stripe Checkout
+      var code = params.get("paid"), sid = params.get("session_id") || "";
+      history.replaceState(null, "", location.pathname);
+      return http("POST", API + "payment", { code: code, sessionId: sid }).then(function (j) { flow = j.paid ? { step: 4, booking: j.booking } : { step: "unpaid" }; })
+        .catch(function () { flow = { step: "unpaid" }; });
+    }
+    if (params.get("unpaid")) { history.replaceState(null, "", location.pathname); flow = { step: "unpaid" }; }
   }).then(render).catch(function (e) { $("main").innerHTML = '<div class="panel done"><h1>Something went wrong</h1><p class="hint">' + esc(e.message) + "</p></div>"; });
 })();

@@ -120,5 +120,25 @@
     });
   }
 
-  ({ new: signup, verify: verify, login: login, forgot: forgot, reset: reset }[page] || login)();
+  // ---------------------------------------------------------------- team invite
+  function invite() {
+    document.title = "Join your team | WebersLink";
+    var token = q.get("token") || "";
+    if (token) history.replaceState(null, "", "/book/invite");
+    if (!token) return show('<h1>Link not valid</h1><p class="hint">Open the link from your invite email again.</p>');
+    show("<h1>Loading your invite…</h1>");
+    api("invite", { token: token }).then(function (j) {
+      show("<h1>Join " + esc(j.business) + "</h1><p class=\"hint\">You've been invited as <b>" + esc(j.role) + "</b> with " + esc(j.email) + ". Choose a password to sign in.</p><form id=\"f\" novalidate>" +
+        field("nm", "Your name", "text", 'maxlength="60" autocomplete="name" value="' + esc(j.name || "") + '"') +
+        field("pw", "Password", "password", 'minlength="10" maxlength="200" autocomplete="new-password" required', "At least 10 characters.") +
+        '<p class="err" id="err" role="alert" hidden></p><button type="submit" class="btn primary">Join and sign in</button></form>');
+      $("f").addEventListener("submit", function (e) {
+        e.preventDefault(); if ($("pw").value.length < 10) return err("Use at least 10 characters.");
+        busy(true, "Joining…");
+        api("accept", { token: token, password: $("pw").value, name: $("nm").value.trim() }).then(function (r) { goDashboard(r.slug); }).catch(function (x) { busy(false, "Join and sign in"); err(x.message); });
+      });
+    }).catch(function (x) { show('<h1>This invite can\'t be used</h1><p class="hint">' + esc(x.message) + "</p>"); });
+  }
+
+  ({ new: signup, verify: verify, login: login, forgot: forgot, reset: reset, invite: invite }[page] || login)();
 })();

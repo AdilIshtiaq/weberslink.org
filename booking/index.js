@@ -275,7 +275,7 @@ async function businessApi(req, res, slug, rest) {
     const from = Date.now() - 90 * 864e5;
     if (!biz.feedToken) { biz.feedToken = crypto.randomBytes(16).toString("hex"); store.saveBiz(slug, biz); }
     return send(res, 200, { ok: true, settings: { ...s, poweredBy: plan.poweredBy }, slug, ownerEmail: biz.acc.ownerEmail, mailOn: mail.canSend(),
-      me: { role, name: me.user ? me.user.name : "Owner", email: me.user ? me.user.email : biz.acc.ownerEmail, staffId: staffOnly || (me.user && me.user.staffId) || "" },
+      me: { role, name: me.user ? me.user.name : biz.acc.ownerEmail, email: me.user ? me.user.email : biz.acc.ownerEmail, staffId: staffOnly || (me.user && me.user.staffId) || "" },
       team: role === "owner" ? (biz.acc.users || []).map(publicUser) : undefined,
       bookings: biz.bookings.filter((b) => Date.parse(b.end) > from && mine(b)).map(ownerBooking), blocks: biz.blocks.filter((b) => !staffOnly || b.staffId === "all" || b.staffId === staffOnly),
       plan: { key: biz.acc.plan || "free", ...plan, usage: { bookingsThisMonth: onlineThisMonth(biz), staff: s.staff.length } },

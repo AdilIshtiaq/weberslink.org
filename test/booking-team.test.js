@@ -37,7 +37,7 @@ test("setup: Free plan has no team logins; Pro does", async () => {
   PW = made.json.password;
   OWNER = (await call("POST", `${A}/login`, { password: PW })).cookie;
   const d = (await call("GET", `${A}/admin/data`, undefined, OWNER)).json;
-  assert.strictEqual(d.me.role, "owner"); assert.deepStrictEqual(d.team, []);
+  assert.strictEqual(d.me.role, "owner"); assert.strictEqual(d.me.name, "boss@team.test"); assert.deepStrictEqual(d.team, []);
   assert.match((await call("POST", `${A}/admin/team/invite`, { email: "sam@team.test", role: "staff", staffId: "p1" }, OWNER)).json.error, /part of Pro/);
   await call("POST", "/api/booking-admin/set-plan", { slug: "team-shop", plan: "pro" });
   const st = { ...d.settings, setupDone: true, staff: [{ id: "p1", name: "Sam", days: [0, 1, 2, 3, 4, 5, 6], services: ["s1", "s2", "s3"] }, { id: "p2", name: "Kim", days: [0, 1, 2, 3, 4, 5, 6], services: ["s1", "s2", "s3"] }] };
