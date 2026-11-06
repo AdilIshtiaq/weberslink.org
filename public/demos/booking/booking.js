@@ -206,7 +206,7 @@
       if (!LIVE) return Promise.resolve();
       return http("GET", API + "admin/data").then(function (j) {
         setSettings(j.settings); biz.bookings = j.bookings; biz.blocks = j.blocks || [];
-        owner.signedIn = true; owner.mailOn = j.mailOn; owner.email = j.ownerEmail || ""; owner.plan = j.plan; owner.plans = j.plans; owner.services = j.services; owner.requests = j.requests || []; owner.feedUrl = j.feedUrl;
+        owner.signedIn = true; owner.mailOn = j.mailOn; try { localStorage.setItem("wl_booking_slug", SLUG); } catch (e) {} owner.email = j.ownerEmail || ""; owner.plan = j.plan; owner.plans = j.plans; owner.services = j.services; owner.requests = j.requests || []; owner.feedUrl = j.feedUrl;
         owner.me = j.me || { role: "owner" }; owner.team = j.team || []; owner.payments = j.payments || {};
       });
     },
@@ -1030,7 +1030,7 @@
     else if (a === "wiznext") return wizNext();
     else if (a === "wizback") { wiz.step = Math.max(0, wiz.step - 1); }
     else if (a === "todash") { wiz.done = false; adminTab = "messages"; }
-    else if (a === "logout") { http("POST", API + "logout").then(function () { owner.signedIn = false; render(); }); return; }
+    else if (a === "logout") { http("POST", API + "logout").then(function () { owner.signedIn = false; try { localStorage.removeItem("wl_booking_slug"); } catch (e) {} render(); }); return; }
     render();
   });
   function reloadOwner() { if (LIVE) data.load().then(render).catch(function () {}); }

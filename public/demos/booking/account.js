@@ -15,7 +15,8 @@
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok || j.ok === false) { var e = new Error(j.error || "Something went wrong (" + r.status + ")."); e.status = r.status; throw e; } return j; }); },
         function () { throw new Error("No connection. Check your internet and try again."); });
   }
-  function show(html) { $("main").innerHTML = '<div class="panel acct">' + html + "</div>"; var h = $("main").querySelector("h1"); if (h) { h.setAttribute("tabindex", "-1"); h.focus(); } }
+  var TABS = function (on) { return '<div class="acct-tabs" role="tablist"><a role="tab" href="/book/login" aria-selected="' + (on === "login") + '">Sign in</a><a role="tab" href="/book/new" aria-selected="' + (on === "new") + '">Create account</a></div>'; };
+  function show(html) { $("main").innerHTML = '<div class="panel acct">' + (page === "login" || page === "new" ? TABS(page) : "") + html + "</div>"; var h = $("main").querySelector("h1"); if (h) { h.setAttribute("tabindex", "-1"); h.focus(); } }
   function err(msg) { var e = $("err"); e.textContent = msg; e.hidden = false; }
   function busy(on, label) { var b = $("main").querySelector("button[type=submit]"); if (b) { b.disabled = on; if (label) b.textContent = label; } }
   var field = function (id, label, type, extra, hint) { return '<div class="field"><label for="' + id + '">' + label + '</label><input type="' + type + '" id="' + id + '" ' + (extra || "") + ">" + (hint ? '<span class="hint">' + hint + "</span>" : "") + "</div>"; };

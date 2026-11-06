@@ -36,7 +36,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap"></noscript>
-<link rel="stylesheet" href="/assets/site.css">
+<link rel="stylesheet" href="/assets/site.css?v=5">
 <script type="application/ld+json">
 {
  "@context": "https://schema.org",
@@ -156,8 +156,10 @@
       <a href="/plugins/">Free resources</a>
       <a href="/blog/">Guides</a>
       <a href="/contact">Contact</a>
+      <a href="/book/login" class="nav-signin" data-track="Sign in" data-loc="nav">Sign in</a>
+      <a href="/book/new" class="nav-signup-m" data-track="Sign up" data-loc="nav-menu">Sign up free</a>
     </nav>
-    <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="nav">Book a walkthrough</a>
+    <div class="nav-cta"><a href="/book/new" class="btn btn-ghost nav-signup" data-track="Sign up" data-loc="nav">Sign up</a><a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="nav">Book a walkthrough</a></div>
     <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false"><span></span><span></span></button>
   </div>
 </header>
@@ -325,7 +327,7 @@
 </div>
 </aside>
 <script src="/config.js"></script>
-<script src="/assets/site.js" defer></script>
+<script src="/assets/site.js?v=2" defer></script>
 <script src="/assets/chat-widget.js" defer></script>
 </body>
 </html>
