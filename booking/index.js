@@ -19,6 +19,7 @@ const core = require("./core");
 const store = require("./store");
 const mail = require("./mail");
 const presets = require("./presets");
+const plans = require("./plans");
 
 const PAGE = path.join(__dirname, "..", "public", "demos", "booking", "index.html");
 const ACCOUNT_PAGE = path.join(__dirname, "..", "public", "demos", "booking", "account.html");
@@ -105,7 +106,29 @@ function findByCode(biz, code, email) {
   const c = String(code || "").trim().toUpperCase(), e = String(email || "").trim().toLowerCase();
   return biz.bookings.find((b) => b.code === c && b.email === e) || null;
 }
-const ownerBooking = (b) => ({ id: b.id, code: b.code, serviceId: b.serviceId, staffId: b.staffId, start: b.start, end: b.end, status: b.status, name: b.name, email: b.email, phone: b.phone,
+const clientKey = (email, phone) => (email ? String(email).toLowerCase() : String(phone || "").replace(/\D/g, "").length >= 7 ? "tel:" + String(phone).replace(/\D/g, "") : "");
+const monthKey = (ms) => new Date(ms).toISOString().slice(0, 7);
+const onlineThisMonth = (biz) => biz.bookings.filter((b) => b.source === "online" && monthKey(Date.parse(b.createdAt)) === monthKey(Date.now())).length;
+/** Clients: everyone who booked (grouped by email, else phone) merged with the owner's own records (notes, tags, blocked, imports). */
+function clientList(biz) {
+  const s = biz.settings, now = Date.now(), map = new Map();
+  const price = (id) => (s.services.find((x) => x.id === id) || {}).price || 0;
+  for (const [key, r] of Object.entries(biz.clients || {})) map.set(key, { key, name: r.name || "", email: r.email || "", phone: r.phone || "", notes: r.notes || "", tags: r.tags || [], blocked: Boolean(r.blocked), visits: 0, upcoming: 0, noShows: 0, cancelled: 0, spent: 0, first: "", last: "", source: r.source || "added" });
+  for (const b of biz.bookings.slice().sort((a, c) => a.start.localeCompare(c.start))) {
+    const key = clientKey(b.email, b.phone);
+    if (!key) continue;
+    const c = map.get(key) || { key, name: "", email: "", phone: "", notes: "", tags: [], blocked: false, visits: 0, upcoming: 0, noShows: 0, cancelled: 0, spent: 0, first: "", last: "", source: "booking" };
+    c.name = b.name || c.name; c.email = b.email || c.email; c.phone = b.phone || c.phone;
+    const past = Date.parse(b.start) < now;
+    if (b.status === "cancelled") c.cancelled++;
+    else if (b.status === "no-show") c.noShows++;
+    else if (past) { c.visits++; c.spent += price(b.serviceId); c.last = b.start; c.first = c.first || b.start; }
+    else c.upcoming++;
+    map.set(key, c);
+  }
+  return [...map.values()].sort((a, b) => (b.last || "").localeCompare(a.last || "") || a.name.localeCompare(b.name));
+}
+const ownerBooking = (b) => ({ answers: b.answers || {}, id: b.id, code: b.code, serviceId: b.serviceId, staffId: b.staffId, start: b.start, end: b.end, status: b.status, name: b.name, email: b.email, phone: b.phone,
   address: b.address || "", notes: b.notes || "", source: b.source, createdAt: b.createdAt, rescheduled: Boolean(b.rescheduled), isNew: !b.seen, reminded: Boolean(b.remindedAt) });
 
 // ------------------------------------------------------------------ pages
@@ -127,15 +150,16 @@ async function businessApi(req, res, slug, rest) {
   const m = req.method, ip = clientIp(req);
   const biz = getBiz(slug);
   if (!biz) return fail(res, 404, "This booking page doesn't exist.");
-  const s = biz.settings;
+  const s = biz.settings, plan = plans.planOf(biz.acc);
+  const occ = () => core.busy(biz.bookings, biz.blocks, s.staff); // bookings + time off
 
-  if (rest === "config" && m === "GET") return send(res, 200, { ok: true, settings: core.publicSettings(s) });
+  if (rest === "config" && m === "GET") return send(res, 200, { ok: true, settings: { ...core.publicSettings(s), poweredBy: plan.poweredBy } });
   const notYet = s.setupDone === false && ["slots", "book", "lookup", "cancel", "reschedule"].includes(rest);
   if (notYet) return fail(res, 404, "This business isn't taking online bookings yet.");
   if (rest === "slots" && m === "GET") {
     if (!allow("slots:" + ip, 240, 600e3)) return fail(res, 429, "Too many requests. Please wait a moment.");
     const q = new URL(req.url, "http://x").searchParams;
-    try { return send(res, 200, { ok: true, days: core.availability(s, biz.bookings, { serviceId: q.get("service"), staffId: q.get("staff") || "any", from: q.get("from"), days: Number(q.get("days")) || 28 }) }); }
+    try { return send(res, 200, { ok: true, days: core.availability(s, occ(), { serviceId: q.get("service"), staffId: q.get("staff") || "any", from: q.get("from"), days: Number(q.get("days")) || 28 }) }); }
     catch (e) { return fail(res, 400, e.message); }
   }
   if (rest === "book" && m === "POST") {
@@ -144,10 +168,14 @@ async function businessApi(req, res, slug, rest) {
     if (!allow("book:" + ip, 8, 3600e3) || !allow("book-all:" + slug, 300, 3600e3)) return fail(res, 429, "Too many bookings from this connection. Please call us instead.");
     try {
       const who = core.cleanCustomer(body, s);
+      const answers = core.cleanAnswers(s, body.answers);
+      const rec = biz.clients[clientKey(who.email)] || biz.clients[clientKey("", who.phone)];
+      if (rec && rec.blocked) throw new Error(`Online booking isn't available for you.${s.phone ? " Please call " + s.phone + "." : " Please contact us."}`);
+      if (plan.bookingsPerMonth && onlineThisMonth(biz) >= plan.bookingsPerMonth) throw new Error(`Online booking is full for this month.${s.phone ? " Please call " + s.phone + "." : " Please contact us."}`);
       const upcoming = biz.bookings.filter((b) => b.email === who.email && b.status === "booked" && Date.parse(b.start) > Date.now()).length;
       if (upcoming >= 5) throw new Error("You already have 5 upcoming bookings. Please call us to book more.");
-      const slot = core.resolveSlot(s, biz.bookings, body);
-      const b = { id: crypto.randomBytes(8).toString("hex"), code: uniqueCode(biz), serviceId: body.serviceId, ...slot, ...who, status: "booked", source: "online", createdAt: new Date().toISOString() };
+      const slot = core.resolveSlot(s, occ(), body);
+      const b = { id: crypto.randomBytes(8).toString("hex"), code: uniqueCode(biz), serviceId: body.serviceId, ...slot, ...who, answers, status: "booked", source: "online", createdAt: new Date().toISOString() };
       biz.bookings.push(b); store.saveBiz(slug, biz);
       notify("confirm", biz, b, slug); notify("owner-new", biz, b, slug);
       return send(res, 200, { ok: true, booking: core.customerView(b) });
@@ -168,7 +196,7 @@ async function businessApi(req, res, slug, rest) {
       return send(res, 200, { ok: true, booking: core.customerView(b) });
     }
     try {
-      const slot = core.resolveSlot(s, biz.bookings, { serviceId: b.serviceId, staffId: body.staffId || b.staffId, start: body.start }, { ignoreId: b.id });
+      const slot = core.resolveSlot(s, occ(), { serviceId: b.serviceId, staffId: body.staffId || b.staffId, start: body.start }, { ignoreId: b.id });
       Object.assign(b, slot, { rescheduled: true, remindedAt: undefined, seen: false }); store.saveBiz(slug, biz);
       notify("moved", biz, b, slug); notify("owner-moved", biz, b, slug);
       return send(res, 200, { ok: true, booking: core.customerView(b) });
@@ -189,8 +217,13 @@ async function businessApi(req, res, slug, rest) {
 
   if (what === "data" && m === "GET") {
     const from = Date.now() - 90 * 864e5;
-    return send(res, 200, { ok: true, settings: s, slug, ownerEmail: biz.acc.ownerEmail, mailOn: mail.canSend(),
-      bookings: biz.bookings.filter((b) => Date.parse(b.end) > from).map(ownerBooking) });
+    if (!biz.feedToken) { biz.feedToken = crypto.randomBytes(16).toString("hex"); store.saveBiz(slug, biz); }
+    return send(res, 200, { ok: true, settings: { ...s, poweredBy: plan.poweredBy }, slug, ownerEmail: biz.acc.ownerEmail, mailOn: mail.canSend(),
+      bookings: biz.bookings.filter((b) => Date.parse(b.end) > from).map(ownerBooking), blocks: biz.blocks,
+      plan: { key: biz.acc.plan || "free", ...plan, usage: { bookingsThisMonth: onlineThisMonth(biz), staff: s.staff.length } },
+      plans: { free: plans.free, pro: plans.pro }, services: plans.SERVICES,
+      requests: store.requests().filter((r) => r.slug === slug).slice(-10),
+      feedUrl: `${mail.base()}/api/booking-feed/${slug}/${biz.feedToken}.ics` });
   }
   if (what === "seen" && m === "POST") { biz.bookings.forEach((b) => { b.seen = true; }); store.saveBiz(slug, biz); return send(res, 200, { ok: true }); }
   if (what === "status" && m === "POST") {
@@ -198,7 +231,7 @@ async function businessApi(req, res, slug, rest) {
     const b = biz.bookings.find((x) => x.id === body.id);
     if (!b || !core.STATUSES.includes(body.status)) return fail(res, 400, "Unknown booking or status.");
     if (b.status === "cancelled" && body.status !== "cancelled") {
-      try { core.resolveSlot(s, biz.bookings, { serviceId: b.serviceId, staffId: b.staffId, start: b.start }, { owner: true, ignoreId: b.id }); }
+      try { core.resolveSlot(s, occ(), { serviceId: b.serviceId, staffId: b.staffId, start: b.start }, { owner: true, ignoreId: b.id }); }
       catch (e) { return fail(res, 400, "That time has been booked by someone else since, so it can't be restored."); }
     }
     const wasLive = b.status === "booked";
@@ -216,6 +249,9 @@ async function businessApi(req, res, slug, rest) {
     const lostPerson = ahead.find((b) => !next.staff.some((x) => x.id === b.staffId));
     if (lostSvc) return fail(res, 400, `"${(s.services.find((x) => x.id === lostSvc.serviceId) || {}).name || "A service"}" has upcoming bookings. Cancel or move them before removing it.`);
     if (lostPerson) return fail(res, 400, `${(s.staff.find((x) => x.id === lostPerson.staffId) || {}).name || "That person"} has upcoming bookings. Cancel or move them before removing them.`);
+    if (plan.staff && next.staff.length > plan.staff) return fail(res, 403, `The ${plan.name} plan includes ${plan.staff} team member${plan.staff > 1 ? "s" : ""}. Upgrade to add more (Plan & help).`);
+    if (plan.questions !== null && next.questions.length > plan.questions) return fail(res, 403, `The ${plan.name} plan includes ${plan.questions} booking questions. Upgrade for more (Plan & help).`);
+    next.poweredBy = plan.poweredBy;
     biz.settings = next;
     store.saveBiz(slug, biz);
     return send(res, 200, { ok: true, settings: biz.settings });
@@ -225,12 +261,94 @@ async function businessApi(req, res, slug, rest) {
     try {
       const who = core.cleanCustomer({ ...body, email: body.email || `no-email+${Date.now()}@invalid.local` }, s);
       if (!body.email) who.email = "";
-      const slot = core.resolveSlot(s, biz.bookings, body, { owner: true });
-      const b = { id: crypto.randomBytes(8).toString("hex"), code: uniqueCode(biz), serviceId: body.serviceId, ...slot, ...who, status: "booked", source: body.source === "walk-in" ? "walk-in" : "phone", createdAt: new Date().toISOString(), seen: true };
+      const slot = core.resolveSlot(s, occ(), body, { owner: true });
+      const answers = core.cleanAnswers({ ...s, questions: (s.questions || []).map((q) => ({ ...q, required: false })) }, body.answers);
+      const b = { id: crypto.randomBytes(8).toString("hex"), code: uniqueCode(biz), serviceId: body.serviceId, ...slot, ...who, answers, status: "booked", source: body.source === "walk-in" ? "walk-in" : "phone", createdAt: new Date().toISOString(), seen: true };
       biz.bookings.push(b); store.saveBiz(slug, biz);
       if (b.email && body.sendConfirmation !== false) notify("confirm", biz, b, slug);
       return send(res, 200, { ok: true, booking: ownerBooking(b) });
     } catch (e) { return fail(res, 400, e.message); }
+  }
+  if (what === "update" && m === "POST") { // the owner moves or edits a booking
+    const body = await readJson(req);
+    const b = biz.bookings.find((x) => x.id === body.id);
+    if (!b || b.status === "cancelled") return fail(res, 400, "That booking can't be changed (it may be cancelled).");
+    const next = { serviceId: body.serviceId || b.serviceId, staffId: body.staffId || b.staffId, start: body.start || b.start };
+    const moved = next.start !== b.start || next.staffId !== b.staffId || next.serviceId !== b.serviceId;
+    try {
+      const who = core.cleanCustomer({ name: body.name ?? b.name, email: (body.email ?? b.email) || "x@no-email.invalid", phone: body.phone ?? b.phone, address: body.address ?? b.address, notes: body.notes ?? b.notes }, { ...s, needAddress: false });
+      if (!(body.email ?? b.email)) who.email = "";
+      if (moved) Object.assign(b, core.resolveSlot(s, occ(), { ...next, staffId: next.staffId }, { owner: true, ignoreId: b.id }), { serviceId: next.serviceId, rescheduled: true, remindedAt: undefined });
+      Object.assign(b, who, { seen: true });
+      store.saveBiz(slug, biz);
+      if (moved && b.email && body.notify !== false && Date.parse(b.start) > Date.now()) notify("moved", biz, b, slug);
+      return send(res, 200, { ok: true, booking: ownerBooking(b) });
+    } catch (e) { return fail(res, 400, e.message.replace("Sorry, that time was just taken. Please pick another time.", "That time isn't free for this person (another booking, time off, a break or outside their hours).")); }
+  }
+  if (what === "blocks/add" && m === "POST") {
+    const body = await readJson(req);
+    let blk;
+    try { blk = core.cleanBlock(s, body); } catch (e) { return fail(res, 400, e.message); }
+    if ((biz.blocks || []).length >= 500) return fail(res, 400, "Too many time-off entries. Remove old ones first.");
+    biz.blocks = (biz.blocks || []).concat(blk); store.saveBiz(slug, biz);
+    const clash = biz.bookings.filter((b) => b.status === "booked" && (blk.staffId === "all" || b.staffId === blk.staffId) && Date.parse(b.start) < Date.parse(blk.end) && Date.parse(blk.start) < Date.parse(b.end));
+    return send(res, 200, { ok: true, block: blk, conflicts: clash.map(ownerBooking) });
+  }
+  if (what === "blocks/remove" && m === "POST") {
+    const body = await readJson(req);
+    biz.blocks = (biz.blocks || []).filter((b) => b.id !== body.id); store.saveBiz(slug, biz);
+    return send(res, 200, { ok: true });
+  }
+  if (what === "clients" && m === "GET") return send(res, 200, { ok: true, clients: clientList(biz) });
+  if (what === "client" && m === "POST") {
+    const body = await readJson(req);
+    const key = body.key || clientKey(core.email(body.email), body.phone);
+    if (!key) return fail(res, 400, "Enter an email or a phone number.");
+    const r = biz.clients[key] || {};
+    biz.clients[key] = { ...r, name: core.str(body.name ?? r.name, 80), email: core.email(body.email ?? r.email) || r.email || "", phone: core.str(body.phone ?? r.phone, 30),
+      notes: core.str(body.notes ?? r.notes, 2000), tags: (Array.isArray(body.tags) ? body.tags : r.tags || []).map((t) => core.str(t, 30)).filter((t, i, a) => t && a.indexOf(t) === i).slice(0, 10),
+      blocked: body.blocked === undefined ? Boolean(r.blocked) : Boolean(body.blocked), source: r.source || "added" };
+    if (Object.keys(biz.clients).length > 20000) return fail(res, 400, "Client list is full (20,000).");
+    store.saveBiz(slug, biz);
+    return send(res, 200, { ok: true, key });
+  }
+  if (what === "clients/import" && m === "POST") {
+    const body = await readJson(req, 4 * 1024 * 1024);
+    const rows = Array.isArray(body.rows) ? body.rows.slice(0, 5000) : [];
+    let added = 0, updated = 0, skipped = 0;
+    for (const row of rows) {
+      const em = core.email(row.email), key = clientKey(em, row.phone);
+      if (!key || !core.str(row.name, 80)) { skipped++; continue; }
+      const r = biz.clients[key];
+      biz.clients[key] = { ...(r || {}), name: core.str(row.name, 80), email: em || (r && r.email) || "", phone: core.str(row.phone, 30) || (r && r.phone) || "",
+        notes: core.str(row.notes, 2000) || (r && r.notes) || "", tags: String(row.tags || "").split(/[,;|]/).map((t) => core.str(t, 30)).filter(Boolean).slice(0, 10).concat((r && r.tags) || []).filter((t, i, a) => a.indexOf(t) === i).slice(0, 10),
+        blocked: Boolean(r && r.blocked), source: (r && r.source) || "import" };
+      r ? updated++ : added++;
+    }
+    if (Object.keys(biz.clients).length > 20000) return fail(res, 400, "That would make more than 20,000 clients.");
+    store.saveBiz(slug, biz);
+    return send(res, 200, { ok: true, added, updated, skipped });
+  }
+  if (what === "clients.csv" && m === "GET") {
+    const q = (v) => `"${String(v == null ? "" : v).replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`;
+    const rows = [["Name", "Email", "Phone", "Visits", "Upcoming", "No-shows", "Cancelled", "Spent", "Last visit", "Tags", "Notes", "Blocked"]]
+      .concat(clientList(biz).map((c) => [c.name, c.email, c.phone, c.visits, c.upcoming, c.noShows, c.cancelled, c.spent, (c.last || "").slice(0, 10), c.tags.join(", "), c.notes, c.blocked ? "yes" : ""]));
+    res.writeHead(200, { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="clients-${slug}.csv"`, "Cache-Control": "no-store" });
+    return res.end("\ufeff" + rows.map((r) => r.map(q).join(",")).join("\r\n"));
+  }
+  if (what === "feed/reset" && m === "POST") {
+    biz.feedToken = crypto.randomBytes(16).toString("hex"); store.saveBiz(slug, biz);
+    return send(res, 200, { ok: true, feedUrl: `${mail.base()}/api/booking-feed/${slug}/${biz.feedToken}.ics` });
+  }
+  if (what === "request" && m === "POST") { // upgrade, done-for-you setup or a custom feature: goes to you
+    const body = await readJson(req);
+    if (!["upgrade", "setup", "custom"].includes(body.kind)) return fail(res, 400, "Choose what you need.");
+    if (!allow("request:" + slug, 5, 864e5)) return fail(res, 429, "You've sent several requests today. We'll be in touch.");
+    const r = { id: crypto.randomBytes(6).toString("hex"), slug, name: s.name, ownerEmail: biz.acc.ownerEmail, kind: body.kind, message: core.str(body.message, 3000), phone: core.str(body.phone, 30), status: "open", createdAt: new Date().toISOString() };
+    store.saveRequests(store.requests().concat(r).slice(-2000));
+    const to = process.env.BOOKING_ADMIN_EMAIL || process.env.SMTP_USER;
+    if (to) mail.sendPlain(to, `Booking ${r.kind} request: ${s.name}`, `${s.name} (${mail.base()}/book/${slug})\nOwner: ${r.ownerEmail}${r.phone ? ", " + r.phone : ""}\nPlan: ${plan.name}\nRequest: ${r.kind}\n\n${r.message || "(no message)"}\n\nSee all requests: ${mail.base()}/admin/booking.html`);
+    return send(res, 200, { ok: true, request: r });
   }
   if (what === "password" && m === "POST") {
     const body = await readJson(req);
@@ -268,11 +386,18 @@ async function siteAdminApi(req, res, rest) {
       const b = store.loadBiz(a.slug) || { settings: {}, bookings: [] };
       const now = Date.now();
       return { slug: a.slug, name: b.settings.name || a.slug, ownerEmail: a.ownerEmail, disabled: Boolean(a.disabled), createdAt: a.createdAt,
-        source: a.source || "admin", verified: a.verified !== false, setupDone: b.settings.setupDone !== false,
+        source: a.source || "admin", verified: a.verified !== false, setupDone: b.settings.setupDone !== false, plan: a.plan || "free",
         upcoming: b.bookings.filter((x) => x.status === "booked" && Date.parse(x.start) > now).length, total: b.bookings.length };
     }) });
   }
+  if (rest === "requests" && m === "GET") return send(res, 200, { ok: true, requests: store.requests().slice().reverse(), plans: Object.fromEntries(Object.entries(plans).filter(([, v]) => v && v.name)) });
   const body = m === "POST" ? await readJson(req) : {};
+  if (rest === "request-status" && m === "POST") {
+    const list = store.requests(), r = list.find((x) => x.id === body.id);
+    if (!r) return fail(res, 404, "Unknown request.");
+    r.status = body.status === "done" ? "done" : "open"; store.saveRequests(list);
+    return send(res, 200, { ok: true });
+  }
   if (rest === "create" && m === "POST") {
     const slug = String(body.slug || "").trim().toLowerCase();
     if (!store.SLUG.test(slug)) return fail(res, 400, "Web address: 3–40 lowercase letters, numbers or dashes (e.g. studio-nova).");
@@ -294,6 +419,13 @@ async function siteAdminApi(req, res, rest) {
     const password = newPassword();
     Object.assign(acc, hashPassword(password), { pwv: (acc.pwv || 1) + 1 }); store.saveAccounts(list);
     return send(res, 200, { ok: true, password });
+  }
+  if (rest === "set-plan" && m === "POST") {
+    if (!plans[body.plan] || !plans[body.plan].name) return fail(res, 400, "Unknown plan.");
+    acc.plan = body.plan; store.saveAccounts(list);
+    const b = store.loadBiz(acc.slug);
+    if (b) { b.settings.poweredBy = plans[body.plan].poweredBy; store.saveBiz(acc.slug, b); }
+    return send(res, 200, { ok: true });
   }
   if (rest === "disable" && m === "POST") { acc.disabled = Boolean(body.disabled); store.saveAccounts(list); return send(res, 200, { ok: true }); }
   return fail(res, 404, "Not found");
@@ -400,6 +532,21 @@ async function accountApi(req, res, what) {
   }
   return fail(res, 404, "Not found");
 }
+/** Private calendar feed for the owner (subscribe in Google, Outlook or Apple Calendar). The token in the URL is the key. */
+function serveFeed(req, res, slug, token) {
+  const biz = getBiz(slug);
+  const ok = biz && biz.feedToken && biz.feedToken.length === token.length && crypto.timingSafeEqual(Buffer.from(biz.feedToken), Buffer.from(token));
+  if (!ok) { res.writeHead(404, { "Content-Type": "text/plain" }); return res.end("Not found"); }
+  const s = biz.settings, from = Date.now() - 30 * 864e5;
+  const d = (iso) => new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const esc = (v) => String(v || "").replace(/[\r\n]+/g, " ").replace(/([,;\\])/g, "\\$1");
+  const svc = (id) => (s.services.find((x) => x.id === id) || {}).name || "Appointment", who = (id) => (s.staff.find((x) => x.id === id) || {}).name || "";
+  const ev = biz.bookings.filter((b) => b.status !== "cancelled" && Date.parse(b.end) > from).map((b) => ["BEGIN:VEVENT", `UID:${b.id}@${slug}.booking.weberslink`, `DTSTAMP:${d(b.createdAt || b.start)}`, `DTSTART:${d(b.start)}`, `DTEND:${d(b.end)}`,
+    `SUMMARY:${esc(b.name + " – " + svc(b.serviceId))}`, `DESCRIPTION:${esc(`With ${who(b.staffId)}. ${b.phone || ""} ${b.email || ""}. Code ${b.code}.${b.notes ? " Notes: " + b.notes : ""}`)}`, b.address ? `LOCATION:${esc(b.address)}` : "", b.status === "booked" ? "STATUS:CONFIRMED" : "STATUS:TENTATIVE", "END:VEVENT"].filter(Boolean).join("\r\n"));
+  const off = (biz.blocks || []).map((b) => ["BEGIN:VEVENT", `UID:${b.id}@${slug}.booking.weberslink`, `DTSTAMP:${d(b.start)}`, `DTSTART:${d(b.start)}`, `DTEND:${d(b.end)}`, `SUMMARY:${esc("Time off – " + (b.staffId === "all" ? "everyone" : who(b.staffId)) + (b.note ? ": " + b.note : ""))}`, "TRANSP:TRANSPARENT", "END:VEVENT"].join("\r\n"));
+  res.writeHead(200, { "Content-Type": "text/calendar; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
+  res.end(req.method === "HEAD" ? undefined : ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Weberslink//Booking//EN", "CALSCALE:GREGORIAN", `X-WR-CALNAME:${esc(s.name)} bookings`, `X-WR-TIMEZONE:${s.tz}`, ...ev, ...off, "END:VCALENDAR"].join("\r\n"));
+}
 /** Removes sign-ups that never confirmed their email. */
 function cleanupUnverified(now = Date.now()) {
   const old = store.accounts().filter((a) => a.verified === false && now - Date.parse(a.createdAt) > UNVERIFIED_DAYS * 864e5);
@@ -418,6 +565,8 @@ function handle(req, res) {
   const p = String(req.url || "").split("?")[0];
   const ap = /^\/book\/([a-z]+)\/?$/.exec(p);
   if (ap && ACCOUNT_PAGES.includes(ap[1]) && (req.method === "GET" || req.method === "HEAD")) { serveAccountPage(req, res); return true; }
+  const feed = /^\/api\/booking-feed\/([a-z0-9-]{3,40})\/([0-9a-f]{32})\.ics$/.exec(p);
+  if (feed && (req.method === "GET" || req.method === "HEAD")) { serveFeed(req, res, feed[1], feed[2]); return true; }
   const acct = /^\/api\/booking-account\/([a-z]+)$/.exec(p);
   if (acct) { accountApi(req, res, acct[1]).catch((e) => { if (!res.headersSent) fail(res, e.status || 500, e.status ? e.message : "Server error"); if (!e.status) console.error("booking account error:", e); }); return true; }
   let mm = /^\/book\/([a-z0-9-]{3,40})(\/admin)?\/?$/.exec(p);

@@ -125,6 +125,8 @@ test("'anyone' spreads work: the second booking at the same time goes to the oth
   const { cookie } = await make("edge-team");
   const cfg = (await call("GET", "/api/booking/edge-team/admin/data", undefined, cookie)).json.settings;
   cfg.staff.push({ id: "p2", name: "Bo", role: "", days: [1, 2, 3, 4, 5], services: ["s1"] });
+  assert.match((await call("PUT", "/api/booking/edge-team/admin/settings", { settings: cfg }, cookie)).json.error, /Free plan includes 1 team member/);
+  assert.strictEqual((await call("POST", "/api/booking-admin/set-plan", { slug: "edge-team", plan: "pro" })).status, 200);
   assert.strictEqual((await call("PUT", "/api/booking/edge-team/admin/settings", { settings: cfg }, cookie)).status, 200);
   const [t] = await firstSlots("edge-team");
   const a = await call("POST", "/api/booking/edge-team/book", { serviceId: "s1", staffId: "any", start: t, ...person({ email: "a1@example.com" }) }, null, fresh());

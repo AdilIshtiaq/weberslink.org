@@ -98,4 +98,11 @@ async function sendAccount(kind, to, { name, link }) {
   } catch (e) { console.error(`booking account mail ${kind} -> ${to} failed:`, e.message); return false; }
 }
 
-module.exports = { compose, send, icsText, setSender, base, canSend, sendAccount };
+/** A plain notification e-mail (e.g. a request from an owner to you). Never throws. */
+async function sendPlain(to, subject, text) {
+  const msg = { from: { name: "WebersLink Booking", address: process.env.SMTP_USER || "no-reply@weberslink.org" }, to, subject, text };
+  try { if (sender) { await sender(msg, "plain"); return true; } const t = smtp(); if (!t) return false; await t.sendMail(msg); return true; }
+  catch (e) { console.error("booking mail failed:", e.message); return false; }
+}
+
+module.exports = { compose, send, icsText, setSender, base, canSend, sendAccount, sendPlain };
