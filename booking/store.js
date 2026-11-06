@@ -33,7 +33,8 @@ function saveBiz(slug, biz) {
   const cut = Date.now() - KEEP_DAYS * 864e5;
   write(`b-${slug}.json`, { settings: biz.settings, bookings: biz.bookings.filter((b) => Date.parse(b.end) > cut) });
 }
-function removeBiz(slug) { try { fs.renameSync(file(`b-${slug}.json`), file(`deleted-${slug}-${Date.now()}.json`)); } catch (e) { /* nothing to remove */ } }
+/** Erases a business's data file for good (owner deleted their page, or a sign-up was never confirmed). */
+function deleteBiz(slug) { if (SLUG.test(slug)) try { fs.unlinkSync(file(`b-${slug}.json`)); } catch (e) { /* already gone */ } }
 
 /** Signing key for owner sessions: BOOKING_SECRET, else a random key kept in the data folder. */
 let secret = null;
@@ -45,4 +46,4 @@ function key() {
   return (secret = k);
 }
 
-module.exports = { DIR, SLUG, accounts, saveAccounts, account, loadBiz, saveBiz, removeBiz, key };
+module.exports = { DIR, SLUG, accounts, saveAccounts, account, loadBiz, saveBiz, deleteBiz, key };

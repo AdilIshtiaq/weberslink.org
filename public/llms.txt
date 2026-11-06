@@ -34,6 +34,9 @@
 - [Contractor Website Checklist: 15 Must-Haves](https://weberslink.org/blog/contractor-website-checklist): A practical contractor website checklist: 15 things every roofing, remodeling, plumbing and HVAC website needs to rank locally and turn visitors into booked estimates.
 - [Why Is My Website Not Getting Leads?](https://weberslink.org/blog/website-not-generating-leads): Website getting visitors but no enquiries? 9 common reasons small business websites don't generate leads — and practical fixes you can make this week.
 
+## Demos
+- [Live demos](https://weberslink.org/demos/): Systems you can try in the browser, starting with online booking for appointment businesses (salons, clinics, home services).
+
 ## Free resources
 - [Free WordPress plugins](https://weberslink.org/plugins/): Free, GPL-licensed WordPress plugins for forms, email, redirects, security and SEO.
 

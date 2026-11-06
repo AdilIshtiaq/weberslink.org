@@ -78,4 +78,24 @@ async function send(kind, s, b, slug) {
   } catch (e) { console.error(`booking mail ${kind} -> ${m.to} failed:`, e.message); return false; }
 }
 
-module.exports = { compose, send, icsText, setSender, base };
+/** Can e-mail actually be sent (SMTP set, or a test sender)? */
+function canSend() { return Boolean(sender) || Boolean(process.env.SMTP_USER && process.env.SMTP_PASS); }
+
+/** Account e-mails to a business owner: verify | reset. Never throws; returns true when sent. */
+async function sendAccount(kind, to, { name, link }) {
+  const T = {
+    verify: ["Confirm your email to finish your booking page", `Hi,\n\nThanks for creating a booking page for ${name}. Confirm your email to set it up:\n\n${link}\n\nThe link works for 48 hours. If this wasn't you, ignore this email and nothing happens.`],
+    reset: ["Reset your booking dashboard password", `Hi,\n\nSomeone asked to reset the password for ${name}'s booking dashboard. Choose a new password here:\n\n${link}\n\nThe link works for 1 hour. If this wasn't you, ignore this email; your password stays the same.`],
+  }[kind];
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#222;max-width:560px">${esc(T[1]).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color:#d9251c">$1</a>').replace(/\n/g, "<br>")}<p style="color:#888;font-size:12px">WebersLink online booking</p></div>`;
+  const msg = { from: { name: "WebersLink Booking", address: process.env.SMTP_USER || "no-reply@weberslink.org" }, to, subject: T[0], text: T[1] + "\n\nWebersLink online booking", html };
+  try {
+    if (sender) { await sender(msg, kind); return true; }
+    const t = smtp();
+    if (!t) return false;
+    await t.sendMail(msg);
+    return true;
+  } catch (e) { console.error(`booking account mail ${kind} -> ${to} failed:`, e.message); return false; }
+}
+
+module.exports = { compose, send, icsText, setSender, base, canSend, sendAccount };
