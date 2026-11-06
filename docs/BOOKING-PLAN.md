@@ -37,7 +37,7 @@ Until online payments are connected, upgrades are **requested in the dashboard**
 
 ## 3. Features: where we are and what comes next
 
-Legend: ✅ have · 🔨 phase 1 (building now) · 2️⃣ phase 2 · 3️⃣ phase 3. "T" = table stakes in the market.
+Legend: ✅ have · 🔨 phase 1 (built, Nov 2026) · 2️⃣ phase 2 · 3️⃣ phase 3. "T" = table stakes in the market.
 
 **Booking page & widget**
 - ✅ Hosted page, embed code, mobile flow, brand colour, customer self-reschedule/cancel (T)

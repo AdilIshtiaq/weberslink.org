@@ -11,6 +11,38 @@ It runs inside this website's Node app: no extra hosting, no database, no monthl
 | `/book/<name>/admin` | the business owner | Their dashboard (password login). |
 | `/book/new`, `/book/login`, `/book/forgot` | business owners | Sign up, sign in with email, reset password. |
 
+## Owner dashboard (phase 1 platform)
+
+Tabs:
+- **Calendar**: week strip and each person's day. Every booking shows the customer's answers and can be
+  edited or moved (date, time, person, service, details), marked done or no-show, or cancelled. The customer
+  is emailed when the time changes, unless the owner unticks it.
+- **Add booking**: phone and walk-in bookings. Only free times are offered, phone-only services are included,
+  and minimum notice doesn't apply.
+- **Clients**: everyone who booked, plus imported clients. Shows visits, upcoming, no-shows, spend, last visit
+  and tags. Each client has private notes, tags, a "block online booking" switch and their history. CSV import
+  (columns name, email, phone, notes, tags) and CSV export.
+- **Time off**: whole days or part of a day, for one person or the whole business. Clashing bookings are listed
+  (they aren't cancelled).
+- **Reports**: next 7 days, booked value, online share, after-hours bookings, no-show rate, cancellations; the
+  last 30 days by person, new versus returning clients, most booked services; CSV of all bookings.
+- **Settings**:
+  - services: category, gap after, online or phone-only
+  - team: own hours, daily break, days, services
+  - opening hours, gaps, notice, booking window, change cut-off, reminder timing
+  - booking questions: short or long answer, choose one, yes/no; required or optional
+  - password; delete the page
+- **Share**: booking link, embed code for their website, and a private calendar feed (subscribe in
+  Google/Outlook/Apple, with a reset).
+- **Plan & help**: usage meters, Free and Pro plans, and done-for-you setup or custom features. Each request is
+  emailed to `BOOKING_ADMIN_EMAIL` (or `SMTP_USER`) and listed on /admin/booking.html, where you switch plans.
+
+Plans, prices and limits are in `booking/plans.js`. Free: 1 team member, 100 online bookings a month,
+2 questions, "Powered by WebersLink". Pro: unlimited, no branding. The limits are enforced on the server.
+The browser runs the same scheduling engine as the server (`booking/core.js`, served as
+`/demos/booking/core.js`), so the demo behaves exactly like the real thing. The full roadmap is in
+`docs/BOOKING-PLAN.md`.
+
 ## Business owners sign up themselves
 
 1. **/book/new**: business name, type (sets example services and hours), time zone, currency, email, password.
@@ -82,6 +114,7 @@ Without SMTP everything still works; emails are skipped and logged.
 | `SMTP_USER`, `SMTP_PASS` | for emails | Mailbox that sends booking emails. |
 | `BOOKING_PUBLIC_URL` | no | Address used in email links (default `https://weberslink.org`). |
 | `BOOKING_DATA_DIR` | no | Where booking data lives (default: `booking/` inside the Outreach data folder). |
+| `BOOKING_ADMIN_EMAIL` | no | Where owners' upgrade / setup / custom requests are emailed (default `SMTP_USER`). |
 | `BOOKING_SIGNUP` | no | `off` closes self sign-up (existing owners keep working). |
 | `BOOKING_SECRET` | no | 32+ characters to sign owner logins (default: a random key saved in the data folder). |
 

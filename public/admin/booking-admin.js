@@ -25,7 +25,20 @@
     $("created").scrollIntoView({ behavior: "smooth" });
   }
 
+  var PLANS = { free: { name: "Free" }, pro: { name: "Pro" } };
+  var KIND = { upgrade: "Upgrade to Pro", setup: "Done-for-you setup", custom: "Custom features" };
+  function loadRequests() {
+    api("GET", "/api/booking-admin/requests").then(function (j) {
+      PLANS = j.plans || PLANS;
+      var open = j.requests.filter(function (r) { return r.status !== "done"; });
+      $("reqCount").textContent = open.length ? "· " + open.length + " open" : "";
+      $("reqList").innerHTML = j.requests.length ? "<table><tbody>" + j.requests.slice(0, 50).map(function (r) {
+        return '<tr' + (r.status === "done" ? ' class="off"' : "") + "><td>" + esc((r.createdAt || "").slice(0, 10)) + "</td><td><b>" + esc(r.name) + '</b><br><span class="hint">' + esc(r.ownerEmail) + (r.phone ? " · " + esc(r.phone) : "") + "</span></td><td><b>" + esc(KIND[r.kind] || r.kind) + "</b><br>" + esc(r.message || "") + '</td><td style="text-align:right"><a class="btn sm" href="mailto:' + esc(r.ownerEmail) + '?subject=' + encodeURIComponent("Your WebersLink booking: " + (KIND[r.kind] || r.kind)) + '">Email</a> <button type="button" class="btn sm ghost" data-reqdone="' + esc(r.id) + '" data-to="' + (r.status === "done" ? "open" : "done") + '">' + (r.status === "done" ? "Reopen" : "Mark done") + "</button></td></tr>";
+      }).join("") + "</tbody></table>" : '<p class="empty">No requests yet. Owners ask to upgrade, for done-for-you setup or for custom features from their dashboard (Plan &amp; help).</p>';
+    }).catch(function () {});
+  }
   function load() {
+    loadRequests();
     api("GET", "/api/booking-admin/list").then(function (j) {
       $("signin").hidden = true; $("app").hidden = false;
       $("mailNote").innerHTML = j.mailOn ? "Emails are <b>on</b>: customers get confirmations and reminders, owners get alerts." : "Emails are <b>off</b>: set SMTP_USER and SMTP_PASS on the server so customers get confirmations and reminders. Bookings work without them.";
@@ -33,7 +46,7 @@
         var url = base + "/book/" + b.slug;
         return '<div class="biz' + (b.disabled ? " off" : "") + '"><div><b>' + esc(b.name) + "</b>" + (b.disabled ? ' <span class="pill">switched off</span>' : "") + (!b.verified ? ' <span class="pill">email not confirmed</span>' : !b.setupDone ? ' <span class="pill">setting up</span>' : "") + (b.source === "signup" ? ' <span class="pill">signed up</span>' : "") + '<div class="meta"><a href="' + esc(url) + '" target="_blank" rel="noopener">/book/' + esc(b.slug) + "</a> · " + esc(b.ownerEmail) + "</div>" +
           '<div class="meta">' + b.upcoming + " upcoming · " + b.total + " bookings in total · since " + esc((b.createdAt || "").slice(0, 10)) + "</div></div>" +
-          '<div class="acts"><a class="btn sm" href="' + esc(url) + '/admin" target="_blank" rel="noopener">Dashboard ↗</a><button type="button" class="btn sm" data-reset="' + esc(b.slug) + '" data-name="' + esc(b.name) + '">New password</button>' +
+          '<div class="acts"><label class="hint" style="display:flex;gap:6px;align-items:center">Plan <select data-plan="' + esc(b.slug) + '">' + Object.keys(PLANS).map(function (k) { return '<option value="' + esc(k) + '"' + (k === (b.plan || "free") ? " selected" : "") + ">" + esc(PLANS[k].name) + "</option>"; }).join("") + '</select></label><a class="btn sm" href="' + esc(url) + '/admin" target="_blank" rel="noopener">Dashboard ↗</a><button type="button" class="btn sm" data-reset="' + esc(b.slug) + '" data-name="' + esc(b.name) + '">New password</button>' +
           '<button type="button" class="btn sm ' + (b.disabled ? "" : "danger") + '" data-toggle="' + esc(b.slug) + '" data-off="' + (b.disabled ? "0" : "1") + '">' + (b.disabled ? "Switch on" : "Switch off") + "</button></div></div>";
       }).join("") : '<p class="empty">No businesses yet. Add the first one on the right.</p>';
     }).catch(function (e) { if (e.status === 401) { $("signin").hidden = false; $("app").hidden = true; } else toast(e.message, true); });
@@ -51,6 +64,15 @@
       showSecret(body.name + " is ready", j.slug, j.password);
       $("createForm").reset(); slugTouched = false; $("slugPrev").textContent = ""; $("cTz").value = "America/New_York"; load();
     }).catch(function (err) { $("cErr").textContent = err.message; $("cErr").hidden = false; });
+  });
+  $("reqList").addEventListener("click", function (e) {
+    var d = e.target.closest("[data-reqdone]"); if (!d) return;
+    api("POST", "/api/booking-admin/request-status", { id: d.dataset.reqdone, status: d.dataset.to }).then(loadRequests).catch(function (err) { toast(err.message, true); });
+  });
+  $("list").addEventListener("change", function (e) {
+    var s = e.target.closest("select[data-plan]"); if (!s) return;
+    if (!confirm("Switch " + s.dataset.plan + " to the " + (PLANS[s.value] || {}).name + " plan? Do this after they've paid (or to downgrade).")) { load(); return; }
+    api("POST", "/api/booking-admin/set-plan", { slug: s.dataset.plan, plan: s.value }).then(function () { toast("Plan updated"); load(); }).catch(function (err) { toast(err.message, true); load(); });
   });
   $("list").addEventListener("click", function (e) {
     var r = e.target.closest("[data-reset]"), t = e.target.closest("[data-toggle]");

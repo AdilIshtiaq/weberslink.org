@@ -106,28 +106,8 @@ function findByCode(biz, code, email) {
   const c = String(code || "").trim().toUpperCase(), e = String(email || "").trim().toLowerCase();
   return biz.bookings.find((b) => b.code === c && b.email === e) || null;
 }
-const clientKey = (email, phone) => (email ? String(email).toLowerCase() : String(phone || "").replace(/\D/g, "").length >= 7 ? "tel:" + String(phone).replace(/\D/g, "") : "");
 const monthKey = (ms) => new Date(ms).toISOString().slice(0, 7);
 const onlineThisMonth = (biz) => biz.bookings.filter((b) => b.source === "online" && monthKey(Date.parse(b.createdAt)) === monthKey(Date.now())).length;
-/** Clients: everyone who booked (grouped by email, else phone) merged with the owner's own records (notes, tags, blocked, imports). */
-function clientList(biz) {
-  const s = biz.settings, now = Date.now(), map = new Map();
-  const price = (id) => (s.services.find((x) => x.id === id) || {}).price || 0;
-  for (const [key, r] of Object.entries(biz.clients || {})) map.set(key, { key, name: r.name || "", email: r.email || "", phone: r.phone || "", notes: r.notes || "", tags: r.tags || [], blocked: Boolean(r.blocked), visits: 0, upcoming: 0, noShows: 0, cancelled: 0, spent: 0, first: "", last: "", source: r.source || "added" });
-  for (const b of biz.bookings.slice().sort((a, c) => a.start.localeCompare(c.start))) {
-    const key = clientKey(b.email, b.phone);
-    if (!key) continue;
-    const c = map.get(key) || { key, name: "", email: "", phone: "", notes: "", tags: [], blocked: false, visits: 0, upcoming: 0, noShows: 0, cancelled: 0, spent: 0, first: "", last: "", source: "booking" };
-    c.name = b.name || c.name; c.email = b.email || c.email; c.phone = b.phone || c.phone;
-    const past = Date.parse(b.start) < now;
-    if (b.status === "cancelled") c.cancelled++;
-    else if (b.status === "no-show") c.noShows++;
-    else if (past) { c.visits++; c.spent += price(b.serviceId); c.last = b.start; c.first = c.first || b.start; }
-    else c.upcoming++;
-    map.set(key, c);
-  }
-  return [...map.values()].sort((a, b) => (b.last || "").localeCompare(a.last || "") || a.name.localeCompare(b.name));
-}
 const ownerBooking = (b) => ({ answers: b.answers || {}, id: b.id, code: b.code, serviceId: b.serviceId, staffId: b.staffId, start: b.start, end: b.end, status: b.status, name: b.name, email: b.email, phone: b.phone,
   address: b.address || "", notes: b.notes || "", source: b.source, createdAt: b.createdAt, rescheduled: Boolean(b.rescheduled), isNew: !b.seen, reminded: Boolean(b.remindedAt) });
 
@@ -139,7 +119,7 @@ function servePage(req, res, slug) {
   const admin = /\/admin\/?$/.test(req.url.split("?")[0]);
   res.writeHead(acc ? 200 : 404, {
     "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "same-origin",
-    "Content-Security-Policy": `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors ${admin ? "'none'" : "*"}`,
+    "Content-Security-Policy": `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors ${admin ? "'none'" : "*"}`,
     ...(admin ? { "X-Frame-Options": "DENY" } : {}),
   });
   res.end(req.method === "HEAD" ? undefined : page);
@@ -169,7 +149,7 @@ async function businessApi(req, res, slug, rest) {
     try {
       const who = core.cleanCustomer(body, s);
       const answers = core.cleanAnswers(s, body.answers);
-      const rec = biz.clients[clientKey(who.email)] || biz.clients[clientKey("", who.phone)];
+      const rec = biz.clients[core.clientKey(who.email)] || biz.clients[core.clientKey("", who.phone)];
       if (rec && rec.blocked) throw new Error(`Online booking isn't available for you.${s.phone ? " Please call " + s.phone + "." : " Please contact us."}`);
       if (plan.bookingsPerMonth && onlineThisMonth(biz) >= plan.bookingsPerMonth) throw new Error(`Online booking is full for this month.${s.phone ? " Please call " + s.phone + "." : " Please contact us."}`);
       const upcoming = biz.bookings.filter((b) => b.email === who.email && b.status === "booked" && Date.parse(b.start) > Date.now()).length;
@@ -269,6 +249,11 @@ async function businessApi(req, res, slug, rest) {
       return send(res, 200, { ok: true, booking: ownerBooking(b) });
     } catch (e) { return fail(res, 400, e.message); }
   }
+  if (what === "slots" && m === "GET") { // owner view: includes phone-only services, ignores minimum notice
+    const q = new URL(req.url, "http://x").searchParams;
+    try { return send(res, 200, { ok: true, days: core.availability(s, occ(), { serviceId: q.get("service"), staffId: q.get("staff") || "any", days: Number(q.get("days")) || 28, owner: true }) }); }
+    catch (e) { return fail(res, 400, e.message); }
+  }
   if (what === "update" && m === "POST") { // the owner moves or edits a booking
     const body = await readJson(req);
     const b = biz.bookings.find((x) => x.id === body.id);
@@ -299,10 +284,10 @@ async function businessApi(req, res, slug, rest) {
     biz.blocks = (biz.blocks || []).filter((b) => b.id !== body.id); store.saveBiz(slug, biz);
     return send(res, 200, { ok: true });
   }
-  if (what === "clients" && m === "GET") return send(res, 200, { ok: true, clients: clientList(biz) });
+  if (what === "clients" && m === "GET") return send(res, 200, { ok: true, clients: core.clientList(biz) });
   if (what === "client" && m === "POST") {
     const body = await readJson(req);
-    const key = body.key || clientKey(core.email(body.email), body.phone);
+    const key = body.key || core.clientKey(core.email(body.email), body.phone);
     if (!key) return fail(res, 400, "Enter an email or a phone number.");
     const r = biz.clients[key] || {};
     biz.clients[key] = { ...r, name: core.str(body.name ?? r.name, 80), email: core.email(body.email ?? r.email) || r.email || "", phone: core.str(body.phone ?? r.phone, 30),
@@ -317,7 +302,7 @@ async function businessApi(req, res, slug, rest) {
     const rows = Array.isArray(body.rows) ? body.rows.slice(0, 5000) : [];
     let added = 0, updated = 0, skipped = 0;
     for (const row of rows) {
-      const em = core.email(row.email), key = clientKey(em, row.phone);
+      const em = core.email(row.email), key = core.clientKey(em, row.phone);
       if (!key || !core.str(row.name, 80)) { skipped++; continue; }
       const r = biz.clients[key];
       biz.clients[key] = { ...(r || {}), name: core.str(row.name, 80), email: em || (r && r.email) || "", phone: core.str(row.phone, 30) || (r && r.phone) || "",
@@ -332,7 +317,7 @@ async function businessApi(req, res, slug, rest) {
   if (what === "clients.csv" && m === "GET") {
     const q = (v) => `"${String(v == null ? "" : v).replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`;
     const rows = [["Name", "Email", "Phone", "Visits", "Upcoming", "No-shows", "Cancelled", "Spent", "Last visit", "Tags", "Notes", "Blocked"]]
-      .concat(clientList(biz).map((c) => [c.name, c.email, c.phone, c.visits, c.upcoming, c.noShows, c.cancelled, c.spent, (c.last || "").slice(0, 10), c.tags.join(", "), c.notes, c.blocked ? "yes" : ""]));
+      .concat(core.clientList(biz).map((c) => [c.name, c.email, c.phone, c.visits, c.upcoming, c.noShows, c.cancelled, c.spent, (c.last || "").slice(0, 10), c.tags.join(", "), c.notes, c.blocked ? "yes" : ""]));
     res.writeHead(200, { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="clients-${slug}.csv"`, "Cache-Control": "no-store" });
     return res.end("\ufeff" + rows.map((r) => r.map(q).join(",")).join("\r\n"));
   }
@@ -554,15 +539,28 @@ function cleanupUnverified(now = Date.now()) {
   if (old.length) store.saveAccounts(store.accounts().filter((a) => !old.some((o) => o.slug === a.slug)));
   return old.length;
 }
+/** The scheduling engine (core.js) for the browser, so the demo and the dashboard use exactly the server's rules. */
+let coreJs = null;
+function serveCore(req, res) {
+  if (!coreJs) {
+    const src = fs.readFileSync(path.join(__dirname, "core.js"), "utf8");
+    coreJs = "/* WebersLink booking engine (same code as the server) */\n(function () {\n\"use strict\";\nvar module = { exports: {} }, exports = module.exports;\n" +
+      "var require = function (n) { if (n !== \"crypto\") throw new Error(n); return { randomBytes: function (k) { var a = new Uint8Array(k); window.crypto.getRandomValues(a); a.toString = function () { return Array.prototype.map.call(a, function (x) { return (\"0\" + x.toString(16)).slice(-2); }).join(\"\"); }; return a; } }; };\n" +
+      src.replace(/^"use strict";?/m, "") + "\nwindow.BookingCore = module.exports;\n})();\n";
+  }
+  res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "public, max-age=300", "X-Content-Type-Options": "nosniff" });
+  res.end(req.method === "HEAD" ? undefined : coreJs);
+}
 function serveAccountPage(req, res) {
   res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer",
-    "X-Frame-Options": "DENY", "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" });
+    "X-Frame-Options": "DENY", "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" });
   res.end(req.method === "HEAD" ? undefined : fs.readFileSync(ACCOUNT_PAGE, "utf8"));
 }
 
 // ------------------------------------------------------------------ entry point + reminders
 function handle(req, res) {
   const p = String(req.url || "").split("?")[0];
+  if (p === "/demos/booking/core.js" && (req.method === "GET" || req.method === "HEAD")) { serveCore(req, res); return true; }
   const ap = /^\/book\/([a-z]+)\/?$/.exec(p);
   if (ap && ACCOUNT_PAGES.includes(ap[1]) && (req.method === "GET" || req.method === "HEAD")) { serveAccountPage(req, res); return true; }
   const feed = /^\/api\/booking-feed\/([a-z0-9-]{3,40})\/([0-9a-f]{32})\.ics$/.exec(p);

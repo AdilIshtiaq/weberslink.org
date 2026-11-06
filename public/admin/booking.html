@@ -6,7 +6,7 @@
 <title>Booking clients | Weberslink admin</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="/favicon-32.png" sizes="32x32">
-<link rel="stylesheet" href="/demos/booking/booking.css?v=6">
+<link rel="stylesheet" href="/demos/booking/booking.css?v=8">
 <style>
   .biz{display:grid;grid-template-columns:1fr auto;gap:6px 16px;padding:14px 0;border-top:1px solid var(--line)}
   .biz:first-child{border-top:0}
@@ -24,6 +24,7 @@
   <div id="app" hidden>
     <p class="hint" id="mailNote" style="margin:0 0 14px"></p>
     <div class="panel" id="created" hidden></div>
+    <div class="panel" id="reqBox" style="margin-bottom:16px"><h2 style="margin-bottom:6px">Requests from owners <small class="hint" id="reqCount"></small></h2><div id="reqList"><p class="hint">Loading…</p></div></div>
     <div class="grid2" style="align-items:start">
       <div class="panel"><h2 style="margin-bottom:6px">Businesses</h2><div id="list"></div></div>
       <div class="panel"><h2>Add a business</h2><p class="hint">They get a booking page and their own dashboard. You'll see their password once, to send them.</p>
@@ -41,6 +42,6 @@
     </div>
   </div>
 </main>
-<script src="/admin/booking-admin.js?v=1"></script>
+<script src="/admin/booking-admin.js?v=2"></script>
 </body>
 </html>

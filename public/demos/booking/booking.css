@@ -104,7 +104,7 @@ form.details{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;margin-top
 .field{display:flex;flex-direction:column;gap:5px}
 .field.full{grid-column:1/-1}
 label{font-size:13px;font-weight:600}
-input[type=text],input[type=email],input[type=tel],input[type=password],input[type=number],input[type=time],input[type=date],select,textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--panel);outline:none}
+input[type=text],input[type=email],input[type=tel],input[type=password],input[type=search],input[type=number],input[type=time],input[type=date],select,textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--panel);outline:none}
 input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 textarea{min-height:80px;resize:vertical}
 .check{display:flex;gap:8px;align-items:flex-start;font-weight:400;font-size:14px}
@@ -165,3 +165,38 @@ td input{padding:6px 8px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1d1c1a;color:#fff;padding:10px 18px;border-radius:10px;font-size:14px;box-shadow:var(--shadow);z-index:20;max-width:calc(100% - 32px)}
 footer.foot{max-width:1080px;margin:0 auto;padding:0 16px 40px;color:var(--mute);font-size:13px;text-align:center}
 [hidden]{display:none!important}
+
+/* ---------- WebersLink platform look (owner dashboard, setup, sign-up). The customer page keeps the business's own brand. ---------- */
+body.owner{--wl-red:#d9251c;--wl-red-hi:#ff3b2e;--accent:var(--wl-red);--accent-soft:rgba(217,37,28,.12)}
+body.owner header.top{background:#090807;border-bottom-color:rgba(255,255,255,.09);color:#fff}
+body.owner header.top .brand span{color:#979592}
+body.owner header.top .switch{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12)}
+body.owner header.top .switch button{color:#c9c6c0}
+body.owner header.top .switch button[aria-pressed="true"]{background:#fff;color:#090807}
+body.owner h1,body.owner .kpi b,body.owner .price,body.owner .code{font-family:"Archivo","Inter",system-ui,sans-serif;font-stretch:125%;font-weight:800;letter-spacing:-.03em}
+body.owner h1{font-size:clamp(22px,3vw,30px)}
+body.owner h2{font-family:"Archivo","Inter",system-ui,sans-serif;font-stretch:112%;font-weight:700;letter-spacing:-.02em}
+body.owner .tabs button,body.owner .kick,body.owner .kpi small,body.owner th,body.owner .steps li{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase}
+body.owner .tabs button[aria-selected="true"]{border-bottom-color:var(--wl-red);color:var(--text)}
+body.owner .btn{border-radius:999px}
+body.owner .btn.primary{background:var(--wl-red);border-color:var(--wl-red)}
+body.owner .btn.primary:hover{background:var(--wl-red-hi);filter:none}
+body.owner .kpi{border-top:2px solid var(--wl-red)}
+.kick{color:var(--mute);display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.kick::before{content:"";width:16px;height:1px;background:#d9251c}
+.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:16px}
+.plan{display:flex;flex-direction:column;gap:6px}
+.plan.cur{border-color:#d9251c;box-shadow:0 0 0 3px rgba(217,37,28,.12)}
+.plan .price{font-size:22px;margin:2px 0}
+.plan .perks{list-style:none;padding:0;margin:6px 0 12px;font-size:14px;flex:1}
+.plan .perks li{padding-left:22px;position:relative;margin:4px 0}
+.plan .perks li::before{content:"✓";position:absolute;left:0;color:#d9251c;font-weight:700}
+.plan .btn{align-self:flex-start}
+.meter{height:6px;border-radius:3px;background:var(--panel-2);margin-top:8px;overflow:hidden}
+.meter i{display:block;height:100%;background:#d9251c}
+tr.click{cursor:pointer}
+tr.click:hover td,tr.click:focus td{background:var(--panel-2)}
+h2.cat{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);margin:18px 0 -4px;font-weight:600}
+.edit-bk{background:var(--panel-2);border-radius:10px;padding:12px}
+.to-time[hidden],#toToWrap[hidden]{display:none!important}
+.details .full{grid-column:1/-1}

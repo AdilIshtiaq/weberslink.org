@@ -241,4 +241,24 @@ function cleanBlock(s, b) {
   return { id: newId("t"), staffId, start: new Date(start).toISOString(), end: new Date(end).toISOString(), note: str(b.note, 120) };
 }
 
-module.exports = { busy, cleanBlock, cleanAnswers, personHours, gapAfter, STATUSES, partsIn, validTz, offsetMin, zonedToUtc, keyOf, weekday, addDaysKey, toMin, sanitizeSettings, publicSettings, availability, freeStarts, resolveSlot, pickPerson, cleanCustomer, newCode, customerView, clashes, email, str };
+const clientKey = (email, phone) => (email ? String(email).toLowerCase() : String(phone || "").replace(/\D/g, "").length >= 7 ? "tel:" + String(phone).replace(/\D/g, "") : "");
+/** Clients: everyone who booked (grouped by email, else phone) merged with the owner's own records (notes, tags, blocked, imports). */
+function clientList(biz, now = Date.now()) {
+  const s = biz.settings || biz, map = new Map();
+  const price = (id) => (s.services.find((x) => x.id === id) || {}).price || 0;
+  for (const [key, r] of Object.entries(biz.clients || {})) map.set(key, { key, name: r.name || "", email: r.email || "", phone: r.phone || "", notes: r.notes || "", tags: r.tags || [], blocked: Boolean(r.blocked), visits: 0, upcoming: 0, noShows: 0, cancelled: 0, spent: 0, first: "", last: "", source: r.source || "added" });
+  for (const b of biz.bookings.slice().sort((a, c) => a.start.localeCompare(c.start))) {
+    const key = clientKey(b.email, b.phone);
+    if (!key) continue;
+    const c = map.get(key) || { key, name: "", email: "", phone: "", notes: "", tags: [], blocked: false, visits: 0, upcoming: 0, noShows: 0, cancelled: 0, spent: 0, first: "", last: "", source: "booking" };
+    c.name = b.name || c.name; c.email = b.email || c.email; c.phone = b.phone || c.phone;
+    const past = Date.parse(b.start) < now;
+    if (b.status === "cancelled") c.cancelled++;
+    else if (b.status === "no-show") c.noShows++;
+    else if (past) { c.visits++; c.spent += price(b.serviceId); c.last = b.start; c.first = c.first || b.start; }
+    else c.upcoming++;
+    map.set(key, c);
+  }
+  return [...map.values()].sort((a, b) => (b.last || "").localeCompare(a.last || "") || a.name.localeCompare(b.name));
+}
+module.exports = { clientKey, clientList, busy, cleanBlock, cleanAnswers, personHours, gapAfter, STATUSES, partsIn, validTz, offsetMin, zonedToUtc, keyOf, weekday, addDaysKey, toMin, sanitizeSettings, publicSettings, availability, freeStarts, resolveSlot, pickPerson, cleanCustomer, newCode, customerView, clashes, email, str };
