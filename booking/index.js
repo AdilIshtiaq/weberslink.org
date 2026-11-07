@@ -20,10 +20,12 @@ const store = require("./store");
 const mail = require("./mail");
 const presets = require("./presets");
 const plans = require("./plans");
+const stripe = require("./stripe");
+const HOLD_MS = 35 * 60 * 1000; // a booking waiting for its deposit keeps the time this long (Stripe Checkout expires after 31 min)
 
 const PAGE = path.join(__dirname, "..", "public", "demos", "booking", "index.html");
 const ACCOUNT_PAGE = path.join(__dirname, "..", "public", "demos", "booking", "account.html");
-const ACCOUNT_PAGES = ["new", "login", "forgot", "reset", "verify"]; // /book/<these> are sign-up and sign-in pages
+const ACCOUNT_PAGES = ["new", "login", "forgot", "reset", "verify", "invite"]; // /book/<these> are sign-up and sign-in pages
 const RESERVED = ["admin", "api", "demo", "demos", "start", "signup", "help", "www", ...ACCOUNT_PAGES];
 const UNVERIFIED_DAYS = 7;
 const SESSION_MS = 12 * 3600 * 1000;
@@ -74,16 +76,24 @@ function checkPassword(acc, pw) {
 function newPassword() { const a = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789", b = crypto.randomBytes(14); let s = ""; for (const x of b) s += a[x % a.length]; return s; }
 const sign = (v) => crypto.createHmac("sha256", store.key()).update(v).digest("hex");
 const cookieName = (slug) => "wlb_" + slug.replace(/-/g, "_");
-function makeSession(acc) { const body = `${acc.slug}.${Date.now() + SESSION_MS}.${acc.pwv || 1}`; return `${body}.${sign(body)}`; }
+/** Session = slug.expiry.passwordVersion.who.signature; who = "o" (owner) or a staff login's id. */
+function makeSession(acc, user) { const body = `${acc.slug}.${Date.now() + SESSION_MS}.${user ? user.pwv || 1 : acc.pwv || 1}.${user ? user.id : "o"}`; return `${body}.${sign(body)}`; }
+/** Who is signed in to this business: { acc, user, role: owner | manager | staff } or null. */
 function ownerOf(req, slug) {
   const acc = store.account(slug);
   if (!acc || acc.disabled) return null;
   const parts = cookieOf(req, cookieName(slug)).split(".");
-  if (parts.length !== 4) return null;
-  const [s, exp, pwv, sig] = parts, want = sign(`${s}.${exp}.${pwv}`);
-  if (s !== slug || Number(exp) < Date.now() || Number(pwv) !== (acc.pwv || 1) || sig.length !== want.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(want))) return null;
-  return acc;
+  if (parts.length !== 5) return null;
+  const [s, exp, pwv, who, sig] = parts, want = sign(`${s}.${exp}.${pwv}.${who}`);
+  if (s !== slug || Number(exp) < Date.now() || sig.length !== want.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(want))) return null;
+  if (who === "o") return Number(pwv) === (acc.pwv || 1) ? { acc, user: null, role: "owner" } : null;
+  const user = (acc.users || []).find((u) => u.id === who && u.hash);
+  return user && Number(pwv) === (user.pwv || 1) ? { acc, user, role: user.role } : null;
 }
+const publicUser = (u) => ({ id: u.id, email: u.email, name: u.name, role: u.role, staffId: u.staffId || "", status: u.hash ? "active" : "invited", invitedAt: u.invitedAt || "", lastLogin: u.lastLogin || "" });
+// What each role may do in the dashboard (the owner may do everything).
+const OWNER_ONLY = ["delete", "stripe/connect", "stripe/dashboard", "team/invite", "team/update", "team/remove", "team/resend"];
+const STAFF_OK = ["data", "seen", "status", "update", "book", "slots", "blocks/add", "blocks/remove", "clients", "client", "password"];
 const sessionCookie = (req, slug, value, maxAge) => `${cookieName(slug)}=${encodeURIComponent(value)}; Path=/api/booking/${slug}; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${isHttps(req) ? "; Secure" : ""}`;
 
 // ------------------------------------------------------------------ business helpers
@@ -97,6 +107,35 @@ function getBiz(slug) {
 function notify(kind, biz, b, slug) {
   mail.send(kind, biz.settings, b, slug).then((ok) => { if (!ok) return; const fresh = store.loadBiz(slug); const x = fresh && fresh.bookings.find((y) => y.id === b.id); if (x) { (x.mails = x.mails || []).push(kind); store.saveBiz(slug, fresh); } });
 }
+/** Releases bookings whose deposit was never paid. Returns true when something changed. */
+function expireHolds(biz, now = Date.now()) {
+  let changed = false;
+  for (const b of biz.bookings) if (b.status === "pending" && Date.parse(b.holdUntil) < now) { b.status = "expired"; if (b.payment) b.payment.status = "unpaid"; changed = true; }
+  return changed;
+}
+/** A deposit was paid (from the customer's return or Stripe's webhook). Idempotent. */
+async function markPaid(slug, bookingId, session) {
+  const biz = store.loadBiz(slug);
+  const b = biz && biz.bookings.find((x) => x.id === bookingId);
+  if (!b || !b.payment || b.payment.status === "paid" || b.payment.status === "refunded") return b;
+  if (session.payment_status !== "paid" || (session.metadata && session.metadata.booking !== b.id)) return b;
+  b.payment = { ...b.payment, status: "paid", paymentIntent: session.payment_intent, paidAt: new Date().toISOString() };
+  if (b.status === "pending") b.status = "booked";
+  else if (b.status === "expired") { // paid after the hold ran out: keep it if the time is still free, else refund
+    try { Object.assign(b, core.resolveSlot(biz.settings, core.busy(biz.bookings, biz.blocks, biz.settings.staff), { serviceId: b.serviceId, staffId: b.staffId, start: b.start }, { owner: true, ignoreId: b.id }), { status: "booked" }); }
+    catch (e) { await refundBooking(biz, b, "time no longer free"); }
+  }
+  b.seen = false;
+  store.saveBiz(slug, biz);
+  if (b.status === "booked") { notify("confirm", { settings: biz.settings }, b, slug); notify("owner-new", { settings: biz.settings }, b, slug); }
+  return b;
+}
+async function refundBooking(biz, b, why) {
+  if (!b.payment || b.payment.status !== "paid" || !b.payment.paymentIntent || !biz.stripe) return false;
+  try { await stripe.refund(biz.stripe.account, b.payment.paymentIntent); b.payment.status = "refunded"; b.payment.refundedAt = new Date().toISOString(); b.payment.refundNote = why || ""; return true; }
+  catch (e) { b.payment.refundError = String(e.message).slice(0, 200); console.error("booking refund failed:", e.message); return false; }
+}
+const paymentsReady = (biz) => stripe.enabled() && biz.stripe && biz.stripe.chargesEnabled;
 function uniqueCode(biz) {
   let c;
   do c = core.newCode(biz.settings); while (biz.bookings.some((b) => b.code === c));
@@ -108,7 +147,7 @@ function findByCode(biz, code, email) {
 }
 const monthKey = (ms) => new Date(ms).toISOString().slice(0, 7);
 const onlineThisMonth = (biz) => biz.bookings.filter((b) => b.source === "online" && monthKey(Date.parse(b.createdAt)) === monthKey(Date.now())).length;
-const ownerBooking = (b) => ({ answers: b.answers || {}, id: b.id, code: b.code, serviceId: b.serviceId, staffId: b.staffId, start: b.start, end: b.end, status: b.status, name: b.name, email: b.email, phone: b.phone,
+const ownerBooking = (b) => ({ payment: b.payment ? { amount: b.payment.amount, currency: b.payment.currency, status: b.payment.status, paidAt: b.payment.paidAt || "", refundError: b.payment.refundError || "" } : null, holdUntil: b.holdUntil || "", answers: b.answers || {}, id: b.id, code: b.code, serviceId: b.serviceId, staffId: b.staffId, start: b.start, end: b.end, status: b.status, name: b.name, email: b.email, phone: b.phone,
   address: b.address || "", notes: b.notes || "", source: b.source, createdAt: b.createdAt, rescheduled: Boolean(b.rescheduled), isNew: !b.seen, reminded: Boolean(b.remindedAt) });
 
 // ------------------------------------------------------------------ pages
@@ -130,10 +169,11 @@ async function businessApi(req, res, slug, rest) {
   const m = req.method, ip = clientIp(req);
   const biz = getBiz(slug);
   if (!biz) return fail(res, 404, "This booking page doesn't exist.");
+  if (expireHolds(biz)) store.saveBiz(slug, biz);
   const s = biz.settings, plan = plans.planOf(biz.acc);
   const occ = () => core.busy(biz.bookings, biz.blocks, s.staff); // bookings + time off
 
-  if (rest === "config" && m === "GET") return send(res, 200, { ok: true, settings: { ...core.publicSettings(s), poweredBy: plan.poweredBy } });
+  if (rest === "config" && m === "GET") return send(res, 200, { ok: true, settings: { ...core.publicSettings(s), poweredBy: plan.poweredBy, payments: Boolean(paymentsReady(biz)), testPayments: stripe.testMode() } });
   const notYet = s.setupDone === false && ["slots", "book", "lookup", "cancel", "reschedule"].includes(rest);
   if (notYet) return fail(res, 404, "This business isn't taking online bookings yet.");
   if (rest === "slots" && m === "GET") {
@@ -156,10 +196,39 @@ async function businessApi(req, res, slug, rest) {
       if (upcoming >= 5) throw new Error("You already have 5 upcoming bookings. Please call us to book more.");
       const slot = core.resolveSlot(s, occ(), body);
       const b = { id: crypto.randomBytes(8).toString("hex"), code: uniqueCode(biz), serviceId: body.serviceId, ...slot, ...who, answers, status: "booked", source: "online", createdAt: new Date().toISOString() };
+      const svc = s.services.find((x) => x.id === b.serviceId), deposit = core.depositFor(svc);
+      if (deposit > 0 && paymentsReady(biz)) { // hold the time and send the customer to pay
+        Object.assign(b, { status: "pending", holdUntil: new Date(Date.now() + HOLD_MS).toISOString(), payment: { amount: deposit, currency: s.currencyCode, status: "pending" } });
+        biz.bookings.push(b); store.saveBiz(slug, biz);
+        let session;
+        const page = `${mail.base()}/book/${slug}`;
+        try {
+          session = await stripe.createCheckout({ account: biz.stripe.account, amount: deposit, currency: s.currencyCode, email: b.email,
+            name: `${deposit === svc.price ? "Payment" : "Deposit"}: ${svc.name}`, description: `${s.name}, ${new Intl.DateTimeFormat("en-US", { timeZone: s.tz, dateStyle: "medium", timeStyle: "short" }).format(new Date(b.start))}. Booking ${b.code}.`,
+            successUrl: `${page}?paid=${encodeURIComponent(b.code)}&session_id={CHECKOUT_SESSION_ID}`, cancelUrl: `${page}?unpaid=${encodeURIComponent(b.code)}`, metadata: { booking: b.id, slug, code: b.code } });
+        } catch (e) {
+          const again = store.loadBiz(slug); const x = again.bookings.find((y) => y.id === b.id); if (x) { x.status = "expired"; store.saveBiz(slug, again); }
+          return fail(res, 502, `Online payment isn't available right now (${String(e.message).slice(0, 80)}). Please try again${s.phone ? " or call " + s.phone : ""}.`);
+        }
+        const again = store.loadBiz(slug); const x = again.bookings.find((y) => y.id === b.id);
+        if (x) { x.payment.sessionId = session.id; store.saveBiz(slug, again); }
+        return send(res, 200, { ok: true, booking: core.customerView(x || b), payUrl: session.url });
+      }
       biz.bookings.push(b); store.saveBiz(slug, biz);
       notify("confirm", biz, b, slug); notify("owner-new", biz, b, slug);
       return send(res, 200, { ok: true, booking: core.customerView(b) });
     } catch (e) { return fail(res, 400, e.message); }
+  }
+  if (rest === "payment" && m === "POST") { // the customer is back from Stripe Checkout
+    if (!allow("pay:" + ip, 30, 600e3)) return fail(res, 429, "Too many attempts. Please wait a moment.");
+    const body = await readJson(req);
+    const b = biz.bookings.find((x) => x.code === String(body.code || "").toUpperCase());
+    if (!b || !b.payment) return fail(res, 404, "We couldn't find that booking.");
+    if (b.payment.status === "pending" && body.sessionId === b.payment.sessionId && biz.stripe) {
+      try { await markPaid(slug, b.id, await stripe.getCheckout(biz.stripe.account, b.payment.sessionId)); } catch (e) { return fail(res, 502, "We couldn't check the payment with Stripe yet. Refresh in a moment."); }
+    }
+    const fresh = store.loadBiz(slug).bookings.find((x) => x.id === b.id);
+    return send(res, 200, { ok: true, booking: core.customerView(fresh), paid: fresh.payment.status === "paid" });
   }
   if (["lookup", "cancel", "reschedule"].includes(rest) && m === "POST") {
     if (!allow("lookup:" + ip, 30, 600e3)) return fail(res, 429, "Too many attempts. Please wait 10 minutes.");
@@ -171,7 +240,9 @@ async function businessApi(req, res, slug, rest) {
     if (rest === "lookup") return send(res, 200, { ok: true, booking: core.customerView(b), changeable, lockedMsg: changeable ? "" : lockedMsg });
     if (!changeable) return fail(res, 400, b.status !== "booked" ? "This booking can't be changed any more." : lockedMsg);
     if (rest === "cancel") {
-      b.status = "cancelled"; b.cancelledAt = new Date().toISOString(); b.cancelledBy = "customer"; b.seen = false; store.saveBiz(slug, biz);
+      b.status = "cancelled"; b.cancelledAt = new Date().toISOString(); b.cancelledBy = "customer"; b.seen = false;
+      await refundBooking(biz, b, "cancelled by the customer in time");
+      store.saveBiz(slug, biz);
       notify("cancel", biz, b, slug); notify("owner-cancel", biz, b, slug);
       return send(res, 200, { ok: true, booking: core.customerView(b) });
     }
@@ -192,30 +263,41 @@ async function businessApi(req, res, slug, rest) {
   }
   if (rest === "logout" && m === "POST") return send(res, 200, { ok: true }, { "Set-Cookie": sessionCookie(req, slug, "", 0) });
   if (!rest.startsWith("admin/")) return fail(res, 404, "Not found");
-  if (!ownerOf(req, slug)) return fail(res, 401, "Please sign in.");
-  const what = rest.slice(6);
+  const me = ownerOf(req, slug);
+  if (!me) return fail(res, 401, "Please sign in.");
+  const what = rest.slice(6), role = me.role, staffOnly = role === "staff" ? me.user.staffId : null;
+  if (OWNER_ONLY.includes(what) && role !== "owner") return fail(res, 403, "Only the owner can do that.");
+  if (role === "staff" && !STAFF_OK.includes(what)) return fail(res, 403, "Your login can't do that. Ask the owner or a manager.");
+  const mine = (b) => !staffOnly || b.staffId === staffOnly; // staff only see and change their own appointments
+  const myClientKeys = () => new Set(biz.bookings.filter(mine).map((b) => core.clientKey(b.email, b.phone)).filter(Boolean));
 
   if (what === "data" && m === "GET") {
     const from = Date.now() - 90 * 864e5;
     if (!biz.feedToken) { biz.feedToken = crypto.randomBytes(16).toString("hex"); store.saveBiz(slug, biz); }
     return send(res, 200, { ok: true, settings: { ...s, poweredBy: plan.poweredBy }, slug, ownerEmail: biz.acc.ownerEmail, mailOn: mail.canSend(),
-      bookings: biz.bookings.filter((b) => Date.parse(b.end) > from).map(ownerBooking), blocks: biz.blocks,
+      me: { role, name: me.user ? me.user.name : biz.acc.ownerEmail, email: me.user ? me.user.email : biz.acc.ownerEmail, staffId: staffOnly || (me.user && me.user.staffId) || "" },
+      team: role === "owner" ? (biz.acc.users || []).map(publicUser) : undefined,
+      bookings: biz.bookings.filter((b) => Date.parse(b.end) > from && mine(b)).map(ownerBooking), blocks: biz.blocks.filter((b) => !staffOnly || b.staffId === "all" || b.staffId === staffOnly),
       plan: { key: biz.acc.plan || "free", ...plan, usage: { bookingsThisMonth: onlineThisMonth(biz), staff: s.staff.length } },
       plans: { free: plans.free, pro: plans.pro }, services: plans.SERVICES,
       requests: store.requests().filter((r) => r.slug === slug).slice(-10),
-      feedUrl: `${mail.base()}/api/booking-feed/${slug}/${biz.feedToken}.ics` });
+      feedUrl: `${mail.base()}/api/booking-feed/${slug}/${biz.feedToken}.ics`,
+      payments: { available: stripe.enabled(), test: stripe.testMode(), connected: Boolean(biz.stripe && biz.stripe.account), chargesEnabled: Boolean(biz.stripe && biz.stripe.chargesEnabled), feePercent: stripe.feePercent() } });
   }
   if (what === "seen" && m === "POST") { biz.bookings.forEach((b) => { b.seen = true; }); store.saveBiz(slug, biz); return send(res, 200, { ok: true }); }
   if (what === "status" && m === "POST") {
     const body = await readJson(req);
     const b = biz.bookings.find((x) => x.id === body.id);
-    if (!b || !core.STATUSES.includes(body.status)) return fail(res, 400, "Unknown booking or status.");
+    if (!b || !core.STATUSES.includes(body.status) || !mine(b)) return fail(res, 400, "Unknown booking or status.");
     if (b.status === "cancelled" && body.status !== "cancelled") {
       try { core.resolveSlot(s, occ(), { serviceId: b.serviceId, staffId: b.staffId, start: b.start }, { owner: true, ignoreId: b.id }); }
       catch (e) { return fail(res, 400, "That time has been booked by someone else since, so it can't be restored."); }
     }
+    if (b.status === "pending" || b.status === "expired") return fail(res, 400, "This booking is waiting for (or never got) its deposit, so it can't be changed.");
     const wasLive = b.status === "booked";
-    b.status = body.status; b.seen = true; store.saveBiz(slug, biz);
+    b.status = body.status; b.seen = true;
+    if (body.status === "cancelled" && body.refund !== false) await refundBooking(biz, b, "cancelled by the business");
+    store.saveBiz(slug, biz);
     if (body.status === "cancelled" && wasLive && body.notify !== false && Date.parse(b.start) > Date.now()) notify("cancel", biz, b, slug);
     return send(res, 200, { ok: true });
   }
@@ -238,6 +320,7 @@ async function businessApi(req, res, slug, rest) {
   }
   if (what === "book" && m === "POST") { // phone / walk-in booking by the owner
     const body = await readJson(req);
+    if (staffOnly && body.staffId !== staffOnly) return fail(res, 403, "You can only add bookings to your own calendar.");
     try {
       const who = core.cleanCustomer({ ...body, email: body.email || `no-email+${Date.now()}@invalid.local` }, s);
       if (!body.email) who.email = "";
@@ -249,15 +332,44 @@ async function businessApi(req, res, slug, rest) {
       return send(res, 200, { ok: true, booking: ownerBooking(b) });
     } catch (e) { return fail(res, 400, e.message); }
   }
+  if (what === "stripe/connect" && m === "POST") {
+    if (!stripe.enabled()) return fail(res, 503, "Online payments aren't switched on for this website yet. Ask WebersLink.");
+    try {
+      if (!biz.stripe || !biz.stripe.account) { const a = await stripe.createAccount({ email: biz.acc.ownerEmail, name: s.name, url: `${mail.base()}/book/${slug}` }); biz.stripe = { account: a.id, chargesEnabled: false, createdAt: new Date().toISOString() }; store.saveBiz(slug, biz); }
+      const back = `${mail.base()}/book/${slug}/admin?stripe=back`;
+      const link = await stripe.accountLink(biz.stripe.account, back.replace("back", "retry"), back);
+      return send(res, 200, { ok: true, url: link.url });
+    } catch (e) { return fail(res, 502, String(e.message).slice(0, 200)); }
+  }
+  if (what === "stripe/status" && m === "POST") {
+    if (!biz.stripe || !stripe.enabled()) return send(res, 200, { ok: true, payments: { available: stripe.enabled(), connected: false } });
+    try { const a = await stripe.getAccount(biz.stripe.account); Object.assign(biz.stripe, { chargesEnabled: Boolean(a.charges_enabled), detailsSubmitted: Boolean(a.details_submitted), checkedAt: new Date().toISOString() }); store.saveBiz(slug, biz); }
+    catch (e) { return fail(res, 502, String(e.message).slice(0, 200)); }
+    return send(res, 200, { ok: true, payments: { available: true, connected: true, chargesEnabled: biz.stripe.chargesEnabled, detailsSubmitted: biz.stripe.detailsSubmitted } });
+  }
+  if (what === "stripe/dashboard" && m === "POST") {
+    if (!biz.stripe || !stripe.enabled()) return fail(res, 400, "Connect Stripe first.");
+    try { return send(res, 200, { ok: true, url: (await stripe.loginLink(biz.stripe.account)).url }); } catch (e) { return fail(res, 502, String(e.message).slice(0, 200)); }
+  }
+  if (what === "refund" && m === "POST") {
+    const body = await readJson(req);
+    const b = biz.bookings.find((x) => x.id === body.id);
+    if (!b || !b.payment || b.payment.status !== "paid" || !mine(b)) return fail(res, 400, "There's no paid deposit on this booking to refund.");
+    if (!(await refundBooking(biz, b, "refunded by the business"))) { store.saveBiz(slug, biz); return fail(res, 502, "Stripe couldn't refund it: " + (b.payment.refundError || "unknown error")); }
+    store.saveBiz(slug, biz);
+    return send(res, 200, { ok: true });
+  }
   if (what === "slots" && m === "GET") { // owner view: includes phone-only services, ignores minimum notice
     const q = new URL(req.url, "http://x").searchParams;
-    try { return send(res, 200, { ok: true, days: core.availability(s, occ(), { serviceId: q.get("service"), staffId: q.get("staff") || "any", days: Number(q.get("days")) || 28, owner: true }) }); }
+    try { return send(res, 200, { ok: true, days: core.availability(s, occ(), { serviceId: q.get("service"), staffId: staffOnly || q.get("staff") || "any", days: Number(q.get("days")) || 28, owner: true }) }); }
     catch (e) { return fail(res, 400, e.message); }
   }
   if (what === "update" && m === "POST") { // the owner moves or edits a booking
     const body = await readJson(req);
     const b = biz.bookings.find((x) => x.id === body.id);
-    if (!b || b.status === "cancelled") return fail(res, 400, "That booking can't be changed (it may be cancelled).");
+    if (!b || b.status === "cancelled" || !mine(b)) return fail(res, 400, "That booking can't be changed (it may be cancelled).");
+    if (b.status === "pending" || b.status === "expired") return fail(res, 400, "This booking is waiting for (or never got) its deposit.");
+    if (staffOnly && body.staffId && body.staffId !== staffOnly) return fail(res, 403, "Only the owner or a manager can give a booking to someone else.");
     const next = { serviceId: body.serviceId || b.serviceId, staffId: body.staffId || b.staffId, start: body.start || b.start };
     const moved = next.start !== b.start || next.staffId !== b.staffId || next.serviceId !== b.serviceId;
     try {
@@ -273,6 +385,7 @@ async function businessApi(req, res, slug, rest) {
   if (what === "blocks/add" && m === "POST") {
     const body = await readJson(req);
     let blk;
+    if (staffOnly && body.staffId !== staffOnly) return fail(res, 403, "You can only add your own time off.");
     try { blk = core.cleanBlock(s, body); } catch (e) { return fail(res, 400, e.message); }
     if ((biz.blocks || []).length >= 500) return fail(res, 400, "Too many time-off entries. Remove old ones first.");
     biz.blocks = (biz.blocks || []).concat(blk); store.saveBiz(slug, biz);
@@ -281,14 +394,17 @@ async function businessApi(req, res, slug, rest) {
   }
   if (what === "blocks/remove" && m === "POST") {
     const body = await readJson(req);
+    const blk = (biz.blocks || []).find((b) => b.id === body.id);
+    if (blk && staffOnly && blk.staffId !== staffOnly) return fail(res, 403, "You can only remove your own time off.");
     biz.blocks = (biz.blocks || []).filter((b) => b.id !== body.id); store.saveBiz(slug, biz);
     return send(res, 200, { ok: true });
   }
-  if (what === "clients" && m === "GET") return send(res, 200, { ok: true, clients: core.clientList(biz) });
+  if (what === "clients" && m === "GET") { const keys = staffOnly ? myClientKeys() : null; return send(res, 200, { ok: true, clients: core.clientList(biz).filter((c) => !keys || keys.has(c.key)) }); }
   if (what === "client" && m === "POST") {
     const body = await readJson(req);
     const key = body.key || core.clientKey(core.email(body.email), body.phone);
     if (!key) return fail(res, 400, "Enter an email or a phone number.");
+    if (staffOnly && !myClientKeys().has(key)) return fail(res, 403, "You can only update your own clients.");
     const r = biz.clients[key] || {};
     biz.clients[key] = { ...r, name: core.str(body.name ?? r.name, 80), email: core.email(body.email ?? r.email) || r.email || "", phone: core.str(body.phone ?? r.phone, 30),
       notes: core.str(body.notes ?? r.notes, 2000), tags: (Array.isArray(body.tags) ? body.tags : r.tags || []).map((t) => core.str(t, 30)).filter((t, i, a) => t && a.indexOf(t) === i).slice(0, 10),
@@ -334,6 +450,48 @@ async function businessApi(req, res, slug, rest) {
     const to = process.env.BOOKING_ADMIN_EMAIL || process.env.SMTP_USER;
     if (to) mail.sendPlain(to, `Booking ${r.kind} request: ${s.name}`, `${s.name} (${mail.base()}/book/${slug})\nOwner: ${r.ownerEmail}${r.phone ? ", " + r.phone : ""}\nPlan: ${plan.name}\nRequest: ${r.kind}\n\n${r.message || "(no message)"}\n\nSee all requests: ${mail.base()}/admin/booking.html`);
     return send(res, 200, { ok: true, request: r });
+  }
+  if (what === "password" && m === "POST" && me.user) { // a staff login changes its own password
+    const body = await readJson(req);
+    if (!checkPassword(me.user, body.current)) return fail(res, 400, "Your current password is wrong.");
+    if (String(body.next || "").length < 10) return fail(res, 400, "Use at least 10 characters.");
+    const list = store.accounts(), u = list.find((a) => a.slug === slug).users.find((x) => x.id === me.user.id);
+    Object.assign(u, hashPassword(body.next), { pwv: (u.pwv || 1) + 1 }); store.saveAccounts(list);
+    return send(res, 200, { ok: true }, { "Set-Cookie": sessionCookie(req, slug, makeSession(me.acc, u), SESSION_MS / 1000) });
+  }
+  if (what === "team/invite" && m === "POST") {
+    const body = await readJson(req);
+    if (plan.logins === 0) return fail(res, 403, `Team logins are part of Pro. Upgrade under Plan & help.`);
+    const email = core.email(body.email), name = core.str(body.name, 60);
+    if (!email) return fail(res, 400, "Enter their email address.");
+    if (!["manager", "staff"].includes(body.role)) return fail(res, 400, "Choose a role.");
+    if (body.role === "staff" && !s.staff.some((p) => p.id === body.staffId)) return fail(res, 400, "Choose which team member's calendar they use.");
+    const list = store.accounts(), acc = list.find((a) => a.slug === slug);
+    acc.users = acc.users || [];
+    if (email === acc.ownerEmail || acc.users.some((u) => u.email === email)) return fail(res, 409, "That email already has a login here.");
+    if (acc.users.length >= 50) return fail(res, 400, "That's the maximum of 50 logins.");
+    const token = crypto.randomBytes(24).toString("hex");
+    const u = { id: "u" + crypto.randomBytes(5).toString("hex"), email, name: name || email.split("@")[0], role: body.role, staffId: s.staff.some((p) => p.id === body.staffId) ? body.staffId : "", pwv: 1, invitedAt: new Date().toISOString(), inviteHash: crypto.createHash("sha256").update(token).digest("hex"), inviteExp: Date.now() + 7 * 864e5 };
+    acc.users.push(u); store.saveAccounts(list);
+    const sent = await mail.sendAccount("invite", email, { name: s.name, link: `${mail.base()}/book/invite?token=${token}` });
+    return send(res, 200, { ok: true, user: publicUser(u), emailed: sent });
+  }
+  if ((what === "team/update" || what === "team/remove" || what === "team/resend") && m === "POST") {
+    const body = await readJson(req);
+    const list = store.accounts(), acc = list.find((a) => a.slug === slug), u = (acc.users || []).find((x) => x.id === body.id);
+    if (!u) return fail(res, 404, "Unknown login.");
+    if (what === "team/remove") { acc.users = acc.users.filter((x) => x !== u); store.saveAccounts(list); return send(res, 200, { ok: true }); }
+    if (what === "team/resend") {
+      if (u.hash) return fail(res, 400, "They've already set a password.");
+      const token = crypto.randomBytes(24).toString("hex");
+      Object.assign(u, { inviteHash: crypto.createHash("sha256").update(token).digest("hex"), inviteExp: Date.now() + 7 * 864e5, invitedAt: new Date().toISOString() }); store.saveAccounts(list);
+      return send(res, 200, { ok: true, emailed: await mail.sendAccount("invite", u.email, { name: s.name, link: `${mail.base()}/book/invite?token=${token}` }) });
+    }
+    if (!["manager", "staff"].includes(body.role)) return fail(res, 400, "Choose a role.");
+    if (body.role === "staff" && !s.staff.some((p) => p.id === body.staffId)) return fail(res, 400, "Choose which team member's calendar they use.");
+    Object.assign(u, { role: body.role, staffId: s.staff.some((p) => p.id === body.staffId) ? body.staffId : "", pwv: (u.pwv || 1) + 1 }); // role change signs them out
+    store.saveAccounts(list);
+    return send(res, 200, { ok: true, user: publicUser(u) });
   }
   if (what === "password" && m === "POST") {
     const body = await readJson(req);
@@ -429,8 +587,17 @@ function freeSlug(base) {
   for (let i = 2; i < 100; i++) { const t = `${s.slice(0, 36)}-${i}`; if (!store.account(t)) return t; }
   return `${s.slice(0, 30)}-${crypto.randomBytes(3).toString("hex")}`;
 }
-function loggedIn(req, res, acc, extra = {}) {
-  return send(res, 200, { ok: true, slug: acc.slug, ...extra }, { "Set-Cookie": sessionCookie(req, acc.slug, makeSession(acc), SESSION_MS / 1000) });
+function loggedIn(req, res, acc, extra = {}, user = null) {
+  return send(res, 200, { ok: true, slug: acc.slug, ...extra }, { "Set-Cookie": sessionCookie(req, acc.slug, makeSession(acc, user), SESSION_MS / 1000) });
+}
+function findInvite(token) {
+  const h = crypto.createHash("sha256").update(String(token || "")).digest("hex");
+  for (const acc of store.accounts()) {
+    if (acc.disabled) continue;
+    const user = (acc.users || []).find((u) => u.inviteHash && u.inviteHash === h && u.inviteExp > Date.now());
+    if (user) return { acc, user };
+  }
+  return null;
 }
 function updateAccount(slug, fn) { const list = store.accounts(), a = list.find((x) => x.slug === slug); if (!a) return null; fn(a); store.saveAccounts(list); return a; }
 async function sendVerify(acc, name) {
@@ -490,11 +657,32 @@ async function accountApi(req, res, what) {
   }
   if (what === "login") {
     if (!allow("acct-login:" + ip, 10, 900e3)) return fail(res, 429, "Too many attempts. Try again in 15 minutes.");
-    const list = email ? store.accounts().filter((a) => a.ownerEmail === email && !a.disabled) : [];
-    const acc = list.find((a) => checkPassword(a, body.password));
-    if (!acc) { await new Promise((r) => setTimeout(r, 400)); return fail(res, 401, "Wrong email or password."); }
-    if (acc.verified === false) return fail(res, 403, "Please confirm your email first. We've sent you a link (check spam too).");
-    return loggedIn(req, res, acc);
+    const all = email ? store.accounts().filter((a) => !a.disabled) : [];
+    const acc = all.filter((a) => a.ownerEmail === email).find((a) => checkPassword(a, body.password));
+    if (acc) {
+      if (acc.verified === false) return fail(res, 403, "Please confirm your email first. We've sent you a link (check spam too).");
+      return loggedIn(req, res, acc);
+    }
+    for (const a of all) { // a manager or staff login
+      const u = (a.users || []).find((x) => x.email === email && x.hash && checkPassword(x, body.password));
+      if (u && a.verified !== false) { const list = store.accounts(), uu = list.find((x) => x.slug === a.slug).users.find((x) => x.id === u.id); uu.lastLogin = new Date().toISOString(); store.saveAccounts(list); return loggedIn(req, res, a, {}, uu); }
+    }
+    await new Promise((r) => setTimeout(r, 400)); return fail(res, 401, "Wrong email or password.");
+  }
+  if (what === "invite") { // what the invite page shows before they set a password
+    const found = findInvite(body.token);
+    if (!found) return fail(res, 400, "This invite has expired or was already used. Ask the owner to send it again.");
+    return send(res, 200, { ok: true, business: bizName(found.acc.slug), email: found.user.email, name: found.user.name, role: found.user.role });
+  }
+  if (what === "accept") {
+    if (!allow("accept:" + ip, 20, 3600e3)) return fail(res, 429, "Too many attempts. Please wait a while.");
+    if (String(body.password || "").length < 10) return fail(res, 400, "Choose a password of at least 10 characters.");
+    const found = findInvite(body.token);
+    if (!found) return fail(res, 400, "This invite has expired or was already used. Ask the owner to send it again.");
+    const list = store.accounts(), acc = list.find((a) => a.slug === found.acc.slug), u = acc.users.find((x) => x.id === found.user.id);
+    Object.assign(u, hashPassword(body.password), { pwv: (u.pwv || 1) + 1, joinedAt: new Date().toISOString(), lastLogin: new Date().toISOString(), name: core.str(body.name, 60) || u.name });
+    delete u.inviteHash; delete u.inviteExp; store.saveAccounts(list);
+    return loggedIn(req, res, acc, {}, u);
   }
   if (what === "forgot") {
     if (!allow("forgot:" + ip, 5, 3600e3)) return fail(res, 429, "Too many requests. Please wait a while.");
@@ -503,6 +691,13 @@ async function accountApi(req, res, what) {
       const token = newToken();
       updateAccount(acc.slug, (a) => { a.resetHash = tokenHash(token); a.resetExp = Date.now() + 3600e3; });
       await mail.sendAccount("reset", email, { name: bizName(acc.slug), link: `${mail.base()}/book/reset?token=${token}` });
+    } else if (email) { // a manager or staff login
+      const a = store.accounts().find((x) => !x.disabled && (x.users || []).some((u) => u.email === email && u.hash));
+      if (a) {
+        const token = newToken();
+        updateAccount(a.slug, (x) => { const u = x.users.find((y) => y.email === email); u.resetHash = tokenHash(token); u.resetExp = Date.now() + 3600e3; });
+        await mail.sendAccount("reset", email, { name: bizName(a.slug), link: `${mail.base()}/book/reset?token=${token}` });
+      }
     }
     return send(res, 200, { ok: true }); // same answer either way: nobody can test which emails have accounts
   }
@@ -511,7 +706,14 @@ async function accountApi(req, res, what) {
     if (String(body.password || "").length < 10) return fail(res, 400, "Choose a password of at least 10 characters.");
     const h = tokenHash(body.token || "");
     const acc = store.accounts().find((a) => a.resetHash && a.resetHash === h && !a.disabled);
-    if (!acc || acc.resetExp < Date.now()) return fail(res, 400, "This reset link has expired or was already used. Ask for a new one.");
+    if (!acc) { // a manager or staff login?
+      const a = store.accounts().find((x) => !x.disabled && (x.users || []).some((u) => u.resetHash === h && u.resetExp > Date.now()));
+      if (!a) return fail(res, 400, "This reset link has expired or was already used. Ask for a new one.");
+      const list = store.accounts(), u = list.find((x) => x.slug === a.slug).users.find((x) => x.resetHash === h);
+      Object.assign(u, hashPassword(body.password), { pwv: (u.pwv || 1) + 1 }); delete u.resetHash; delete u.resetExp; store.saveAccounts(list);
+      return loggedIn(req, res, a, {}, u);
+    }
+    if (acc.resetExp < Date.now()) return fail(res, 400, "This reset link has expired or was already used. Ask for a new one.");
     const done = updateAccount(acc.slug, (a) => { Object.assign(a, hashPassword(body.password)); a.pwv = (a.pwv || 1) + 1; a.verified = true; delete a.resetHash; delete a.resetExp; });
     return loggedIn(req, res, done);
   }
@@ -531,6 +733,27 @@ function serveFeed(req, res, slug, token) {
   const off = (biz.blocks || []).map((b) => ["BEGIN:VEVENT", `UID:${b.id}@${slug}.booking.weberslink`, `DTSTAMP:${d(b.start)}`, `DTSTART:${d(b.start)}`, `DTEND:${d(b.end)}`, `SUMMARY:${esc("Time off – " + (b.staffId === "all" ? "everyone" : who(b.staffId)) + (b.note ? ": " + b.note : ""))}`, "TRANSP:TRANSPARENT", "END:VEVENT"].join("\r\n"));
   res.writeHead(200, { "Content-Type": "text/calendar; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
   res.end(req.method === "HEAD" ? undefined : ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Weberslink//Booking//EN", "CALSCALE:GREGORIAN", `X-WR-CALNAME:${esc(s.name)} bookings`, `X-WR-TIMEZONE:${s.tz}`, ...ev, ...off, "END:VCALENDAR"].join("\r\n"));
+}
+/** Stripe Connect webhook: payments completed or expired, and connected accounts becoming able to take payments. */
+async function stripeWebhook(req, res) {
+  const raw = await new Promise((resolve, reject) => { const c = []; let n = 0; req.on("data", (d) => { n += d.length; if (n > 512 * 1024) { reject(new Error("too large")); req.destroy(); } else c.push(d); }); req.on("end", () => resolve(Buffer.concat(c).toString("utf8"))); req.on("error", reject); });
+  let ev;
+  try { ev = stripe.verifyWebhook(raw, req.headers["stripe-signature"]); } catch (e) { return fail(res, 400, e.message); }
+  const obj = (ev.data && ev.data.object) || {};
+  if (ev.type === "checkout.session.completed" || ev.type === "checkout.session.async_payment_succeeded") {
+    const md = obj.metadata || {};
+    const acc = md.slug && store.account(md.slug), biz = acc && store.loadBiz(md.slug);
+    if (biz && biz.stripe && biz.stripe.account === ev.account) await markPaid(md.slug, md.booking, obj); // only trust events from that business's own account
+  } else if (ev.type === "checkout.session.expired") {
+    const md = obj.metadata || {}, biz = md.slug && store.loadBiz(md.slug), b = biz && biz.bookings.find((x) => x.id === md.booking);
+    if (b && b.status === "pending" && biz.stripe && biz.stripe.account === ev.account) { b.status = "expired"; b.payment.status = "unpaid"; store.saveBiz(md.slug, biz); }
+  } else if (ev.type === "account.updated") {
+    for (const acc of store.accounts()) {
+      const biz = store.loadBiz(acc.slug);
+      if (biz && biz.stripe && biz.stripe.account === obj.id) { Object.assign(biz.stripe, { chargesEnabled: Boolean(obj.charges_enabled), detailsSubmitted: Boolean(obj.details_submitted), checkedAt: new Date().toISOString() }); store.saveBiz(acc.slug, biz); }
+    }
+  }
+  return send(res, 200, { received: true });
 }
 /** Removes sign-ups that never confirmed their email. */
 function cleanupUnverified(now = Date.now()) {
@@ -565,6 +788,7 @@ function handle(req, res) {
   if (ap && ACCOUNT_PAGES.includes(ap[1]) && (req.method === "GET" || req.method === "HEAD")) { serveAccountPage(req, res); return true; }
   const feed = /^\/api\/booking-feed\/([a-z0-9-]{3,40})\/([0-9a-f]{32})\.ics$/.exec(p);
   if (feed && (req.method === "GET" || req.method === "HEAD")) { serveFeed(req, res, feed[1], feed[2]); return true; }
+  if (p === "/api/booking-stripe/webhook" && req.method === "POST") { stripeWebhook(req, res).catch((e) => { console.error("stripe webhook:", e.message); if (!res.headersSent) fail(res, 500, "error"); }); return true; }
   const acct = /^\/api\/booking-account\/([a-z]+)$/.exec(p);
   if (acct) { accountApi(req, res, acct[1]).catch((e) => { if (!res.headersSent) fail(res, e.status || 500, e.status ? e.message : "Server error"); if (!e.status) console.error("booking account error:", e); }); return true; }
   let mm = /^\/book\/([a-z0-9-]{3,40})(\/admin)?\/?$/.exec(p);
@@ -596,7 +820,7 @@ async function sendReminders(now = Date.now()) {
   return n;
 }
 function startScheduler() {
-  const tick = () => { try { cleanupUnverified(); } catch (e) { console.error("booking cleanup:", e.message); } sendReminders().catch((e) => console.error("booking reminders:", e.message)); };
+  const tick = () => { try { for (const a of store.accounts()) { const b = store.loadBiz(a.slug); if (b && expireHolds(b)) store.saveBiz(a.slug, b); } } catch (e) { console.error("booking holds:", e.message); } try { cleanupUnverified(); } catch (e) { console.error("booking cleanup:", e.message); } sendReminders().catch((e) => console.error("booking reminders:", e.message)); };
   setInterval(tick, 5 * 60 * 1000).unref();
   setTimeout(tick, 40 * 1000).unref();
 }

@@ -24,6 +24,12 @@ a{color:inherit;text-decoration:none}
 .logo-img{display:block;height:32px;width:auto}
 .nav-links{display:flex;gap:30px;font-size:14px;color:var(--grey-3)}
 .nav-links a:hover{color:var(--white)}
+.nav-cta{display:flex;gap:10px;align-items:center}
+.nav .nav-signup{padding:10px 18px}
+.nav-links a{white-space:nowrap}
+.nav-links .nav-signup-m{display:none}
+@media(max-width:1240px){.nav-links{gap:20px}}
+@media(max-width:1120px){.nav .nav-signup{display:none}.nav-links{gap:16px;font-size:13.5px}}
 .btn{display:inline-flex;align-items:center;gap:8px;padding:11px 20px;border-radius:999px;font-size:14px;font-weight:500;transition:transform .25s var(--ease),background .25s,color .25s,border-color .25s;cursor:pointer;border:1px solid transparent;font-family:inherit}
 .btn:hover{transform:translateY(-2px)}
 .btn-light{background:var(--red);color:#fff}
@@ -34,8 +40,12 @@ a{color:inherit;text-decoration:none}
 .btn-dark:hover{background:var(--grey-9)}
 .menu-btn{display:none;background:none;border:0;color:var(--white);width:40px;height:40px;cursor:pointer}
 .menu-btn span{display:block;width:20px;height:1.5px;background:currentColor;margin:5px auto;transition:transform .3s}
-@media(max-width:860px){
-  .nav-links,.nav .btn{display:none}
+@media(max-width:860px){.nav .btn{display:none}}
+/* The menu button takes over from 1000px: the full menu (with Sign in) no longer fits on one line below that. */
+@media(max-width:1000px){
+  .nav-links,.nav .nav-signup{display:none}
+  .nav-cta{margin-left:auto;margin-right:10px}
+  .nav.open .nav-links .nav-signup-m{display:block;color:var(--red-bright)!important;font-weight:600}
   .menu-btn{display:block}
   .nav.open .nav-links{display:flex;position:absolute;top:68px;left:0;right:0;flex-direction:column;gap:0;background:#090807;border-bottom:1px solid var(--line-d);padding:8px 16px 16px}
   .nav.open .nav-links a{padding:14px 0;border-bottom:1px solid var(--line-d);font-size:16px;color:var(--white)}

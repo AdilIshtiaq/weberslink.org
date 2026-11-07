@@ -43,6 +43,33 @@ The browser runs the same scheduling engine as the server (`booking/core.js`, se
 `/demos/booking/core.js`), so the demo behaves exactly like the real thing. The full roadmap is in
 `docs/BOOKING-PLAN.md`.
 
+## Deposits (Stripe Connect)
+
+- **You switch it on once:**
+  - In your Stripe account, turn on Connect.
+  - Set `STRIPE_SECRET_KEY` on the server.
+  - Add a webhook endpoint for connected accounts pointing at `https://weberslink.org/api/booking-stripe/webhook`, with the events `checkout.session.completed`, `checkout.session.expired` and `account.updated`. Set its signing secret as `STRIPE_WEBHOOK_SECRET`.
+  - Optional: `STRIPE_PLATFORM_FEE_PERCENT` (0–20), the share of each payment you keep.
+  - Use `sk_test_…` keys first; the dashboard shows "test mode".
+- **Each business:** Settings → Online payments → **Connect Stripe**. Stripe hosts the sign-up, identity check and bank details (Express account). The money goes straight to the business's own Stripe account. **Open your Stripe dashboard** shows their payouts.
+- **Per service:** no deposit, a fixed amount, a % of the price, or the full price.
+- **Customer:**
+  - The summary shows "pay online now" and "pay at your appointment".
+  - **Continue to payment** opens Stripe Checkout (card, Apple Pay, Google Pay).
+  - The time is held for 35 minutes. The booking is confirmed when they return, or by the webhook if they close the tab.
+  - Confirmation emails go out only after paying. Unpaid holds expire and the time frees up.
+- **Refunds:** automatic when a customer cancels within the policy. When the owner cancels, they choose whether to refund (e.g. keep a late cancellation). No-shows keep the deposit. There's also a **Refund** button.
+- **Fallback:** without Stripe connected (or while Stripe pauses an account), bookings go through without payment.
+- **Demo:** the payment step is simulated; no card is charged.
+
+## Team logins (Pro)
+
+Owner → Settings → **Team logins**: invite by email as:
+- **Manager:** everything except team logins, Stripe and deleting the page.
+- **Staff:** linked to a team member's calendar. They see and change only their own appointments, clients and time off, and add bookings to their own calendar.
+
+The invite link (valid 7 days) lets them set their password. After that they sign in at `/book/login` with their email, and "Forgot password" works for them too. Changing someone's role or removing their login signs them out at once. Every permission is enforced on the server; the dashboard also hides what a role can't use.
+
 ## Business owners sign up themselves
 
 1. **/book/new**: business name, type (sets example services and hours), time zone, currency, email, password.
@@ -115,6 +142,8 @@ Without SMTP everything still works; emails are skipped and logged.
 | `BOOKING_PUBLIC_URL` | no | Address used in email links (default `https://weberslink.org`). |
 | `BOOKING_DATA_DIR` | no | Where booking data lives (default: `booking/` inside the Outreach data folder). |
 | `BOOKING_ADMIN_EMAIL` | no | Where owners' upgrade / setup / custom requests are emailed (default `SMTP_USER`). |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | for deposits | Your Stripe platform key and the Connect webhook's signing secret. |
+| `STRIPE_PLATFORM_FEE_PERCENT` | no | Your share of each deposit (default 0). |
 | `BOOKING_SIGNUP` | no | `off` closes self sign-up (existing owners keep working). |
 | `BOOKING_SECRET` | no | 32+ characters to sign owner logins (default: a random key saved in the data folder). |
 

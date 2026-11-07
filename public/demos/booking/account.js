@@ -15,7 +15,8 @@
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok || j.ok === false) { var e = new Error(j.error || "Something went wrong (" + r.status + ")."); e.status = r.status; throw e; } return j; }); },
         function () { throw new Error("No connection. Check your internet and try again."); });
   }
-  function show(html) { $("main").innerHTML = '<div class="panel acct">' + html + "</div>"; var h = $("main").querySelector("h1"); if (h) { h.setAttribute("tabindex", "-1"); h.focus(); } }
+  var TABS = function (on) { return '<div class="acct-tabs" role="tablist"><a role="tab" href="/book/login" aria-selected="' + (on === "login") + '">Sign in</a><a role="tab" href="/book/new" aria-selected="' + (on === "new") + '">Create account</a></div>'; };
+  function show(html) { $("main").innerHTML = '<div class="panel acct">' + (page === "login" || page === "new" ? TABS(page) : "") + html + "</div>"; var h = $("main").querySelector("h1"); if (h) { h.setAttribute("tabindex", "-1"); h.focus(); } }
   function err(msg) { var e = $("err"); e.textContent = msg; e.hidden = false; }
   function busy(on, label) { var b = $("main").querySelector("button[type=submit]"); if (b) { b.disabled = on; if (label) b.textContent = label; } }
   var field = function (id, label, type, extra, hint) { return '<div class="field"><label for="' + id + '">' + label + '</label><input type="' + type + '" id="' + id + '" ' + (extra || "") + ">" + (hint ? '<span class="hint">' + hint + "</span>" : "") + "</div>"; };
@@ -120,5 +121,25 @@
     });
   }
 
-  ({ new: signup, verify: verify, login: login, forgot: forgot, reset: reset }[page] || login)();
+  // ---------------------------------------------------------------- team invite
+  function invite() {
+    document.title = "Join your team | WebersLink";
+    var token = q.get("token") || "";
+    if (token) history.replaceState(null, "", "/book/invite");
+    if (!token) return show('<h1>Link not valid</h1><p class="hint">Open the link from your invite email again.</p>');
+    show("<h1>Loading your invite…</h1>");
+    api("invite", { token: token }).then(function (j) {
+      show("<h1>Join " + esc(j.business) + "</h1><p class=\"hint\">You've been invited as <b>" + esc(j.role) + "</b> with " + esc(j.email) + ". Choose a password to sign in.</p><form id=\"f\" novalidate>" +
+        field("nm", "Your name", "text", 'maxlength="60" autocomplete="name" value="' + esc(j.name || "") + '"') +
+        field("pw", "Password", "password", 'minlength="10" maxlength="200" autocomplete="new-password" required', "At least 10 characters.") +
+        '<p class="err" id="err" role="alert" hidden></p><button type="submit" class="btn primary">Join and sign in</button></form>');
+      $("f").addEventListener("submit", function (e) {
+        e.preventDefault(); if ($("pw").value.length < 10) return err("Use at least 10 characters.");
+        busy(true, "Joining…");
+        api("accept", { token: token, password: $("pw").value, name: $("nm").value.trim() }).then(function (r) { goDashboard(r.slug); }).catch(function (x) { busy(false, "Join and sign in"); err(x.message); });
+      });
+    }).catch(function (x) { show('<h1>This invite can\'t be used</h1><p class="hint">' + esc(x.message) + "</p>"); });
+  }
+
+  ({ new: signup, verify: verify, login: login, forgot: forgot, reset: reset, invite: invite }[page] || login)();
 })();

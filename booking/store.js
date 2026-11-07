@@ -29,12 +29,12 @@ function loadBiz(slug) {
   const d = read(`b-${slug}.json`, null);
   if (!d || !d.settings) return null;
   return { settings: d.settings, bookings: Array.isArray(d.bookings) ? d.bookings : [], blocks: Array.isArray(d.blocks) ? d.blocks : [],
-    clients: d.clients && typeof d.clients === "object" && !Array.isArray(d.clients) ? d.clients : {}, feedToken: d.feedToken || "" };
+    clients: d.clients && typeof d.clients === "object" && !Array.isArray(d.clients) ? d.clients : {}, feedToken: d.feedToken || "", stripe: d.stripe || null };
 }
 function saveBiz(slug, biz) {
   const cut = Date.now() - KEEP_DAYS * 864e5;
   write(`b-${slug}.json`, { settings: biz.settings, bookings: biz.bookings.filter((b) => Date.parse(b.end) > cut),
-    blocks: (biz.blocks || []).filter((b) => Date.parse(b.end) > Date.now() - 30 * 864e5), clients: biz.clients || {}, feedToken: biz.feedToken || "" });
+    blocks: (biz.blocks || []).filter((b) => Date.parse(b.end) > Date.now() - 30 * 864e5), clients: biz.clients || {}, feedToken: biz.feedToken || "", stripe: biz.stripe || null });
 }
 /** Erases a business's data file for good (owner deleted their page, or a sign-up was never confirmed). */
 function deleteBiz(slug) { if (SLUG.test(slug)) try { fs.unlinkSync(file(`b-${slug}.json`)); } catch (e) { /* already gone */ } }

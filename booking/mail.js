@@ -40,7 +40,7 @@ function compose(kind, s, b, slug) {
   const first = line(b.name).split(" ")[0];
   const manage = `${base()}/book/${slug}?code=${encodeURIComponent(b.code)}`;
   const at = when(s, b.start);
-  const details = [`${svc.name} with ${who.name}`, at, `Price: ${money(s, svc.price)}`, b.address ? `Address: ${line(b.address)}` : "", `Booking code: ${b.code}`].filter(Boolean);
+  const details = [`${svc.name} with ${who.name}`, at, `Price: ${money(s, svc.price)}`, b.payment && b.payment.status === "paid" ? `Paid online: ${money(s, b.payment.amount)}${b.payment.amount < svc.price ? ` (pay ${money(s, Math.round((svc.price - b.payment.amount) * 100) / 100)} at your appointment)` : ""}` : "", b.payment && b.payment.status === "refunded" ? `Refunded: ${money(s, b.payment.amount)}` : "", b.address ? `Address: ${line(b.address)}` : "", `Booking code: ${b.code}`].filter(Boolean);
   const owner = kind.startsWith("owner-");
   const T = {
     confirm: [`Confirmed: ${svc.name} on ${at}`, `Hi ${first},\n\nYou're booked in.`, `Need to change or cancel? ${manage}`],
@@ -85,6 +85,7 @@ function canSend() { return Boolean(sender) || Boolean(process.env.SMTP_USER && 
 async function sendAccount(kind, to, { name, link }) {
   const T = {
     verify: ["Confirm your email to finish your booking page", `Hi,\n\nThanks for creating a booking page for ${name}. Confirm your email to set it up:\n\n${link}\n\nThe link works for 48 hours. If this wasn't you, ignore this email and nothing happens.`],
+    invite: [`You're invited to ${name}'s booking dashboard`, `Hi,\n\nYou've been given a login to ${name}'s online booking dashboard (WebersLink). Set your password here:\n\n${link}\n\nThe link works for 7 days. If you weren't expecting this, ignore this email.`],
     reset: ["Reset your booking dashboard password", `Hi,\n\nSomeone asked to reset the password for ${name}'s booking dashboard. Choose a new password here:\n\n${link}\n\nThe link works for 1 hour. If this wasn't you, ignore this email; your password stays the same.`],
   }[kind];
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#222;max-width:560px">${esc(T[1]).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color:#d9251c">$1</a>').replace(/\n/g, "<br>")}<p style="color:#888;font-size:12px">WebersLink online booking</p></div>`;
