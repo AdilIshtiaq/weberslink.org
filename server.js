@@ -4,8 +4,6 @@ const path = require("path");
 const zlib = require("zlib");
 const chat = require("./chat");
 const outreach = require("./outreach");
-const booking = require("./booking");
-booking.setSiteAdminCheck(outreach.authed);
 
 let nodemailer = null;
 try {
@@ -224,6 +222,7 @@ function seoRedirect(req, res) {
   const [rawPath, query] = req.url.split("?");
   const qs = query ? "?" + query : "";
   if (host === "www." + CANONICAL_HOST) return redirect(res, `https://${CANONICAL_HOST}${req.url}`), true;
+  if (/^\/(demos|book)(\/|$)/.test(rawPath)) return redirect(res, "/"), true; // the booking system and its demo were removed
   if (LEGACY_REDIRECTS[rawPath.replace(/\.html$/, "").replace(/\/+$/, "")]) return redirect(res, LEGACY_REDIRECTS[rawPath.replace(/\.html$/, "").replace(/\/+$/, "")] + qs), true;
   let p = rawPath.replace(/\/{2,}/g, "/");
   if (/\/index\.html$/.test(p)) p = p.replace(/index\.html$/, "");
@@ -235,7 +234,6 @@ function seoRedirect(req, res) {
 }
 
 const server = http.createServer((req, res) => {
-  if (booking.handle(req, res)) return;
   if (outreach.handle(req, res)) return;
   if (req.method === "POST" && req.url === "/api/lead") return handleLead(req, res);
   if (req.method === "POST" && req.url === "/api/chat") return chat.handleChat(req, res, { deliverLead });
@@ -255,5 +253,4 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   outreach.startScheduler();
-  booking.startScheduler();
 });

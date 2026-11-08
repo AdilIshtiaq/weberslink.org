@@ -61,17 +61,13 @@ function nav(cls = "nav scrolled", logoHref = "/") {
   <div class="wrap">
     <a href="${logoHref}" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="187" height="33"></a>
     <nav class="nav-links" id="navLinks" aria-label="Main">
-      <div class="nav-dd"><a href="/offers/" class="dd-t">Offers <i aria-hidden="true"></i></a><div class="dd-menu">${OFFERS.map((o) => `<a href="${o.path}"><b>${o.n}</b>${esc(o.name)}</a>`).join("")}</div></div>
+      <div class="nav-dd"><a href="/offers/" class="dd-t">What we do <i aria-hidden="true"></i></a><div class="dd-menu">${OFFERS.map((o) => `<a href="${o.path}"><b>${o.n}</b>${esc(o.name)}</a>`).join("")}</div></div>
       <a href="/#work">Work</a>
       <a href="/#pricing">Pricing</a>
-      <a href="/demos/">Demos</a>
-      <a href="/plugins/">Free resources</a>
       <a href="/blog/">Guides</a>
       <a href="/contact">Contact</a>
-      <a href="/book/login" class="nav-signin" data-track="Sign in" data-loc="nav">Sign in</a>
-      <a href="/book/new" class="nav-signup-m" data-track="Sign up" data-loc="nav-menu">Sign up free</a>
     </nav>
-    <div class="nav-cta"><a href="/book/new" class="btn btn-ghost nav-signup" data-track="Sign up" data-loc="nav">Sign up</a><a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="nav">Book a walkthrough</a></div>
+    <div class="nav-cta"><a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="nav">Book a free call</a></div>
     <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false"><span></span><span></span></button>
   </div>
 </header>`;
@@ -85,8 +81,8 @@ function footer() {
     <div class="foot-cols">
       <div class="fcol fcol-brand">
         <a href="/" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="187" height="33"></a>
-        <p>Forward-deployed engineers for businesses in the US, UK &amp; Europe. We build and run AI assistants, automation, websites and reporting in-house.</p>
-        <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="footer">Book a walkthrough</a>
+        <p>Websites and AI assistants that answer, follow up and book your leads for you. For service businesses in the US, UK &amp; Europe.</p>
+        <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="footer">Book a free call</a>
       </div>
       ${col("Offers", OFFERS)}
       ${col("Services", SERVICES)}
@@ -94,7 +90,7 @@ function footer() {
       ${col("Guides", GUIDES.slice(0, 5))}
     </div>
     <div class="foot-big" aria-hidden="true">WebersLink</div>
-    <div class="copy"><span>© <span id="yr">${new Date().getFullYear()}</span> WebersLink · Lahore, Pakistan · Serving clients in the US &amp; Europe</span><span><a href="/demos/">Demos</a> · <a href="/plugins/">Plugins</a> · <a href="/privacy">Privacy</a> · <a href="mailto:hassan@weberslink.org">hassan@weberslink.org</a></span></div>
+    <div class="copy"><span>© <span id="yr">${new Date().getFullYear()}</span> WebersLink · Lahore, Pakistan · Serving clients in the US &amp; Europe</span><span><a href="/plugins/">Plugins</a> · <a href="/privacy">Privacy</a> · <a href="mailto:hassan@weberslink.org">hassan@weberslink.org</a></span></div>
   </div>
 </footer>`;
 }
@@ -102,7 +98,7 @@ function footer() {
 function stickyCta() {
   return `<aside aria-label="Quick contact">
 <div class="sticky-cta" id="stickyCta">
-  <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="sticky">Book a walkthrough</a>
+  <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="sticky">Book a free call</a>
   <a href="https://wa.me/message/2MT2JFO63P3LA1" class="btn btn-ghost" data-wa data-track="WhatsApp click" data-loc="sticky" target="_blank" rel="noopener">WhatsApp</a>
 </div>
 </aside>`;
@@ -182,7 +178,7 @@ function render(p) {
 <meta name="description" content="${esc(p.description)}">
 <link rel="canonical" href="${url}">
 ${headExtra(url)}
-<meta name="theme-color" content="#090807">
+<meta name="theme-color" content="#ffffff">
 <link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48"><link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta property="og:type" content="${p.type === "guide" ? "article" : "website"}">
@@ -205,7 +201,8 @@ ${headExtra(url)}
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap"></noscript>
-<link rel="stylesheet" href="/assets/site.css?v=5">
+<link rel="stylesheet" href="/assets/site.css?v=6">
+<link rel="stylesheet" href="/assets/v2.css?v=1">
 <script type="application/ld+json">
 ${schema(p)}
 </script>
@@ -223,7 +220,7 @@ ${nav()}
     <p class="lead">${p.lead}</p>
     ${meta}
     ${p.heroCta || `<div class="hero-cta">
-      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="${p.path}">Book a walkthrough →</a>
+      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="${p.path}">Book a free call →</a>
       <a href="/#audit" class="btn btn-ghost" data-track="Audit CTA" data-loc="${p.path}">Get a free website audit</a>
     </div>`}
   </div>
@@ -278,7 +275,7 @@ ${related.map((r) => `      <a class="rel" href="${r.path}"><span class="rel-k">
     <h2 class="h2">Ready to see what we'd <em>build for you?</em></h2>
     <p class="sub">Book a free 20-minute walkthrough. We'll look at where your business loses time or leads, and what we'd build — no obligation.</p>
     <div class="hero-cta" style="margin-top:28px">
-      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="band">Book a walkthrough →</a>
+      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="band">Book a free call →</a>
       <a href="/#pricing" class="btn btn-ghost">See pricing</a>
     </div>
   </div>
@@ -306,7 +303,7 @@ function pageShell(p, main) {
 <meta name="description" content="${esc(p.description)}">
 <link rel="canonical" href="${url}">
 ${headExtra(url, p.noindex)}
-<meta name="theme-color" content="#090807">
+<meta name="theme-color" content="#ffffff">
 <link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48"><link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta property="og:type" content="website">
@@ -329,7 +326,8 @@ ${headExtra(url, p.noindex)}
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap"></noscript>
-<link rel="stylesheet" href="/assets/site.css?v=5">
+<link rel="stylesheet" href="/assets/site.css?v=6">
+<link rel="stylesheet" href="/assets/v2.css?v=1">
 <script type="application/ld+json">
 ${schema(p)}
 </script>
@@ -356,7 +354,7 @@ const ctaBand = (loc, h2, sub) => `<section class="dark pad cta-band final-cta">
     <h2 class="h2">${h2}</h2>
     <p class="sub">${sub}</p>
     <div class="hero-cta" style="margin-top:28px">
-      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="${loc}">Book a walkthrough →</a>
+      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="${loc}">Book a free call →</a>
       <a href="mailto:hassan@weberslink.org" class="btn btn-ghost" data-track="Email CTA" data-loc="${loc}">Or email us directly</a>
     </div>
   </div>
@@ -373,7 +371,7 @@ function renderOffer(o) {
     <h1>${o.h1}</h1>
     <p class="lead">${o.lead}</p>
     <div class="hero-cta">
-      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="${o.path}">Book a walkthrough →</a>
+      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="${o.path}">Book a free call →</a>
       <a href="/#audit" class="btn btn-ghost" data-track="Audit CTA" data-loc="${o.path}">Get a free website audit</a>
     </div>
     <p class="cta-note">${esc(o.price)} · ${esc(o.timeline || "Live in 2–3 weeks")}</p>
@@ -525,7 +523,7 @@ function contactPage() {
 <section class="dark pad">
   <div class="wrap">
     <div class="contact-cards">
-      <a class="contact-card primary" href="/#book" data-track="Book CTA" data-loc="contact"><span class="offer-n">01 · Walkthrough</span><h2>Book a walkthrough</h2><p>20 minutes about your services, your area and how leads are handled today. We usually reply within 24 hours.</p><span class="rel-go">Pick a time →</span></a>
+      <a class="contact-card primary" href="/#book" data-track="Book CTA" data-loc="contact"><span class="offer-n">01 · Walkthrough</span><h2>Book a free call</h2><p>20 minutes about your services, your area and how leads are handled today. We usually reply within 24 hours.</p><span class="rel-go">Pick a time →</span></a>
       <a class="contact-card" href="mailto:hassan@weberslink.org" data-track="Email CTA" data-loc="contact"><span class="offer-n">02 · Email</span><h2>Email us directly</h2><p>Describe what's breaking in one paragraph. hassan@weberslink.org</p><span class="rel-go">Write to us →</span></a>
       <a class="contact-card" href="https://wa.me/message/2MT2JFO63P3LA1" data-wa data-track="WhatsApp click" data-loc="contact" target="_blank" rel="noopener"><span class="offer-n">03 · WhatsApp</span><h2>Message on WhatsApp</h2><p>Quick question? Send it there. We reply within 24 hours.</p><span class="rel-go">Open WhatsApp →</span></a>
       <a class="contact-card" href="/#audit" data-track="Audit CTA" data-loc="contact"><span class="offer-n">04 · Free audit</span><h2>Get a free website audit</h2><p>We'll record a short video showing what's costing you enquiries, within 48 hours.</p><span class="rel-go">Request the audit →</span></a>
@@ -1185,51 +1183,6 @@ function enhanceHome(html) {
   return html;
 }
 
-// ---------- Live demos (/demos/) ----------
-// Each demo is a working system a prospect can try. The demo apps live in public/demos/<name>/ (not generated).
-const DEMOS = [
-  {
-    slug: "booking", name: "Online Booking System", badge: "Live demo",
-    text: "A booking page your customers use day or night, and a dashboard where you run the day. Customers pick a service, a person and a free time; they get a confirmation and a reminder, and can move or cancel online. You see every appointment, add phone bookings, and track no-shows.",
-    feats: ["Only free times shown, in your time zone", "Pick a person or “anyone available”", "Confirmation and reminder emails", "Customers move or cancel online", "Phone and walk-in bookings", "Numbers and CSV export", "Embeds on your own website", "No double bookings, ever"],
-    tries: [["Salon", "?type=salon"], ["Dental clinic", "?type=clinic"], ["Home services", "?type=home"]],
-    who: "Salons, barbers, clinics, dentists, physios, trainers, tutors, plumbers, electricians, cleaners: anyone who books appointments.",
-  },
-];
-const demoCard = (d, loc) => `<div class="plugin-card">
-  <div class="plugin-head"><span class="plugin-badge">${esc(d.badge)}</span><span class="plugin-ver">Works on phone and desktop · nothing to install</span></div>
-  <h2>${esc(d.name)}</h2>
-  <p>${esc(d.text)}</p>
-  <ul class="plugin-feats">
-${d.feats.map((f) => `    <li>${esc(f)}</li>`).join("\n")}
-  </ul>
-  <p><strong>Try it as:</strong> ${d.tries.map(([n, q]) => `<a href="/demos/${d.slug}/${q}" data-track="Demo open" data-loc="${loc}-${d.slug}">${esc(n)}</a>`).join(" · ")}<br><strong>Good for:</strong> ${esc(d.who)}</p>
-  <div class="plugin-actions">
-    <a class="btn btn-dark" href="/demos/${d.slug}/" data-track="Demo open" data-loc="${loc}-${d.slug}">Try the customer side →</a>
-    <a class="btn btn-outline" href="/demos/${d.slug}/?view=admin" data-track="Demo open" data-loc="${loc}-${d.slug}-admin">See the business dashboard →</a>
-  </div>
-  <p style="margin:18px 0 0"><strong>Ready to use it?</strong> <a href="/book/new" data-track="Booking signup" data-loc="${loc}">Create your own booking page</a> in about 5 minutes: sign up, confirm your email, add your services, team and hours, and share your link. Already have one? <a href="/book/login">Sign in</a>.</p>
-</div>`;
-write("/demos/", render({
-  path: "/demos/", type: "hub", kicker: "Demos",
-  title: "Live Demos: Try Our Systems | WebersLink",
-  description: "Try WebersLink systems in your browser before you talk to us. Start with the online booking system: the customer booking page and the business dashboard, for salons, clinics and home services.",
-  h1: "Try it before <em>we build it.</em>",
-  lead: "Working demos of systems we set up for clients. Click around as a customer and as the business owner. Nothing to sign up for, and nothing you do here reaches a real business.",
-  card: { title: "Demos" },
-  heroCta: `<div class="hero-cta">
-      <a href="/demos/booking/" class="btn btn-light" data-track="Demo open" data-loc="hero-booking">Open the booking demo →</a>
-      <a href="/book/new" class="btn btn-ghost" data-track="Booking signup" data-loc="demos-hero">Create your booking page</a>
-    </div>`,
-  faqs: [
-    ["Can I start using the booking system now?", "Yes. Create your booking page, confirm your email, then a short setup asks for your services, prices, team, opening hours and time zone. When you finish, your page is live with its own link and dashboard. Prefer us to set it up for you? Book a walkthrough."],
-    ["Can it go on my existing website?", "Yes. You get a link to share and a short code to paste into any website (WordPress, Wix, Squarespace or custom). It matches your brand colour."],
-    ["Do my customers get reminders?", "Yes. Customers get a confirmation email with a calendar file and a reminder before the appointment, and you get an alert for every new, moved or cancelled booking. Text-message reminders can be added."],
-    ["Is the demo data real?", "No. The demo businesses are made up, and anything you book in the demo stays in your own browser. Use “Reset demo data” at the bottom of the demo to start again."],
-  ],
-  body: DEMOS.map((d) => demoCard(d, "demos-hub")).join("\n"),
-}).replace('<div class="wrap prose-wrap">', '<div class="wrap prose-wrap hub">'));
-
 // ---------- Shared footer on the homepage ----------
 const homeFile = path.join(PUBLIC, "index.html");
 const home = fs.readFileSync(homeFile, "utf8");
@@ -1246,7 +1199,6 @@ const urls = [
   ...INDUSTRIES.map((p) => [p.path, "0.8"]),
   ...GUIDES.map((p) => [p.path, "0.7"]),
   ["/plugins/", "0.7"], ["/plugins/weberslink-forms-pro", "0.7"], ["/plugins/weberslink-smtp", "0.7"], ["/plugins/weberslink-redirects", "0.7"], ["/plugins/weberslink-security", "0.7"], ["/plugins/weberslink-seo", "0.7"], ["/plugins/weberslink-cookies", "0.7"], ["/plugins/weberslink-images", "0.7"], ["/plugins/weberslink-popups", "0.7"],
-  ["/demos/", "0.7"],
   ["/privacy", "0.2"],
 ];
 fs.writeFileSync(path.join(PUBLIC, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>
@@ -1273,9 +1225,6 @@ ${INDUSTRIES.map((p) => llmLink(p.path, p.card.title, p.description)).join("\n")
 
 ## Guides
 ${GUIDES.map((p) => llmLink(p.path, p.card.title, p.description)).join("\n")}
-
-## Demos
-- [Live demos](${SITE}/demos/): Systems you can try in the browser, starting with online booking for appointment businesses (salons, clinics, home services).
 
 ## Free resources
 - [Free WordPress plugins](${SITE}/plugins/): Free, GPL-licensed WordPress plugins for forms, email, redirects, security and SEO.

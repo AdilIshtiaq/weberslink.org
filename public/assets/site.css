@@ -59,7 +59,7 @@ a{color:inherit;text-decoration:none}
 .hero-grid{position:absolute;inset:0;z-index:0;background-image:linear-gradient(var(--line-d) 1px,transparent 1px),linear-gradient(90deg,var(--line-d) 1px,transparent 1px);background-size:64px 64px;mask-image:radial-gradient(ellipse at center,#000 20%,transparent 75%);-webkit-mask-image:radial-gradient(ellipse at center,#000 20%,transparent 75%);opacity:.6}
 .hero .wrap{position:relative;z-index:2}
 .pill{display:inline-flex;align-items:center;gap:10px;padding:6px 14px 6px 8px;border:1px solid var(--line-d);border-radius:999px;font-size:13px;color:var(--grey-3);background:rgba(255,255,255,.03);backdrop-filter:blur(6px)}
-.pill b{background:var(--red);color:#fff;font-weight:600;font-size:11px;padding:2px 8px;border-radius:999px;letter-spacing:.02em}
+.pill b{white-space:nowrap;background:var(--red);color:#fff;font-weight:600;font-size:11px;padding:2px 8px;border-radius:999px;letter-spacing:.02em}
 .hero h1{font-size:clamp(44px,7.4vw,96px);line-height:.98;letter-spacing:-.045em;font-weight:600;margin:26px 0 24px;max-width:900px}
 .hero h1 em{font-family:var(--serif);font-style:italic;font-weight:400;letter-spacing:-.02em;background:linear-gradient(100deg,#ff3b2e 0%,#d9251c 40%,#ff6a5c 60%,#b0231d 85%,#ff3b2e 100%);background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:sheen 6s linear infinite;padding-right:.08em}
 @keyframes sheen{to{background-position:200% center}}
@@ -823,3 +823,12 @@ footer{position:relative}
 footer::before{content:"";position:absolute;left:0;right:0;top:0;height:1px;background:linear-gradient(90deg,transparent,rgba(217,37,28,.55),transparent)}
 .foot-big{font-stretch:100%;font-size:clamp(40px,11.2vw,168px);letter-spacing:-.05em}
 .pk.feat h3{color:var(--white)}
+
+/* Homepage: problem -> fix cards, and the short "more offers" line */
+.pain-grid-3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:1000px){.pain-grid-3{grid-template-columns:1fr}}
+.pain .pain-fix{margin-top:16px;padding-top:14px;border-top:1px solid var(--line-d);color:var(--silver-2)}
+.pain .pain-fix b{color:var(--red-bright);font-weight:600}
+.offers-more{margin-top:36px;font-size:16px;color:var(--grey-3);max-width:760px}
+.offers-more a{display:inline-flex;align-items:center;gap:6px;margin-left:6px;color:#fff;font-weight:600;text-decoration:underline;text-underline-offset:3px}
+.offers-more .ico{width:16px;height:16px}
