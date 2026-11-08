@@ -56,22 +56,55 @@ const SERVICES = pages.filter((p) => p.type === "service");
 const INDUSTRIES = pages.filter((p) => p.type === "industry");
 const GUIDES = pages.filter((p) => p.type === "guide");
 
-// The five main services, shown in the header menu and on the homepage (#svc-<id> opens that service).
+// The five main services, shown in the header menu (each links to its own page) and on the homepage (#svc-<id>).
 const MAIN_SERVICES = [
-  { id: "automation", name: "Automation", line: "Software that does your repetitive work" },
-  { id: "voice", name: "AI Voice & Chat Agents", line: "An AI receptionist for calls and chat, 24/7" },
-  { id: "inhouse", name: "In-house Tech Team", line: "Your own engineers, without hiring" },
-  { id: "web", name: "Web & Software Development", line: "Websites, web apps and custom software" },
-  { id: "cms", name: "CMS Design & Development", line: "A website your team can update itself" },
+  { id: "automation", href: "/services/automation", name: "Automation", line: "Software that does your repetitive work" },
+  { id: "voice", href: "/services/ai-voice-agents", name: "AI Voice & Chat Agents", line: "An AI receptionist for calls and chat, 24/7" },
+  { id: "inhouse", href: "/services/in-house-tech-team", name: "In-house Tech Team", line: "Your own engineers, without hiring" },
+  { id: "web", href: "/services/web-design", name: "Web & Software Development", line: "Websites, web apps and custom software" },
+  { id: "cms", href: "/services/cms-development", name: "CMS Design & Development", line: "A website your team can update itself" },
 ];
+
+// ---------- Projects (real work only; see scripts/content/projects.js) ----------
+const PROJECTS = require("./content/projects");
+const SVC_BY_ID = Object.fromEntries(MAIN_SERVICES.map((m) => [m.id, m]));
+const projectHref = (pj) => pj.href || `/work/${pj.slug}`;
+const projectCard = (pj, loc) => `<a class="pj" href="${projectHref(pj)}" data-s="${pj.services.join(" ")}" data-track="Project open" data-loc="${loc}-${pj.slug}">
+  <span class="pj-img${pj.imgTall ? " pj-img-tall" : ""}"><img src="${pj.img}" alt="${esc(pj.imgAlt)}" loading="lazy"></span>
+  <span class="pj-body"><span class="pj-type">${esc(pj.type)}</span><span class="pj-name">${esc(pj.name)}</span><span class="pj-blurb">${esc(pj.blurb)}</span>
+  <span class="pj-tags">${pj.services.map((id) => `<i>${esc(SVC_BY_ID[id].name)}</i>`).join("")}</span>
+  <span class="pj-go">${pj.href ? "See the plugin" : "See the project"} →</span></span>
+</a>`;
+// Which projects appear on each service page.
+const SERVICE_PROJECTS = {
+  "/services/automation": "automation", "/services/ai-voice-agents": "voice", "/services/ai-chatbots": "voice",
+  "/services/in-house-tech-team": "inhouse", "/services/web-design": "web", "/services/website-redesign": "web",
+  "/services/ecommerce": "web", "/services/cms-development": "cms",
+};
+const projectsSection = (id, loc) => {
+  const list = PROJECTS.filter((pj) => pj.services.includes(id));
+  if (!list.length) return "";
+  return `
+<section class="light pad-sm pj-sec">
+  <div class="wrap">
+    <div class="kicker">Real projects</div>
+    <h2 class="h2" style="margin-bottom:12px">${esc(SVC_BY_ID[id].name)} <em>we've built.</em></h2>
+    <p class="sub" style="margin-bottom:32px">Real work with real screenshots. Click a project for the full story.</p>
+    <div class="pj-grid">
+${list.map((pj) => projectCard(pj, loc)).join("\n")}
+    </div>
+    <p class="pj-all"><a href="/work/?s=${id}">See all projects →</a></p>
+  </div>
+</section>`;
+};
 
 function nav(cls = "nav scrolled", logoHref = "/") {
   return `<header class="${cls}" id="nav">
   <div class="wrap">
     <a href="${logoHref}" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="187" height="33"></a>
     <nav class="nav-links" id="navLinks" aria-label="Main">
-      <div class="nav-dd"><a href="/#services" class="dd-t">Services <i aria-hidden="true"></i></a><div class="dd-menu dd-svc">${MAIN_SERVICES.map((m, i) => `<a href="/#svc-${m.id}"><b>0${i + 1}</b><span>${esc(m.name)}<small>${esc(m.line)}</small></span></a>`).join("")}<a href="/offers/" class="dd-all">All packages and offers →</a></div></div>
-      <a href="/#work">Work</a>
+      <div class="nav-dd"><a href="/#services" class="dd-t">Services <i aria-hidden="true"></i></a><div class="dd-menu dd-svc">${MAIN_SERVICES.map((m, i) => `<a href="${m.href}"><b>0${i + 1}</b><span>${esc(m.name)}<small>${esc(m.line)}</small></span></a>`).join("")}<a href="/services/" class="dd-all">All services →</a></div></div>
+      <a href="/work/">Work</a>
       <a href="/#pricing">Pricing</a>
       <a href="/plugins/">Free plugins</a>
       <a href="/blog/">Guides</a>
@@ -212,7 +245,7 @@ ${headExtra(url)}
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap"></noscript>
 <link rel="stylesheet" href="/assets/site.css?v=6">
-<link rel="stylesheet" href="/assets/v2.css?v=2">
+<link rel="stylesheet" href="/assets/v2.css?v=5">
 <script type="application/ld+json">
 ${schema(p)}
 </script>
@@ -252,6 +285,7 @@ ${p.body.trim()}
     </aside>
   </div>
 </article>
+${p.type === "service" && SERVICE_PROJECTS[p.path] ? projectsSection(SERVICE_PROJECTS[p.path], p.path) : ""}
 ${
   p.faqs && p.faqs.length
     ? `
@@ -294,7 +328,7 @@ ${related.map((r) => `      <a class="rel" href="${r.path}"><span class="rel-k">
 ${footer()}
 ${stickyCta()}
 <script src="/config.js"></script>
-<script src="/assets/site.js?v=2" defer></script>
+<script src="/assets/site.js?v=3" defer></script>
 <script src="/assets/chat-widget.js" defer></script>
 </body>
 </html>
@@ -337,7 +371,7 @@ ${headExtra(url, p.noindex)}
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap"></noscript>
 <link rel="stylesheet" href="/assets/site.css?v=6">
-<link rel="stylesheet" href="/assets/v2.css?v=2">
+<link rel="stylesheet" href="/assets/v2.css?v=5">
 <script type="application/ld+json">
 ${schema(p)}
 </script>
@@ -351,7 +385,7 @@ ${main}
 ${footer()}
 ${stickyCta()}
 <script src="/config.js"></script>
-<script src="/assets/site.js?v=2" defer></script>
+<script src="/assets/site.js?v=3" defer></script>
 <script src="/assets/chat-widget.js" defer></script>
 </body>
 </html>
@@ -1193,6 +1227,52 @@ function enhanceHome(html) {
   return html;
 }
 
+// ---------- Our work (/work/ and /work/<slug>) ----------
+write("/work/", render({
+  path: "/work/", type: "hub", kicker: "Our work",
+  title: "Our Work: Automation, AI Agents, Software, Websites & CMS | WebersLink",
+  description: "Real projects built by the WebersLink team: an outreach automation engine, a booking platform, an AI assistant, WordPress plugins and client websites for businesses in the US and beyond.",
+  h1: "Real projects. <em>Built in-house.</em>",
+  lead: "Software products, AI agents, WordPress plugins and client websites, all designed, built and looked after by our own team. Filter by service, then open a project for the full story.",
+  card: { title: "Our work" },
+  heroCta: `<div class="hero-cta"><a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="work-hero">Book a free call →</a><a href="/#services" class="btn btn-ghost">See our services</a></div>`,
+  body: `<div class="pj-filter" role="group" aria-label="Filter projects by service">
+  <button type="button" data-f="all" aria-pressed="true">All <small>${PROJECTS.length}</small></button>
+${MAIN_SERVICES.map((m) => `  <button type="button" data-f="${m.id}" aria-pressed="false">${esc(m.name)} <small>${PROJECTS.filter((pj) => pj.services.includes(m.id)).length}</small></button>`).join("\n")}
+</div>
+<div class="pj-grid pj-grid-hub">
+${PROJECTS.map((pj) => projectCard(pj, "work")).join("\n")}
+</div>`,
+}).replace('<div class="wrap prose-wrap">', '<div class="wrap prose-wrap hub">'));
+
+PROJECTS.filter((pj) => pj.detail).forEach((pj) => {
+  const d = pj.detail;
+  const svcLinks = pj.services.map((id) => SVC_BY_ID[id].href);
+  write(`/work/${pj.slug}`, render({
+    path: `/work/${pj.slug}`, type: "project", kicker: pj.type,
+    title: `${pj.name}: ${pj.type.split(" · ")[0]} | WebersLink`,
+    description: pj.blurb,
+    h1: d.h1, lead: d.lead,
+    card: { title: pj.name },
+    crumbs: [["Our work", "/work/"]],
+    heroCta: `<div class="hero-cta"><a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="project-${pj.slug}">Build something like this →</a>${pj.live ? `<a href="${pj.live}" class="btn btn-ghost" target="_blank" rel="noopener">Visit the live site ↗</a>` : `<a href="/work/" class="btn btn-ghost">All projects</a>`}</div>`,
+    body: `
+<div class="pj-meta"><div><small>Services</small>${pj.services.map((id) => `<a href="${SVC_BY_ID[id].href}">${esc(SVC_BY_ID[id].name)}</a>`).join("")}</div><div><small>Built with</small>${pj.stack.map((t) => `<span>${esc(t)}</span>`).join("")}</div></div>
+${d.gallery.map(([src, cap, w, h]) => `<figure class="svc-fig${h > w ? " svc-fig-tall" : ""}"><img src="${src}" alt="${esc(cap)}" width="${w}" height="${h}" loading="lazy"><figcaption>${esc(cap)}</figcaption></figure>`).join("\n")}
+<h2>The challenge</h2>
+<p>${esc(d.challenge)}</p>
+<h2>What we built</h2>
+<ul>
+${d.built.map((b) => `  <li>${esc(b)}</li>`).join("\n")}
+</ul>
+<h2>The result</h2>
+<p>${esc(d.outcome)}</p>
+${d.quote ? `<blockquote class="pj-quote"><p>“${esc(d.quote[0])}”</p><cite>${esc(d.quote[1])}</cite></blockquote>` : ""}
+<p class="pj-next"><a href="/work/">← All projects</a></p>`,
+    related: svcLinks,
+  }));
+});
+
 // ---------- Shared footer on the homepage ----------
 const homeFile = path.join(PUBLIC, "index.html");
 const home = fs.readFileSync(homeFile, "utf8");
@@ -1208,6 +1288,7 @@ const urls = [
   ...SERVICES.map((p) => [p.path, "0.9"]),
   ...INDUSTRIES.map((p) => [p.path, "0.8"]),
   ...GUIDES.map((p) => [p.path, "0.7"]),
+  ["/work/", "0.8"], ...PROJECTS.filter((pj) => pj.detail).map((pj) => [`/work/${pj.slug}`, "0.7"]),
   ["/plugins/", "0.7"], ["/plugins/weberslink-forms-pro", "0.7"], ["/plugins/weberslink-smtp", "0.7"], ["/plugins/weberslink-redirects", "0.7"], ["/plugins/weberslink-security", "0.7"], ["/plugins/weberslink-seo", "0.7"], ["/plugins/weberslink-cookies", "0.7"], ["/plugins/weberslink-images", "0.7"], ["/plugins/weberslink-popups", "0.7"],
   ["/privacy", "0.2"],
 ];
@@ -1235,6 +1316,10 @@ ${INDUSTRIES.map((p) => llmLink(p.path, p.card.title, p.description)).join("\n")
 
 ## Guides
 ${GUIDES.map((p) => llmLink(p.path, p.card.title, p.description)).join("\n")}
+
+## Our work
+- [All projects](${SITE}/work/): Real projects by the WebersLink team, filterable by service.
+${PROJECTS.filter((pj) => pj.detail).map((pj) => llmLink(`/work/${pj.slug}`, pj.name, pj.blurb)).join("\n")}
 
 ## Free resources
 - [Free WordPress plugins](${SITE}/plugins/): Free, GPL-licensed WordPress plugins for forms, email, redirects, security and SEO.

@@ -274,4 +274,187 @@ module.exports = [
       ["How much does a website redesign cost?", "Redesigns start at $1,490 one-time for up to 5 pages, or are included in the Lead System setup — with a fixed quote after the audit."],
     ],
   },
+  // Primary: "AI voice agent for small business" · Secondary: "AI receptionist", "AI phone answering service", "AI call answering"
+  {
+    path: "/services/ai-voice-agents",
+    type: "service",
+    serviceName: "AI voice and chat agents for business",
+    title: "AI Voice Agents & AI Receptionist for Business | WebersLink",
+    description: "An AI receptionist that answers your phone calls, website chat and WhatsApp 24/7, answers questions about your services and books appointments into your calendar. For businesses in the US, UK and Europe.",
+    kicker: "AI voice & chat agents",
+    h1: "An AI receptionist that <em>answers every call, day or night.</em>",
+    lead: "Our AI agents pick up your phone, website chat and WhatsApp in a natural voice, answer questions about your services and book the appointment. When a person is needed, they hand over to you.",
+    card: { title: "AI Voice & Chat Agents", blurb: "An AI receptionist for your phone, website chat and WhatsApp that answers and books 24/7." },
+    crumbs: [["Services", "/services/"]],
+    related: ["/services/ai-chatbots", "/services/automation", "/blog/speed-to-lead", "/blog/ai-chatbot-cost"],
+    body: `
+<h2>Every missed call is a customer calling someone else</h2>
+<p>Calls come in while you're with a customer, on a job, or asleep. Most callers won't leave a voicemail. They simply ring the next business on Google. An <strong>AI voice agent</strong> answers every call within a ring or two, in a calm, natural voice, and does what a good receptionist does: answers the question, takes the details and books the appointment.</p>
+
+<figure class="svc-fig svc-fig-split">
+  <img src="/images/ai-assistant-chat.webp" alt="The WebersLink AI assistant chat window answering a question about a roof leak and offering two appointment times" width="760" height="1200" loading="lazy">
+  <figcaption><strong>The real WebersLink AI assistant</strong>, the same technology we build for clients, shown with an example conversation. The voice agent works the same way on the phone.</figcaption>
+</figure>
+
+<h2>What your AI agent does</h2>
+<ul>
+  <li><strong>Answers phone calls 24/7</strong> in a natural voice, in your business name, with no hold music.</li>
+  <li><strong>Chats on your website and WhatsApp</strong> using the same knowledge, so every channel gives the same answer.</li>
+  <li><strong>Answers real questions</strong> about your services, prices, areas, opening hours and process, trained only on information you approve.</li>
+  <li><strong>Books appointments</strong> into Google Calendar, Outlook, Cal.com or Calendly, and sends the customer a confirmation.</li>
+  <li><strong>Hands over to a person</strong> for urgent jobs, complaints or anything outside its rules, with a summary so nobody repeats themselves.</li>
+  <li><strong>Sends you every call</strong>: a short summary, the caller's details and the recording or transcript, straight to your inbox or CRM.</li>
+</ul>
+
+<figure class="svc-fig">
+  <img src="/assets/plugins/forms-11-booking.webp" alt="An appointment picker showing a date and available time slots, with full slots crossed out" width="1200" height="720" loading="lazy">
+  <figcaption><strong>Only real free times are offered.</strong> A booking step from our own WebersLink Forms plugin: full slots are crossed out, so the agent never double-books you.</figcaption>
+</figure>
+
+<h2>How we set it up</h2>
+<ol>
+  <li><strong>Free 20-minute call.</strong> You tell us how calls and enquiries reach you today and what a good outcome looks like.</li>
+  <li><strong>We train the agent</strong> on your services, prices, FAQs and booking rules, and write clear guardrails: what it may say, and when to pass the call to you.</li>
+  <li><strong>We connect it</strong> to your phone number (or a new one), website, WhatsApp, calendar and CRM.</li>
+  <li><strong>We test it</strong> with real-style calls before launch, then review conversations every month and keep improving it.</li>
+</ol>
+
+<div class="callout"><i>🔒</i><div><strong>Safe by design.</strong> The agent only uses information you approve and says "let me get someone for you" rather than guessing. Callers are told they're speaking to an AI assistant. For EU and UK businesses we set up consent, data retention and a clear privacy notice.</div></div>
+
+<h2>Who it's for</h2>
+<p>Any business where the phone matters: clinics and dentists, home services and contractors, salons, law and accounting firms, property managers, agencies and e-commerce support teams. If you miss calls after hours, at lunch or when it's busy, an AI agent pays for itself quickly.</p>
+
+<h2>Pricing</h2>
+<p>An AI chat agent for your website and WhatsApp is included in our <strong>Lead System</strong> ($490/month + $1,490 setup). AI voice agents for phone calls are quoted after a free call, with one fixed price, because call volume and integrations differ from business to business.</p>
+`,
+    faqs: [
+      ["Will callers know it's an AI?", "Yes. The agent introduces itself as an AI assistant for your business. Most callers simply care that they got a fast, useful answer and a booked time."],
+      ["Can it use my existing phone number?", "Usually yes. We can forward your current number to the agent all the time, only after hours, or only when you don't pick up. We can also set up a new number."],
+      ["What happens with urgent or difficult calls?", "You decide the rules. The agent can transfer the call to you, text you straight away, or take a message and promise a call-back, with a summary of what the caller needs."],
+      ["Which languages does it speak?", "English by default. Other languages, such as Spanish, German, French or Arabic, can be added for your customers."],
+      ["How long does setup take?", "Most agents are live in one to two weeks, depending on how quickly we get your service details and access to your calendar and phone system."],
+    ],
+  },
+  // Primary: "in-house development team" · Secondary: "dedicated development team", "outsourced tech team", "hire developers without hiring"
+  {
+    path: "/services/in-house-tech-team",
+    type: "service",
+    serviceName: "Dedicated in-house tech team",
+    title: "Dedicated In-house Tech Team, Without Hiring | WebersLink",
+    description: "Your own engineering team without the hiring: one dedicated team for websites, software, AI agents and automation that learns your business. Month-to-month, for businesses in the US, UK and Europe.",
+    kicker: "In-house tech team",
+    h1: "Your own engineering team, <em>without the hiring.</em>",
+    lead: "A dedicated team that learns your business and builds what you need: websites, software, AI agents and automation. One team to ask, a shared board to follow, month-to-month.",
+    card: { title: "In-house Tech Team", blurb: "A dedicated engineering team for your business, without recruiting. Month-to-month." },
+    crumbs: [["Services", "/services/"]],
+    related: ["/services/automation", "/services/ai-voice-agents", "/services/cms-development", "/offers/ai-workflow-agents"],
+    body: `
+<h2>The problem with doing tech the usual way</h2>
+<p>Most growing businesses end up with a web designer for the site, a freelancer for automations, a separate chatbot tool and an agency for SEO. None of them talk to each other. When something breaks, everyone says it's someone else's problem, and you become the project manager. Hiring your own developers fixes that, but it takes months and costs full-time salaries before anything ships.</p>
+<p>An <strong>in-house tech team from WebersLink</strong> sits in the middle: a dedicated team that works inside your business like employees would, without the recruiting, payroll or management.</p>
+
+<figure class="svc-fig svc-fig-grid">
+  <img src="/images/devziner-studio.jpg" alt="Devziner Studio agency website shown on a laptop and tablet" width="1200" height="670" loading="lazy">
+  <img src="/images/hurmat-industries.jpg" alt="Hurmat Industries medical equipment website on a desktop and laptop" width="1200" height="533" loading="lazy">
+  <img src="/images/legacy-it-software.jpg" alt="Website for an IT and software company shown on several devices" width="993" height="747" loading="lazy">
+  <img src="/assets/plugins/sec-1-checkup.webp" alt="Security checkup screen from the WebersLink Security plugin" width="1200" height="720" loading="lazy">
+  <figcaption><strong>Built by our team.</strong> Client websites for Devziner Studio, Hurmat Industries and an IT company, and a screen from WebersLink Security, one of the WordPress plugins we build and maintain.</figcaption>
+</figure>
+
+<h2>What you get</h2>
+<ul>
+  <li><strong>A dedicated engineer</strong> who learns your services, customers and tools, and stays on your account.</li>
+  <li><strong>The whole skill set under one roof</strong>: design, front-end and back-end development, AI agents, automation, CMS, SEO and hosting.</li>
+  <li><strong>A shared progress board</strong> where you add requests and watch them move from "next" to "done".</li>
+  <li><strong>Weekly updates</strong> in plain English: what shipped, what's next, and anything we need from you.</li>
+  <li><strong>Monitoring and fixes</strong>. We look after what we build, so problems are caught before customers notice.</li>
+  <li><strong>You own everything</strong>: code, accounts, content and domains are yours from day one.</li>
+</ul>
+
+<h2>What teams like yours ask us to build</h2>
+<ul>
+  <li>A new website or a redesign, with a CMS your team can update</li>
+  <li>Customer portals, dashboards and internal tools</li>
+  <li>AI chat and voice agents that answer and book customers</li>
+  <li>Automations that move data between your CRM, email, sheets and accounting</li>
+  <li>Integrations with the software you already pay for</li>
+  <li>Ongoing improvements, fixes, SEO and speed work</li>
+</ul>
+
+<h2>How it works</h2>
+<ol>
+  <li><strong>Free 20-minute call</strong> to understand your business and the work in front of you.</li>
+  <li><strong>A clear plan and a fixed monthly price</strong> based on how much work you have.</li>
+  <li><strong>Start within a week.</strong> Your engineer gets access, learns your tools and ships the first improvements.</li>
+  <li><strong>Scale up or down</strong> month to month as your needs change. Cancel anytime.</li>
+</ol>
+
+<div class="callout"><i>🌍</i><div><strong>Across time zones.</strong> Our team is based in Lahore, Pakistan, and works with businesses in the US, UK and Europe. We schedule calls at times that suit you, reply within 24 hours, and many clients like that work moves forward while they sleep.</div></div>
+
+<h2>Pricing</h2>
+<p>In-house team plans are month-to-month and priced on the amount of work, from a few days a month to a full-time engineer. Book a free call and we'll give you one fixed monthly price.</p>
+`,
+    faqs: [
+      ["How is this different from hiring a freelancer?", "A freelancer usually covers one skill and one project. Our team covers design, development, AI and automation together, stays on your account, and takes responsibility for keeping things running."],
+      ["How is it different from an agency?", "Agencies tend to deliver a project and move on. We work like part of your company: same people every month, a shared board, and ongoing improvements rather than one-off deliverables."],
+      ["Who owns the code and accounts?", "You do. Everything is set up in your name or handed over to you, so you're never locked in."],
+      ["Can we start small?", "Yes. Many clients start with a few days a month for one project, then add more once they see how it works."],
+      ["How do we communicate?", "Through a shared board for requests, weekly written updates, and calls when they're useful. You'll have one main contact who knows your account."],
+    ],
+  },
+  // Primary: "CMS website development" · Secondary: "WordPress development", "headless CMS", "custom WordPress design"
+  {
+    path: "/services/cms-development",
+    type: "service",
+    serviceName: "CMS design and development",
+    offerFrom: "1490",
+    title: "CMS Design & Development: WordPress & Headless | WebersLink",
+    description: "Custom CMS websites your team can update without a developer: branded WordPress or headless CMS builds, easy page blocks, SEO fields, roles and content migration. From $1,490.",
+    kicker: "CMS design & development",
+    h1: "A website your team can update <em>without calling a developer.</em>",
+    lead: "We design and build CMS websites on WordPress or a modern headless CMS, with branded page blocks your team can't break, SEO built in, and your old content moved across.",
+    card: { title: "CMS Design & Development", blurb: "Custom WordPress and headless CMS websites your team can update themselves. From $1,490." },
+    crumbs: [["Services", "/services/"]],
+    related: ["/services/web-design", "/services/website-redesign", "/plugins/", "/blog/wordpress-vs-custom-website"],
+    body: `
+<h2>What a CMS is, in plain words</h2>
+<p>A <strong>CMS (content management system)</strong> is the editing screen behind your website. With a good one, anyone on your team can change text, photos, prices, team members and blog posts, or build a new landing page, in a few minutes, without touching code and without waiting for a developer.</p>
+<p>Many business websites have a CMS that's either too rigid (every change needs a developer) or too loose (one wrong click breaks the layout). We design the middle ground: <strong>flexible blocks, locked-in design</strong>.</p>
+
+<figure class="svc-fig">
+  <img src="/images/legacy-figma-elementor.jpg" alt="An investment firm website shown on a laptop, tablet and phone" width="1200" height="1200" loading="lazy">
+  <figcaption><strong>Designed in Figma, built in the CMS.</strong> A website for an investment firm (client confidential), delivered as editable page blocks on WordPress so their team can update it themselves.</figcaption>
+</figure>
+
+<h2>What's included</h2>
+<ul>
+  <li><strong>Custom design</strong> in Figma, matched to your brand and approved before we build.</li>
+  <li><strong>Your choice of CMS</strong>: WordPress for flexibility and a huge plugin ecosystem, or a headless CMS (such as Sanity or Strapi) for speed and custom apps.</li>
+  <li><strong>Branded page blocks</strong>: hero, services, pricing, testimonials, FAQs, galleries and forms, which your team arranges like building blocks.</li>
+  <li><strong>SEO built in</strong>: titles, descriptions, social previews, schema and sitemaps on every page.</li>
+  <li><strong>Roles and approvals</strong>, so writers can draft and managers can publish.</li>
+  <li><strong>Content migration</strong> from your old website, with redirects so you keep your Google rankings.</li>
+  <li><strong>Training and a short video guide</strong> for your team.</li>
+</ul>
+
+<figure class="svc-fig svc-fig-grid svc-fig-grid-3">
+  <img src="/assets/plugins/forms-1-builder.webp" alt="WordPress form builder with fields on the left and the form layout in the middle" width="1200" height="720" loading="lazy">
+  <img src="/assets/plugins/seo-2-editor.webp" alt="WordPress SEO panel showing a Google preview, focus keyword and checklist" width="1200" height="720" loading="lazy">
+  <img src="/assets/plugins/pop-2-editor.webp" alt="WordPress popup editor with headline, text and email form settings" width="1200" height="720" loading="lazy">
+  <figcaption><strong>Editing screens we build.</strong> Forms, SEO and popups from our own WordPress plugins: simple, clearly labelled screens that non-technical teams use every day. <a href="/plugins/">See our free plugins</a>.</figcaption>
+</figure>
+
+<h2>WordPress or headless?</h2>
+<p><strong>WordPress</strong> suits most business websites: it's familiar, affordable to run and has a plugin for almost everything. A <strong>headless CMS</strong> suits teams that need very fast sites, content shared across a website and an app, or a custom front end. We'll recommend the simpler option that does the job. <a href="/blog/wordpress-vs-custom-website">Read our WordPress vs custom website guide</a>.</p>
+
+<h2>Pricing</h2>
+<p>CMS websites start at <strong>$1,490</strong> one-time for up to 5 custom pages. Larger sites, headless builds and migrations get a fixed quote after a free call. Hosting, updates and ongoing changes are available monthly, or as part of an <a href="/services/in-house-tech-team">in-house team</a> plan.</p>
+`,
+    faqs: [
+      ["Will I be able to update the site myself?", "Yes, that's the point. We build editable blocks, train your team and give you a short video guide. Most changes take a few minutes."],
+      ["Can you move my existing website to a new CMS?", "Yes. We migrate your pages, posts and images, and set up redirects so links and Google rankings carry over."],
+      ["Do you work with Elementor or other page builders?", "Yes. We build custom WordPress themes and Elementor sites, and we'll advise which suits your team best."],
+      ["What about security and updates?", "We keep WordPress, themes and plugins up to date, add security hardening and backups, and monitor the site if you choose a care plan."],
+    ],
+  },
 ];

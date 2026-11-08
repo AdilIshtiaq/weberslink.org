@@ -328,3 +328,23 @@
     });
   }
 }());
+
+/* Our work: filter projects by service (/work/?s=voice opens that filter) */
+(function () {
+  var bar = document.querySelector('.pj-filter');
+  if (!bar) return;
+  var btns = Array.prototype.slice.call(bar.querySelectorAll('button'));
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.pj-grid-hub .pj'));
+  function apply(f) {
+    if (!btns.some(function (b) { return b.dataset.f === f; })) f = 'all';
+    btns.forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.f === f); });
+    cards.forEach(function (c) { c.hidden = f !== 'all' && c.dataset.s.split(' ').indexOf(f) < 0; });
+  }
+  btns.forEach(function (b) {
+    b.addEventListener('click', function () {
+      apply(b.dataset.f);
+      if (history.replaceState) history.replaceState(null, '', b.dataset.f === 'all' ? location.pathname : '?s=' + b.dataset.f);
+    });
+  });
+  apply(new URLSearchParams(location.search).get('s') || 'all');
+}());

@@ -18,6 +18,9 @@
 - [SEO for Service Businesses](https://weberslink.org/services/seo): SEO for service businesses and contractors in the US and Europe: technical SEO, local SEO, Google Business Profile, content and links that bring in enquiries.
 - [WooCommerce & E-commerce](https://weberslink.org/services/ecommerce): WooCommerce store design and development for small brands: product variations, payments, WhatsApp ordering, fast checkout and SEO. See our live store work.
 - [Website Redesign](https://weberslink.org/services/website-redesign): Website redesign for small businesses with outdated or underperforming sites. We audit first, keep what works, protect your SEO and rebuild for speed and conversions.
+- [AI Voice & Chat Agents](https://weberslink.org/services/ai-voice-agents): An AI receptionist that answers your phone calls, website chat and WhatsApp 24/7, answers questions about your services and books appointments into your calendar. For businesses in the US, UK and Europe.
+- [In-house Tech Team](https://weberslink.org/services/in-house-tech-team): Your own engineering team without the hiring: one dedicated team for websites, software, AI agents and automation that learns your business. Month-to-month, for businesses in the US, UK and Europe.
+- [CMS Design & Development](https://weberslink.org/services/cms-development): Custom CMS websites your team can update without a developer: branded WordPress or headless CMS builds, easy page blocks, SEO fields, roles and content migration. From $1,490.
 - [WooCommerce Sales Recovery Pilot](https://weberslink.org/woocommerce): Free 14-day pilot for WooCommerce stores: an AI shopping assistant that answers shoppers 24/7, automatic abandoned-cart follow-up, and mobile speed fixes. Set up in 48 hours.
 
 ## Industries
@@ -33,6 +36,17 @@
 - [WordPress vs Custom Website](https://weberslink.org/blog/wordpress-vs-custom-website): WordPress vs a custom-coded website for small businesses: cost, speed, security, SEO, editing and maintenance compared — plus which to choose for your situation.
 - [Contractor Website Checklist: 15 Must-Haves](https://weberslink.org/blog/contractor-website-checklist): A practical contractor website checklist: 15 things every roofing, remodeling, plumbing and HVAC website needs to rank locally and turn visitors into booked estimates.
 - [Why Is My Website Not Getting Leads?](https://weberslink.org/blog/website-not-generating-leads): Website getting visitors but no enquiries? 9 common reasons small business websites don't generate leads — and practical fixes you can make this week.
+
+## Our work
+- [All projects](https://weberslink.org/work/): Real projects by the WebersLink team, filterable by service.
+- [Outreach Engine](https://weberslink.org/work/outreach-engine): A cold-email platform that runs itself: multi-mailbox sending with warm-up, reply and bounce detection, link-click tracking, AI personalisation and a full dashboard.
+- [Online Booking Platform](https://weberslink.org/work/booking-platform): A booking system for salons, clinics and trades: customer booking pages, a staff dashboard, reminders, client records, reports, team logins and Stripe deposits.
+- [WebersLink AI Assistant](https://weberslink.org/work/ai-assistant): A streaming AI chat agent trained on our services and prices. It answers questions, qualifies visitors and saves leads straight to our inbox, with guardrails and daily limits.
+- [Baladez Construction](https://weberslink.org/work/baladez-construction): A design-build showcase for a luxury home builder, with full-screen galleries, Matterport 3D walkthroughs and project-inquiry flows.
+- [Senjoey Collective](https://weberslink.org/work/senjoey-collective): A home-services site with service-area selection, a guided quote request and licensing and trust sections throughout.
+- [Sharjah Optical](https://weberslink.org/work/sharjah-optical): A full WooCommerce eyewear store with complex product variations and one-tap WhatsApp ordering.
+- [Hurmat Industries](https://weberslink.org/work/hurmat-industries): A corporate site for a medical equipment manufacturer with a legacy since 1935: catalogue, certifications and inquiry flows.
+- [Devziner Studio](https://weberslink.org/work/devziner-studio): An agency site bringing branding, UI/UX and web and app development together, with clear project-inquiry calls to action.
 
 ## Free resources
 - [Free WordPress plugins](https://weberslink.org/plugins/): Free, GPL-licensed WordPress plugins for forms, email, redirects, security and SEO.
