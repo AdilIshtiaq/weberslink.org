@@ -1209,8 +1209,10 @@ function enhanceHome(html) {
   const canon = `<link rel="canonical" href="${SITE}/">`;
   if (!html.includes('hreflang="x-default"')) html = html.replace(canon, () => `${canon}\n${headExtra(SITE + "/")}`);
   if (!html.includes('class="skip"')) html = html.replace(/<body>/, `<body>\n${SKIP}`);
-  html = html.replace(/<meta name="google-adsense-account"[^>]*>\n?/, "");
-  if (ADSENSE) html = html.replace(canon, () => `${canon}\n${adsMeta().trim()}`);
+  html = html.replace(/<meta name="google-adsense-account"[^>]*>\n?/, "").replace(/<script async src="https:\/\/pagead2\.googlesyndication\.com[^>]*><\/script>\n?/, "");
+  // Homepage: verification tag plus the AdSense code snippet in <head>, which Google checks when verifying the site.
+  // To keep Auto ads off the homepage, add a page exclusion for weberslink.org/ in AdSense (Ads -> Auto ads -> Page exclusions).
+  if (ADSENSE) html = html.replace(canon, () => `${canon}\n${adsMeta().trim()}\n<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE}" crossorigin="anonymous"></script>`);
   html = html.replace(/<main>/, '<main id="main">');
   const re = /<script type="application\/ld\+json">\s*([\s\S]*?)\s*<\/script>/;
   const m = html.match(re);
