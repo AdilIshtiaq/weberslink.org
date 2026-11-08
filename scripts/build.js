@@ -61,17 +61,15 @@ function nav(cls = "nav scrolled", logoHref = "/") {
   <div class="wrap">
     <a href="${logoHref}" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="187" height="33"></a>
     <nav class="nav-links" id="navLinks" aria-label="Main">
-      <div class="nav-dd"><a href="/offers/" class="dd-t">Offers <i aria-hidden="true"></i></a><div class="dd-menu">${OFFERS.map((o) => `<a href="${o.path}"><b>${o.n}</b>${esc(o.name)}</a>`).join("")}</div></div>
+      <div class="nav-dd"><a href="/offers/" class="dd-t">What we do <i aria-hidden="true"></i></a><div class="dd-menu">${OFFERS.map((o) => `<a href="${o.path}"><b>${o.n}</b>${esc(o.name)}</a>`).join("")}</div></div>
       <a href="/#work">Work</a>
       <a href="/#pricing">Pricing</a>
       <a href="/demos/">Demos</a>
-      <a href="/plugins/">Free resources</a>
       <a href="/blog/">Guides</a>
       <a href="/contact">Contact</a>
       <a href="/book/login" class="nav-signin" data-track="Sign in" data-loc="nav">Sign in</a>
-      <a href="/book/new" class="nav-signup-m" data-track="Sign up" data-loc="nav-menu">Sign up free</a>
     </nav>
-    <div class="nav-cta"><a href="/book/new" class="btn btn-ghost nav-signup" data-track="Sign up" data-loc="nav">Sign up</a><a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="nav">Book a walkthrough</a></div>
+    <div class="nav-cta"><a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="nav">Book a free call</a></div>
     <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false"><span></span><span></span></button>
   </div>
 </header>`;
@@ -85,7 +83,7 @@ function footer() {
     <div class="foot-cols">
       <div class="fcol fcol-brand">
         <a href="/" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="187" height="33"></a>
-        <p>Forward-deployed engineers for businesses in the US, UK &amp; Europe. We build and run AI assistants, automation, websites and reporting in-house.</p>
+        <p>Websites and AI assistants that answer, follow up and book your leads for you. For service businesses in the US, UK &amp; Europe.</p>
         <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="footer">Book a walkthrough</a>
       </div>
       ${col("Offers", OFFERS)}
