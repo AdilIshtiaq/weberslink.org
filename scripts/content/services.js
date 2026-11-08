@@ -422,8 +422,8 @@ module.exports = [
 <p>Many business websites have a CMS that's either too rigid (every change needs a developer) or too loose (one wrong click breaks the layout). We design the middle ground: <strong>flexible blocks, locked-in design</strong>.</p>
 
 <figure class="svc-fig">
-  <img src="/images/legacy-figma-elementor.jpg" alt="Damascene Capital website shown on a laptop, tablet and phone" width="1200" height="1200" loading="lazy">
-  <figcaption><strong>Designed in Figma, built in the CMS.</strong> A client website for Damascene Capital, delivered as editable page blocks on WordPress so their team can update it themselves.</figcaption>
+  <img src="/images/legacy-figma-elementor.jpg" alt="An investment firm website shown on a laptop, tablet and phone" width="1200" height="1200" loading="lazy">
+  <figcaption><strong>Designed in Figma, built in the CMS.</strong> A website for an investment firm (client confidential), delivered as editable page blocks on WordPress so their team can update it themselves.</figcaption>
 </figure>
 
 <h2>What's included</h2>
