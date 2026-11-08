@@ -451,3 +451,14 @@
 :root{--x-grad:linear-gradient(95deg,#ff3b2e 0%,#ff7a59 25%,#e0261c 50%,#ff7a59 75%,#ff3b2e 100%)}
 .nav.scrolled{background:linear-gradient(180deg,rgba(9,8,7,.86),rgba(9,8,7,.72))!important}
 .side-card{background:linear-gradient(140deg,rgba(22,18,16,.94),rgba(10,9,8,.86))!important}
+/* homepage project cards */
+.x-case{display:flex;flex-direction:column;color:var(--x-off)}
+.x-case-img{display:block;aspect-ratio:16/10;overflow:hidden;background:#0a0908;border-bottom:1px solid var(--x-line)}
+.x-case-img img{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 0;aspect-ratio:auto}
+.x-case-img-tall img{object-fit:contain;padding-top:12px}
+.x-case-cap{display:flex;flex-direction:column;flex:1;padding:22px 24px 24px}
+.x-case-cap small{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--x-red-b)}
+.x-case-cap b{display:block;font-family:var(--x-disp);font-size:21px;font-weight:800;letter-spacing:-.02em;margin:6px 0 10px}
+.x-case-txt{font-size:14.5px;line-height:1.6;color:var(--x-mut);margin-bottom:16px}
+.x-case-go{margin-top:auto;font-size:14px;font-weight:600}
+.x-case:hover .x-case-go{color:var(--x-red-b)}
