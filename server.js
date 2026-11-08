@@ -223,6 +223,7 @@ function seoRedirect(req, res) {
   const qs = query ? "?" + query : "";
   if (host === "www." + CANONICAL_HOST) return redirect(res, `https://${CANONICAL_HOST}${req.url}`), true;
   if (/^\/(demos|book)(\/|$)/.test(rawPath)) return redirect(res, "/"), true; // the booking system and its demo were removed
+  if (/^\/work\/(baladez-construction|senjoey-collective|sharjah-optical|hurmat-industries|devziner-studio)(\.html)?\/?$/.test(rawPath)) return redirect(res, "/work/"), true; // client sites no longer listed
   if (LEGACY_REDIRECTS[rawPath.replace(/\.html$/, "").replace(/\/+$/, "")]) return redirect(res, LEGACY_REDIRECTS[rawPath.replace(/\.html$/, "").replace(/\/+$/, "")] + qs), true;
   let p = rawPath.replace(/\/{2,}/g, "/");
   if (/\/index\.html$/.test(p)) p = p.replace(/index\.html$/, "");

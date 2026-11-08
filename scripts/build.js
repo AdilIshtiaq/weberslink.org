@@ -105,7 +105,6 @@ function nav(cls = "nav scrolled", logoHref = "/") {
     <nav class="nav-links" id="navLinks" aria-label="Main">
       <div class="nav-dd"><a href="/#services" class="dd-t">Services <i aria-hidden="true"></i></a><div class="dd-menu dd-svc">${MAIN_SERVICES.map((m, i) => `<a href="${m.href}"><b>0${i + 1}</b><span>${esc(m.name)}<small>${esc(m.line)}</small></span></a>`).join("")}<a href="/services/" class="dd-all">All services →</a></div></div>
       <a href="/work/">Work</a>
-      <a href="/#pricing">Pricing</a>
       <a href="/plugins/">Free plugins</a>
       <a href="/blog/">Guides</a>
       <a href="/contact">Contact</a>
@@ -245,7 +244,7 @@ ${headExtra(url)}
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap"></noscript>
 <link rel="stylesheet" href="/assets/site.css?v=6">
-<link rel="stylesheet" href="/assets/v2.css?v=5">
+<link rel="stylesheet" href="/assets/v2.css?v=9">
 <script type="application/ld+json">
 ${schema(p)}
 </script>
@@ -320,7 +319,7 @@ ${related.map((r) => `      <a class="rel" href="${r.path}"><span class="rel-k">
     <p class="sub">Book a free 20-minute walkthrough. We'll look at where your business loses time or leads, and what we'd build — no obligation.</p>
     <div class="hero-cta" style="margin-top:28px">
       <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="band">Book a free call →</a>
-      <a href="/#pricing" class="btn btn-ghost">See pricing</a>
+      <a href="/work/" class="btn btn-ghost">See our work</a>
     </div>
   </div>
 </section>
@@ -371,7 +370,7 @@ ${headExtra(url, p.noindex)}
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap"></noscript>
 <link rel="stylesheet" href="/assets/site.css?v=6">
-<link rel="stylesheet" href="/assets/v2.css?v=5">
+<link rel="stylesheet" href="/assets/v2.css?v=9">
 <script type="application/ld+json">
 ${schema(p)}
 </script>
@@ -1231,14 +1230,14 @@ function enhanceHome(html) {
 write("/work/", render({
   path: "/work/", type: "hub", kicker: "Our work",
   title: "Our Work: Automation, AI Agents, Software, Websites & CMS | WebersLink",
-  description: "Real projects built by the WebersLink team: an outreach automation engine, a booking platform, an AI assistant, WordPress plugins and client websites for businesses in the US and beyond.",
+  description: "Real projects built by the WebersLink team: an email outreach automation engine, an online booking platform and an AI chat assistant, designed, built and run in-house.",
   h1: "Real projects. <em>Built in-house.</em>",
-  lead: "Software products, AI agents, WordPress plugins and client websites, all designed, built and looked after by our own team. Filter by service, then open a project for the full story.",
+  lead: "Automation, AI agents and software we designed, built and run ourselves. Filter by service, then open a project for the full story.",
   card: { title: "Our work" },
   heroCta: `<div class="hero-cta"><a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="work-hero">Book a free call →</a><a href="/#services" class="btn btn-ghost">See our services</a></div>`,
   body: `<div class="pj-filter" role="group" aria-label="Filter projects by service">
   <button type="button" data-f="all" aria-pressed="true">All <small>${PROJECTS.length}</small></button>
-${MAIN_SERVICES.map((m) => `  <button type="button" data-f="${m.id}" aria-pressed="false">${esc(m.name)} <small>${PROJECTS.filter((pj) => pj.services.includes(m.id)).length}</small></button>`).join("\n")}
+${MAIN_SERVICES.filter((m) => PROJECTS.some((pj) => pj.services.includes(m.id))).map((m) => `  <button type="button" data-f="${m.id}" aria-pressed="false">${esc(m.name)} <small>${PROJECTS.filter((pj) => pj.services.includes(m.id)).length}</small></button>`).join("\n")}
 </div>
 <div class="pj-grid pj-grid-hub">
 ${PROJECTS.map((pj) => projectCard(pj, "work")).join("\n")}
@@ -1318,7 +1317,7 @@ ${INDUSTRIES.map((p) => llmLink(p.path, p.card.title, p.description)).join("\n")
 ${GUIDES.map((p) => llmLink(p.path, p.card.title, p.description)).join("\n")}
 
 ## Our work
-- [All projects](${SITE}/work/): Real projects by the WebersLink team, filterable by service.
+- [All projects](${SITE}/work/): Automation, AI agent and software projects by the WebersLink team.
 ${PROJECTS.filter((pj) => pj.detail).map((pj) => llmLink(`/work/${pj.slug}`, pj.name, pj.blurb)).join("\n")}
 
 ## Free resources

@@ -37,7 +37,7 @@
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap"></noscript>
 <link rel="stylesheet" href="/assets/site.css?v=6">
-<link rel="stylesheet" href="/assets/v2.css?v=5">
+<link rel="stylesheet" href="/assets/v2.css?v=9">
 <script type="application/ld+json">
 {
  "@context": "https://schema.org",
@@ -170,7 +170,6 @@
     <nav class="nav-links" id="navLinks" aria-label="Main">
       <div class="nav-dd"><a href="/#services" class="dd-t">Services <i aria-hidden="true"></i></a><div class="dd-menu dd-svc"><a href="/services/automation"><b>01</b><span>Automation<small>Software that does your repetitive work</small></span></a><a href="/services/ai-voice-agents"><b>02</b><span>AI Voice &amp; Chat Agents<small>An AI receptionist for calls and chat, 24/7</small></span></a><a href="/services/in-house-tech-team"><b>03</b><span>In-house Tech Team<small>Your own engineers, without hiring</small></span></a><a href="/services/web-design"><b>04</b><span>Web &amp; Software Development<small>Websites, web apps and custom software</small></span></a><a href="/services/cms-development"><b>05</b><span>CMS Design &amp; Development<small>A website your team can update itself</small></span></a><a href="/services/" class="dd-all">All services<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a></div></div>
       <a href="/work/">Work</a>
-      <a href="/#pricing">Pricing</a>
       <a href="/plugins/">Free plugins</a>
       <a href="/blog/">Guides</a>
       <a href="/contact">Contact</a>
@@ -188,6 +187,11 @@
   <div class="x-gridlines" aria-hidden="true"></div>
   <canvas id="scene" aria-hidden="true"></canvas>
   <div class="orb" aria-hidden="true"><div class="orb-ball"></div><div class="orb-ring r1"></div><div class="orb-ring r2"></div></div>
+  <div class="x-float" aria-hidden="true">
+    <div class="x-glass-chip x-chip-1"><span class="x-chip-ic">☎</span><div><b>Call answered</b><small>AI agent · 38 seconds</small></div></div>
+    <div class="x-glass-chip x-chip-2"><span class="x-chip-ic">⚙</span><div><b>Lead saved to CRM</b><small>Automation · just now</small></div></div>
+    <div class="x-glass-chip x-chip-3"><span class="x-chip-ic x-chip-ok">✓</span><div><b>Booked Thu 9:00</b><small>Confirmation sent</small></div></div>
+  </div>
   <div class="x-wrap x-hero-in">
     <p class="x-label" data-m><i></i>Your in-house tech team · US, UK &amp; Europe</p>
     <h1 class="x-h1" data-m>We build the tech<br><span class="x-grad">that runs your business.</span></h1>
@@ -251,7 +255,7 @@
             <li>A weekly report in your inbox, written in plain English</li>
           </ul>
           <p class="x-good"><b>Good for:</b> busy admin teams, sales follow-up, operations</p>
-          <div class="x-panel-cta"><a href="#book" class="x-btn" data-package="Not sure" data-track="Service CTA" data-loc="automation">Talk about automation</a><a href="/services/automation" class="x-link">Learn more<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a><a href="/work/?s=automation" class="x-link x-link-mut">See projects</a></div>
+          <div class="x-panel-cta"><a href="#book" class="x-btn" data-track="Service CTA" data-loc="automation">Talk about automation</a><a href="/services/automation" class="x-link">Learn more<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a><a href="/work/?s=automation" class="x-link x-link-mut">See projects</a></div>
         </div>
         <div class="x-panel-vis" aria-hidden="true">
           <p class="x-vis-k">Example: a new enquiry arrives</p>
@@ -334,7 +338,7 @@
             <li>Integrations, hosting, security and maintenance</li>
           </ul>
           <p class="x-good"><b>Good for:</b> a new website, a redesign, or software your team needs</p>
-          <div class="x-panel-cta"><a href="#book" class="x-btn" data-package="Website" data-track="Service CTA" data-loc="web">Talk about a project</a><a href="/services/web-design" class="x-link">Learn more<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a><a href="/work/?s=web" class="x-link x-link-mut">See projects</a></div>
+          <div class="x-panel-cta"><a href="#book" class="x-btn" data-track="Service CTA" data-loc="web">Talk about a project</a><a href="/services/web-design" class="x-link">Learn more<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a><a href="/work/?s=web" class="x-link x-link-mut">See projects</a></div>
         </div>
         <div class="x-panel-vis" aria-hidden="true">
           <p class="x-vis-k">Example: a client portal</p>
@@ -364,7 +368,7 @@
             <li>Content moved from your old site, plus team training</li>
           </ul>
           <p class="x-good"><b>Good for:</b> marketing teams, publishers, businesses that update their site often</p>
-          <div class="x-panel-cta"><a href="#book" class="x-btn" data-package="Website" data-track="Service CTA" data-loc="cms">Talk about a CMS</a><a href="/services/cms-development" class="x-link">Learn more<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a><a href="/work/?s=cms" class="x-link x-link-mut">See projects</a></div>
+          <div class="x-panel-cta"><a href="#book" class="x-btn" data-track="Service CTA" data-loc="cms">Talk about a CMS</a><a href="/services/cms-development" class="x-link">Learn more<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a></div>
         </div>
         <div class="x-panel-vis" aria-hidden="true">
           <p class="x-vis-k">Example: editing a page yourself</p>
@@ -435,62 +439,24 @@
   <div class="x-wrap">
     <div class="x-head" data-m>
       <p class="x-eyebrow">Our work</p>
-      <h2 class="x-h2">Real businesses.<br><span class="x-grad">Real results.</span></h2>
-      <p class="x-sub">Software products, AI agents and websites for builders, home services, retailers and manufacturers.</p>
+      <h2 class="x-h2">Built in-house.<br><span class="x-grad">Running every day.</span></h2>
+      <p class="x-sub">Automation, AI agents and software we designed, built and run ourselves. The same team builds yours.</p>
     </div>
     <div class="x-work">
-      <figure class="x-case" data-m>
-        <a href="https://bcidesignbuild.com/" target="_blank" rel="noopener"><img src="/images/baladez-construction.jpg" alt="Baladez Construction website on a monitor and tablet" loading="lazy" width="1200" height="670"></a>
-        <figcaption><small>Houston, Texas · Home builder</small><b>Baladez Construction</b><blockquote>“Our homes are the product, so the website had to match that quality. WebersLink handled the galleries and the Matterport integration without us having to chase anything.”</blockquote></figcaption>
-      </figure>
-      <figure class="x-case" data-m>
-        <a href="https://senjoeycollectivellc.com/" target="_blank" rel="noopener"><img src="/images/senjoey-collective.jpg" alt="Senjoey Collective website on a desktop and laptop" loading="lazy" width="1200" height="670"></a>
-        <figcaption><small>Massachusetts · Home services</small><b>Senjoey Collective</b><blockquote>“Let customers pick a service, get a quote, and book. WebersLink built exactly that, with the licensing and trust details baked in from the start.”</blockquote></figcaption>
-      </figure>
-      <figure class="x-case" data-m>
-        <a href="https://sharjahoptical.online/" target="_blank" rel="noopener"><img src="/images/sharjah-optical.jpg" alt="Sharjah Optical online eyewear store on a desktop and laptop" loading="lazy" width="1200" height="670"></a>
-        <figcaption><small>E-commerce · Eyewear retailer</small><b>Sharjah Optical</b><blockquote>“They understood our product variations and WhatsApp ordering flow immediately. The store has held up well under real traffic.”</blockquote></figcaption>
-      </figure>
+      <a class="x-case" href="/work/outreach-engine" data-m>
+        <span class="x-case-img"><img src="/images/project-outreach-dashboard.webp" alt="Outreach Engine dashboard with leads, replies, bounces and mailbox warm-up" loading="lazy" width="1200" height="592"></span>
+        <span class="x-case-cap"><small>Automation · Software</small><b>Outreach Engine</b><span class="x-case-txt">A cold-email platform that runs itself: multi-mailbox sending with warm-up, reply and bounce detection, click tracking and AI personalisation.</span><span class="x-case-go">See the project<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></span></span>
+      </a>
+      <a class="x-case" href="/work/booking-platform" data-m>
+        <span class="x-case-img"><img src="/images/project-booking-dashboard.webp" alt="Booking platform staff dashboard showing a dental clinic's day" loading="lazy" width="1200" height="620"></span>
+        <span class="x-case-cap"><small>Software · Automation</small><b>Online Booking Platform</b><span class="x-case-txt">Booking pages, a staff dashboard, reminders, client records, team logins and Stripe deposits for appointment businesses.</span><span class="x-case-go">See the project<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></span></span>
+      </a>
+      <a class="x-case" href="/work/ai-assistant" data-m>
+        <span class="x-case-img x-case-img-tall"><img src="/images/ai-assistant-chat.webp" alt="WebersLink AI assistant chat window" loading="lazy" width="760" height="1200"></span>
+        <span class="x-case-cap"><small>AI chat agent</small><b>WebersLink AI Assistant</b><span class="x-case-txt">A streaming AI agent trained on our services and prices. It answers questions, qualifies visitors and saves leads to our inbox.</span><span class="x-case-go">See the project<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></span></span>
+      </a>
     </div>
     <p class="x-work-all" data-m><a href="/work/" class="x-btn x-btn-glass">See all projects<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a></p>
-  </div>
-</section>
-
-<!-- PRICING -->
-<section class="x-sec x-paper" id="pricing">
-  <div class="x-wrap">
-    <div class="x-head" data-m>
-      <p class="x-eyebrow">Pricing</p>
-      <h2 class="x-h2">Simple plans.<br><span class="x-grad x-grad-ink">No lock-in.</span></h2>
-      <p class="x-sub">One setup fee, then month-to-month. Cancel anytime and you keep everything we built. Prices in USD; we also invoice in EUR or GBP.</p>
-    </div>
-    <div class="x-plans">
-      <article class="x-plan" data-m>
-        <h3>Website</h3>
-        <p class="x-plan-for">A great website you own outright.</p>
-        <p class="x-price"><small>from</small> $1,490 <small>one-time</small></p>
-        <ul><li>Up to 5 custom pages</li><li>Fast, mobile-first build</li><li>Easy-to-edit CMS</li><li>On-page SEO and Google Business setup</li><li>30 days of support</li></ul>
-        <a href="#book" class="x-btn x-btn-ghost" data-package="Website">Get a website</a>
-      </article>
-      <article class="x-plan x-plan-feat" data-m>
-        <span class="x-badge">Most popular</span>
-        <h3>Lead System</h3>
-        <p class="x-plan-for">Website, AI agent and automation working together.</p>
-        <p class="x-price">$490 <small>/month</small></p>
-        <p class="x-setup">+ $1,490 one-time setup</p>
-        <ul><li>Website up to 10 pages, hosted and maintained</li><li>AI chat agent on your site and WhatsApp</li><li>Replies in under 60 seconds, 24/7</li><li>Appointments booked into your calendar</li><li>Automatic follow-ups and review requests</li><li>Monthly tuning and report</li></ul>
-        <a href="#book" class="x-btn" data-package="Lead System">Get the Lead System</a>
-      </article>
-      <article class="x-plan" data-m>
-        <h3>Growth Engine</h3>
-        <p class="x-plan-for">Everything in Lead System, plus more leads coming in.</p>
-        <p class="x-price">$990 <small>/month</small></p>
-        <p class="x-setup">+ $1,490 one-time setup</p>
-        <ul><li>Everything in Lead System</li><li>Local SEO and service-area pages</li><li>Google Business Profile management</li><li>Google and Meta ads management</li><li>New automations every month</li></ul>
-        <a href="#book" class="x-btn x-btn-ghost" data-package="Growth Engine">Talk about Growth</a>
-      </article>
-    </div>
-    <p class="x-also" data-m>AI voice agents, custom software, CMS projects and in-house teams are quoted after a free call, with one fixed price. <a href="#book">Ask for a quote</a></p>
   </div>
 </section>
 
@@ -533,17 +499,10 @@
               <div class="field"><label for="f-email">Work email</label><input id="f-email" name="email" type="email" required autocomplete="email"></div>
             </div>
             <div class="field"><label for="f-site">Current website <span class="opt">(optional)</span></label><input id="f-site" name="website" inputmode="url" placeholder="yourwebsite.com" autocomplete="url"></div>
-            <div class="row2">
-              <div class="field"><label for="f-service">What do you need?</label>
+            <div class="field"><label for="f-service">What do you need?</label>
                 <select id="f-service" name="service">
                   <option>Automation</option><option>AI voice or chat agent</option><option>In-house tech team</option><option>Website or software</option><option>CMS design and development</option><option>Not sure yet</option>
                 </select>
-              </div>
-              <div class="field"><label for="f-package">Plan</label>
-                <select id="f-package" name="package">
-                  <option>Not sure</option><option>Website</option><option>Lead System</option><option>Growth Engine</option>
-                </select>
-              </div>
             </div>
             <div class="field"><label for="f-msg">Anything we should know? <span class="opt">(optional)</span></label><textarea id="f-msg" name="message" placeholder="What's slowing you down, your goals, links…"></textarea></div>
             <label class="consent"><input type="checkbox" required> <span>I agree to WebersLink contacting me about this request. See our <a href="/privacy">privacy policy</a>.</span></label>

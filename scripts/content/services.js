@@ -45,7 +45,7 @@ module.exports = [
 </ol>
 
 <h2>Pricing</h2>
-<p>A website you own outright starts at <strong>$1,490</strong> one-time for up to 5 custom pages. Most clients choose the <strong>Lead System</strong> — <strong>$490/month</strong> plus a $1,490 setup — which adds up to 10 pages, hosting and maintenance, an AI assistant, online booking, automatic follow-up and review requests. See <a href="/#pricing">all packages</a>, or read <a href="/blog/small-business-website-cost">how much a small business website costs in 2026</a>.</p>
+<p>A website you own outright starts at <strong>$1,490</strong> one-time for up to 5 custom pages. Most clients choose the <strong>Lead System</strong> — <strong>$490/month</strong> plus a $1,490 setup — which adds up to 10 pages, hosting and maintenance, an AI assistant, online booking, automatic follow-up and review requests. See <a href="/offers/">all packages</a>, or read <a href="/blog/small-business-website-cost">how much a small business website costs in 2026</a>.</p>
 `,
     faqs: [
       ["How much does a small business website cost?", "A website you own outright starts at $1,490 one-time for up to 5 pages. Our Lead System — website plus AI assistant, booking and follow-up, hosted and managed — is $490/month plus a $1,490 setup."],
@@ -354,11 +354,11 @@ module.exports = [
 <p>An <strong>in-house tech team from WebersLink</strong> sits in the middle: a dedicated team that works inside your business like employees would, without the recruiting, payroll or management.</p>
 
 <figure class="svc-fig svc-fig-grid">
-  <img src="/images/devziner-studio.jpg" alt="Devziner Studio agency website shown on a laptop and tablet" width="1200" height="670" loading="lazy">
-  <img src="/images/hurmat-industries.jpg" alt="Hurmat Industries medical equipment website on a desktop and laptop" width="1200" height="533" loading="lazy">
-  <img src="/images/legacy-it-software.jpg" alt="Website for an IT and software company shown on several devices" width="993" height="747" loading="lazy">
-  <img src="/assets/plugins/sec-1-checkup.webp" alt="Security checkup screen from the WebersLink Security plugin" width="1200" height="720" loading="lazy">
-  <figcaption><strong>Built by our team.</strong> Client websites for Devziner Studio, Hurmat Industries and an IT company, and a screen from WebersLink Security, one of the WordPress plugins we build and maintain.</figcaption>
+  <img src="/images/project-outreach-dashboard.webp" alt="Outreach Engine dashboard with leads, replies and mailbox warm-up" width="1200" height="592" loading="lazy">
+  <img src="/images/project-booking-dashboard.webp" alt="Booking platform staff dashboard showing a clinic's day" width="1200" height="620" loading="lazy">
+  <img src="/images/project-outreach-leads.webp" alt="Outreach Engine leads table with status, next step and mailbox" width="1200" height="750" loading="lazy">
+  <img src="/images/project-booking-customer.webp" alt="Booking platform customer flow: choose a person or anyone available" width="1200" height="503" loading="lazy">
+  <figcaption><strong>Built and run by our team.</strong> Our Outreach Engine and Online Booking Platform: real products we designed, built and keep improving. <a href="/work/">See our work</a>.</figcaption>
 </figure>
 
 <h2>What you get</h2>
