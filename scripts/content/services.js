@@ -45,7 +45,7 @@ module.exports = [
 </ol>
 
 <h2>Pricing</h2>
-<p>A website you own outright starts at <strong>$1,490</strong> one-time for up to 5 custom pages. Most clients choose the <strong>Lead System</strong> — <strong>$490/month</strong> plus a $1,490 setup — which adds up to 10 pages, hosting and maintenance, an AI assistant, online booking, automatic follow-up and review requests. See <a href="/#pricing">all packages</a>, or read <a href="/blog/small-business-website-cost">how much a small business website costs in 2026</a>.</p>
+<p>A website you own outright starts at <strong>$1,490</strong> one-time for up to 5 custom pages. Most clients choose the <strong>Lead System</strong> — <strong>$490/month</strong> plus a $1,490 setup — which adds up to 10 pages, hosting and maintenance, an AI assistant, online booking, automatic follow-up and review requests. See <a href="/offers/">all packages</a>, or read <a href="/blog/small-business-website-cost">how much a small business website costs in 2026</a>.</p>
 `,
     faqs: [
       ["How much does a small business website cost?", "A website you own outright starts at $1,490 one-time for up to 5 pages. Our Lead System — website plus AI assistant, booking and follow-up, hosted and managed — is $490/month plus a $1,490 setup."],

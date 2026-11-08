@@ -105,7 +105,6 @@ function nav(cls = "nav scrolled", logoHref = "/") {
     <nav class="nav-links" id="navLinks" aria-label="Main">
       <div class="nav-dd"><a href="/#services" class="dd-t">Services <i aria-hidden="true"></i></a><div class="dd-menu dd-svc">${MAIN_SERVICES.map((m, i) => `<a href="${m.href}"><b>0${i + 1}</b><span>${esc(m.name)}<small>${esc(m.line)}</small></span></a>`).join("")}<a href="/services/" class="dd-all">All services →</a></div></div>
       <a href="/work/">Work</a>
-      <a href="/#pricing">Pricing</a>
       <a href="/plugins/">Free plugins</a>
       <a href="/blog/">Guides</a>
       <a href="/contact">Contact</a>
@@ -245,7 +244,7 @@ ${headExtra(url)}
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap"></noscript>
 <link rel="stylesheet" href="/assets/site.css?v=6">
-<link rel="stylesheet" href="/assets/v2.css?v=5">
+<link rel="stylesheet" href="/assets/v2.css?v=8">
 <script type="application/ld+json">
 ${schema(p)}
 </script>
@@ -320,7 +319,7 @@ ${related.map((r) => `      <a class="rel" href="${r.path}"><span class="rel-k">
     <p class="sub">Book a free 20-minute walkthrough. We'll look at where your business loses time or leads, and what we'd build — no obligation.</p>
     <div class="hero-cta" style="margin-top:28px">
       <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="band">Book a free call →</a>
-      <a href="/#pricing" class="btn btn-ghost">See pricing</a>
+      <a href="/work/" class="btn btn-ghost">See our work</a>
     </div>
   </div>
 </section>
@@ -371,7 +370,7 @@ ${headExtra(url, p.noindex)}
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap"></noscript>
 <link rel="stylesheet" href="/assets/site.css?v=6">
-<link rel="stylesheet" href="/assets/v2.css?v=5">
+<link rel="stylesheet" href="/assets/v2.css?v=8">
 <script type="application/ld+json">
 ${schema(p)}
 </script>

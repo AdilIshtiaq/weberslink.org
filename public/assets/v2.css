@@ -390,3 +390,64 @@
 .prose a.pj,.prose a.pj:hover{text-decoration:none;color:var(--ink)}
 .prose a.pj *{text-decoration:none}
 .prose .pj-filter button{font-family:var(--sans)}
+
+/* =====================================================================
+   Glass: frosted, translucent surfaces with a soft top highlight
+   ===================================================================== */
+:root{
+  --g-light:linear-gradient(140deg,rgba(255,255,255,.78),rgba(255,255,255,.42));
+  --g-light-bd:rgba(255,255,255,.85);
+  --g-dark:linear-gradient(140deg,rgba(255,255,255,.10),rgba(255,255,255,.025));
+  --g-dark-bd:rgba(255,255,255,.14);
+  --g-blur:blur(22px) saturate(170%);
+  --g-shadow-l:inset 0 1px 0 rgba(255,255,255,.9),0 24px 60px -32px rgba(60,20,15,.35);
+  --g-shadow-d:inset 0 1px 0 rgba(255,255,255,.12),0 30px 70px -36px rgba(0,0,0,.8);
+}
+/* light sections get soft colour so the frosting has something to blur */
+.x-paper,#faq{background:radial-gradient(ellipse 45% 40% at 8% 12%,rgba(255,59,46,.16),transparent 70%),radial-gradient(ellipse 40% 45% at 95% 30%,rgba(255,138,110,.18),transparent 70%),radial-gradient(ellipse 50% 40% at 50% 100%,rgba(224,38,28,.10),transparent 70%),var(--x-paper)}
+#faq{background-color:var(--x-paper2)}
+
+/* light glass */
+.x-tabs button,.x-panel,#faq .faq,.pj,.prose-wrap .prose,.rel,.pj-filter button,.pj-meta{background:var(--g-light)!important;-webkit-backdrop-filter:var(--g-blur);backdrop-filter:var(--g-blur);border:1px solid var(--g-light-bd)!important;box-shadow:var(--g-shadow-l)}
+#faq .faq{padding:8px 26px;border-radius:22px}
+.x-panel-copy{background:transparent}
+.x-tabs button[aria-selected=true],.pj-filter button[aria-pressed=true]{background:linear-gradient(140deg,rgba(20,16,14,.92),rgba(13,11,10,.82))!important;border-color:rgba(255,255,255,.12)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 22px 44px -18px rgba(224,38,28,.55)}
+.prose-wrap.hub .prose{background:none!important;border:0!important;box-shadow:none;backdrop-filter:none}
+
+/* dark glass */
+.x-compare,.x-case,.x-form-card,.x-call,.x-board,.x-browser,.x-editor,.x-node,.side-card,.x-need-row a,.x-label,.x-btn-glass{background:var(--g-dark)!important;-webkit-backdrop-filter:var(--g-blur);backdrop-filter:var(--g-blur);border:1px solid var(--g-dark-bd)!important;box-shadow:var(--g-shadow-d)}
+.x-col-yes{background:linear-gradient(160deg,rgba(224,38,28,.22),rgba(224,38,28,.02) 65%)}
+.x-audit{background:linear-gradient(140deg,rgba(244,242,237,.95),rgba(244,242,237,.78))!important;-webkit-backdrop-filter:var(--g-blur);backdrop-filter:var(--g-blur);border:1px solid rgba(255,255,255,.6);box-shadow:var(--g-shadow-l)}
+.x-form-card input,.x-form-card select,.x-form-card textarea{background:rgba(255,255,255,.05)!important;border:1px solid rgba(255,255,255,.14)!important;color:var(--x-off)!important}
+.x-form-card select option{color:#111}
+
+/* glass header once you scroll */
+.nav.scrolled{background:linear-gradient(180deg,rgba(9,8,7,.62),rgba(9,8,7,.42))!important;-webkit-backdrop-filter:blur(22px) saturate(180%);backdrop-filter:blur(22px) saturate(180%);border-bottom:1px solid rgba(255,255,255,.08)}
+.dd-menu{background:linear-gradient(150deg,rgba(24,20,18,.82),rgba(12,10,9,.72))!important;-webkit-backdrop-filter:var(--g-blur);backdrop-filter:var(--g-blur);border:1px solid rgba(255,255,255,.12)!important}
+.sticky-cta{-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px)}
+
+/* floating glass cards beside the 3D object */
+.x-float{position:absolute;inset:0;pointer-events:none;z-index:1}
+.x-glass-chip{position:absolute;display:flex;align-items:center;gap:12px;padding:12px 16px 12px 12px;border-radius:16px;background:var(--g-dark);-webkit-backdrop-filter:var(--g-blur);backdrop-filter:var(--g-blur);border:1px solid var(--g-dark-bd);box-shadow:var(--g-shadow-d);color:var(--x-off);animation:x-bob 7s ease-in-out infinite}
+.x-glass-chip b{display:block;font-size:14px;font-weight:600}
+.x-glass-chip small{font-size:12px;color:var(--x-mut)}
+.x-chip-ic{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--x-red-b),var(--x-red-d));font-size:15px;color:#fff;flex:none}
+.x-chip-ok{background:linear-gradient(135deg,#22c55e,#15803d)}
+.x-chip-1{right:30%;top:24%}
+.x-chip-2{right:5%;top:52%;animation-delay:-2.3s}
+.x-chip-3{right:24%;bottom:16%;animation-delay:-4.6s}
+@keyframes x-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+@media(max-width:1180px){.x-float{display:none}}
+@media (prefers-reduced-motion:reduce){.x-glass-chip{animation:none}}
+/* browsers without backdrop blur fall back to solid surfaces */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .x-tabs button,.x-panel,#faq .faq,.pj,.rel,.pj-meta{background:#fff!important}
+  .x-compare,.x-case,.x-form-card,.x-call,.x-board,.x-browser,.x-editor,.x-node,.side-card,.x-glass-chip{background:#151210!important}
+}
+/* fixes: chip placement, gradient stays red while it shimmers, darker glass header */
+.x-chip-1{right:20%;top:15%}
+.x-chip-2{right:4%;top:50%}
+.x-chip-3{right:12%;bottom:9%}
+:root{--x-grad:linear-gradient(95deg,#ff3b2e 0%,#ff7a59 25%,#e0261c 50%,#ff7a59 75%,#ff3b2e 100%)}
+.nav.scrolled{background:linear-gradient(180deg,rgba(9,8,7,.86),rgba(9,8,7,.72))!important}
+.side-card{background:linear-gradient(140deg,rgba(22,18,16,.94),rgba(10,9,8,.86))!important}
