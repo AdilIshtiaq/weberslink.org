@@ -121,7 +121,6 @@ async function route(req, res, url, method) {
     const tok = url.searchParams.get("token") || req.headers["x-cron-token"] || "";
     if (CRON_TOKEN.length < 16 || !tok || !safeEqual(tok, CRON_TOKEN)) return send(res, 403, { ok: false, error: "Forbidden" });
     eng.processScheduled().catch((e) => console.error("outreach scheduled replies:", e.message)); // the cron call also wakes a sleeping app
-    require("../booking").sendReminders().catch((e) => console.error("booking reminders:", e.message));
     const r = eng.startRun({ source: "cron" });
     return send(res, r.started ? 202 : 409, { ok: r.started, ...(r.started ? {} : { error: r.reason }) });
   }

@@ -56,13 +56,9 @@
     $$('#navLinks a').forEach(function (a) { a.addEventListener('click', function () { nav.classList.remove('open'); menuBtn.setAttribute('aria-expanded', false); }); });
   }
 
-  // Sign in: business owners and their team sign in to their booking dashboard. A browser that has opened a
-  // booking dashboard before shows "My bookings" straight to it (a remembered page name, not a credential).
-  // The site owner's own Outreach dashboard link only appears in the site owner's browser.
+  // The site owner's own Outreach dashboard link only appears in the site owner's browser. Visitors see no sign-in.
   try {
-    var navLinks = $('#navLinks'), si = $('.nav-signin');
-    var mine = localStorage.getItem('wl_booking_slug');
-    if (si && mine && /^[a-z0-9-]{3,40}$/.test(mine)) { si.textContent = 'My bookings'; si.href = '/book/' + mine + '/admin'; }
+    var navLinks = $('#navLinks');
     if (navLinks && localStorage.getItem('wl_owner') === '1') {
       var ol = document.createElement('a'); ol.href = '/admin/outreach'; ol.rel = 'nofollow'; ol.textContent = 'Outreach';
       navLinks.appendChild(ol);
