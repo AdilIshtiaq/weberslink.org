@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cold Email Deliverability: How to Stay Out of Spam | WebersLink</title>
+<meta name="description" content="A practical guide to cold email deliverability: domain setup (SPF, DKIM, DMARC), warm-up, sending limits, list cleaning, bounces, replies and writing emails that reach the inbox.">
+<link rel="canonical" href="https://weberslink.org/blog/cold-email-deliverability">
+<link rel="alternate" hreflang="en" href="https://weberslink.org/blog/cold-email-deliverability">
+<link rel="alternate" hreflang="x-default" href="https://weberslink.org/blog/cold-email-deliverability">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="en_GB">
+<link rel="manifest" href="/site.webmanifest">
+<link rel="alternate" type="application/rss+xml" title="WebersLink guides" href="https://weberslink.org/feed.xml">
+<meta name="theme-color" content="#090807">
+<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48"><link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="WebersLink">
+<meta property="og:url" content="https://weberslink.org/blog/cold-email-deliverability">
+<meta property="og:title" content="Cold Email Deliverability: How to Stay Out of Spam | WebersLink">
+<meta property="og:description" content="A practical guide to cold email deliverability: domain setup (SPF, DKIM, DMARC), warm-up, sending limits, list cleaning, bounces, replies and writing emails that reach the inbox.">
+<meta property="og:image" content="https://weberslink.org/og-weberslink.jpg">
+<meta property="og:image:secure_url" content="https://weberslink.org/og-weberslink.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="WebersLink: forward-deployed engineers who build and run AI, automation and web systems">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Cold Email Deliverability: How to Stay Out of Spam | WebersLink">
+<meta name="twitter:description" content="A practical guide to cold email deliverability: domain setup (SPF, DKIM, DMARC), warm-up, sending limits, list cleaning, bounces, replies and writing emails that reach the inbox.">
+<meta name="twitter:image" content="https://weberslink.org/og-weberslink.jpg">
+<meta name="twitter:image:alt" content="WebersLink: forward-deployed engineers who build and run AI, automation and web systems">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap"></noscript>
+<link rel="stylesheet" href="/assets/site.css?v=6">
+<link rel="stylesheet" href="/assets/v2.css?v=10">
+<meta name="google-adsense-account" content="ca-pub-7735069817622962">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7735069817622962" crossorigin="anonymous"></script>
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@graph": [
+  {
+   "@type": "BreadcrumbList",
+   "itemListElement": [
+    {
+     "@type": "ListItem",
+     "position": 1,
+     "name": "Home",
+     "item": "https://weberslink.org/"
+    },
+    {
+     "@type": "ListItem",
+     "position": 2,
+     "name": "Guides",
+     "item": "https://weberslink.org/blog/"
+    },
+    {
+     "@type": "ListItem",
+     "position": 3,
+     "name": "Cold Email Deliverability",
+     "item": "https://weberslink.org/blog/cold-email-deliverability"
+    }
+   ]
+  },
+  {
+   "@type": "Article",
+   "headline": "Cold email deliverability: how to stay out of the spam folder",
+   "description": "A practical guide to cold email deliverability: domain setup (SPF, DKIM, DMARC), warm-up, sending limits, list cleaning, bounces, replies and writing emails that reach the inbox.",
+   "datePublished": "2026-11-09",
+   "dateModified": "2026-11-09",
+   "author": {
+    "@type": "Organization",
+    "name": "WebersLink",
+    "url": "https://weberslink.org/",
+    "logo": "https://weberslink.org/apple-touch-icon.png"
+   },
+   "publisher": {
+    "@type": "Organization",
+    "name": "WebersLink",
+    "url": "https://weberslink.org/",
+    "logo": "https://weberslink.org/apple-touch-icon.png"
+   },
+   "mainEntityOfPage": "https://weberslink.org/blog/cold-email-deliverability",
+   "image": "https://weberslink.org/og-weberslink.jpg"
+  },
+  {
+   "@type": "FAQPage",
+   "mainEntity": [
+    {
+     "@type": "Question",
+     "name": "How many cold emails can I send per day?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Start low with new mailboxes and increase gradually. Spreading volume across several warmed-up mailboxes at a natural pace is safer than sending a lot from one."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Do I need a separate domain for cold email?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "It's a common and sensible practice, so any reputation issues don't affect your main company email. Set it up with a real website and proper authentication."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Why do my emails go to spam?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "The usual causes are missing SPF, DKIM or DMARC records, sending too much too soon, high bounce rates, and emails that look like marketing blasts rather than personal messages."
+     }
+    }
+   ]
+  }
+ ]
+}
+</script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></symbol><symbol id="i-arrow-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></symbol><symbol id="i-arrow-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></symbol></svg>
+<a class="skip" href="#main">Skip to content</a>
+<header class="nav scrolled" id="nav">
+  <div class="wrap">
+    <a href="/" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="187" height="33"></a>
+    <nav class="nav-links" id="navLinks" aria-label="Main">
+      <div class="nav-dd"><a href="/#services" class="dd-t">Services <i aria-hidden="true"></i></a><div class="dd-menu dd-svc"><a href="/services/automation"><b>01</b><span>Automation<small>Software that does your repetitive work</small></span></a><a href="/services/ai-voice-agents"><b>02</b><span>AI Voice &amp; Chat Agents<small>An AI receptionist for calls and chat, 24/7</small></span></a><a href="/services/in-house-tech-team"><b>03</b><span>In-house Tech Team<small>Your own engineers, without hiring</small></span></a><a href="/services/web-design"><b>04</b><span>Web &amp; Software Development<small>Websites, web apps and custom software</small></span></a><a href="/services/cms-development"><b>05</b><span>CMS Design &amp; Development<small>A website your team can update itself</small></span></a><a href="/services/" class="dd-all">All services<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a></div></div>
+      <a href="/work/">Work</a>
+      <a href="/plugins/">Free plugins</a>
+      <a href="/blog/">Guides</a>
+      <a href="/contact">Contact</a>
+    </nav>
+    <div class="nav-cta"><a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="nav">Book a free call</a></div>
+    <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false"><span></span><span></span></button>
+  </div>
+</header>
+<main id="main">
+<section class="page-hero">
+  <div class="hero-grid" aria-hidden="true"></div>
+  <div class="wrap">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a><span>/</span><a href="/blog/">Guides</a><span>/</span><span aria-current="page">Cold Email Deliverability</span></nav>
+    <div class="kicker">Guide · Automation</div>
+    <h1>Cold email deliverability: how to stay out of the spam folder</h1>
+    <p class="lead">The best cold email in the world is worthless if it lands in spam. Here's what decides whether your emails reach the inbox, and the habits that protect your domain, from people who built their own outreach system.</p>
+    <p class="ph-meta">By <a href="/about">the WebersLink team</a> · Updated November 2026 · 9 min read</p>
+    <div class="hero-cta">
+      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="/blog/cold-email-deliverability">Book a free call<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a>
+      <a href="/#audit" class="btn btn-ghost" data-track="Audit CTA" data-loc="/blog/cold-email-deliverability">Get a free website audit</a>
+    </div>
+  </div>
+</section>
+
+<article class="white page-body">
+  <div class="wrap prose-wrap">
+    <div class="prose">
+<h2>What "deliverability" means</h2>
+<p>Deliverability is whether your email reaches the inbox, lands in spam, or doesn't arrive at all. Email providers decide this using your domain's reputation, technical authentication, how recipients react to your emails and the content itself. Cold email is judged especially strictly, because recipients didn't ask to hear from you.</p>
+<p>Before anything else: follow the law where your recipients are. Rules differ between countries, for example the CAN-SPAM Act in the US and GDPR and PECR in the UK and EU. Always identify yourself, give an easy way to opt out and honour it promptly.</p>
+
+<h2>1. Set up your domain properly</h2>
+<p>Three DNS records tell email providers that your emails are really from you:</p>
+<ul>
+  <li><strong>SPF</strong> lists the servers allowed to send email for your domain.</li>
+  <li><strong>DKIM</strong> adds a digital signature that proves the email wasn't changed on the way.</li>
+  <li><strong>DMARC</strong> tells providers what to do with emails that fail those checks, and sends you reports.</li>
+</ul>
+<p>Many teams send cold email from a separate domain similar to their main one, so any reputation problems don't affect everyday company email. Give that domain a real website and a real person behind each mailbox.</p>
+
+<h2>2. Warm up new mailboxes</h2>
+<p>A brand-new mailbox that suddenly sends hundreds of emails looks suspicious. Start small and increase gradually over several weeks, for example a handful of emails a day in the first week, rising week by week. Our own system uses a stepped warm-up per mailbox and never lets a single mailbox exceed a daily cap.</p>
+
+<h2>3. Send like a person, not a machine</h2>
+<ul>
+  <li>Space emails out with natural, varied gaps of a few minutes, not bursts.</li>
+  <li>Keep daily volume per mailbox modest; spread larger campaigns across several mailboxes.</li>
+  <li>Send during sensible hours for the recipient's time zone.</li>
+  <li>Send follow-ups as replies in the same thread, from the same mailbox.</li>
+</ul>
+
+<h2>4. Clean your list before you send</h2>
+<p>Bounces damage your reputation quickly. Before sending, remove obviously invalid addresses, duplicates and role addresses that rarely belong to a decision-maker, and check that each domain can receive email. Keep a permanent do-not-contact list and check it before every send.</p>
+
+<h2>5. Watch bounces and pause early</h2>
+<p>Track your bounce rate per mailbox. If it rises above a few percent, stop and investigate: your list may be outdated or your data source poor. Distinguish between permanent bounces (address doesn't exist: never email again) and temporary ones (mailbox full or server busy: try later). Pausing a mailbox automatically when bounces spike is one of the best protections you can build.</p>
+
+<h2>6. Stop the moment someone replies</h2>
+<p>Nothing annoys people more than a "just following up" email after they've already replied, or after they asked you to stop. Read replies, opt-outs and bounces before every send, and stop the sequence for that person (and ideally their colleagues) immediately. Count only what the person actually wrote, not the quoted history or your own signature, when deciding whether someone opted out.</p>
+
+<h2>7. Write emails that look personal</h2>
+<ul>
+  <li>Keep it short, plain and relevant to the recipient's business.</li>
+  <li>Personalise the first line with something genuinely specific, not just their first name.</li>
+  <li>Avoid heavy images, attachments, lots of links and spammy phrases.</li>
+  <li>Make one clear, low-effort ask, like a quick reply.</li>
+  <li>Test subject lines one change at a time, and give each version enough sends before judging.</li>
+</ul>
+
+<h2>8. Be careful with tracking</h2>
+<p>Open tracking relies on hidden images and is increasingly unreliable. Link-click tracking is more useful, but be aware that email security scanners often click links automatically. Filter out clicks that happen within seconds of sending or come from known scanners, or you'll chase false signals.</p>
+
+<h2>9. Build in safety</h2>
+<p>If your sending system crashes mid-send, it should never email the same person twice. A good system re-checks each lead right before sending and holds anything uncertain for a human to check. These details sound small, but they're the difference between a trusted sender and a blocked one.</p>
+
+<h2>A quick deliverability checklist</h2>
+<ol>
+  <li>SPF, DKIM and DMARC set up</li>
+  <li>Separate sending domain with a real website</li>
+  <li>Gradual warm-up and daily caps per mailbox</li>
+  <li>Clean list and do-not-contact list</li>
+  <li>Automatic pause on high bounces</li>
+  <li>Sequences stop on reply or opt-out</li>
+  <li>Short, personal, plain emails</li>
+</ol>
+<p>We built these rules into our own <a href="/work/outreach-engine">Outreach Engine</a>. If you'd like a system like it for your business, see our <a href="/services/automation">automation service</a>.</p>
+    </div>
+    <aside class="side-cta" aria-label="Get started">
+      <div class="side-card">
+        <p class="side-k">Free for readers</p>
+        <h2>Get a free website audit</h2>
+        <p>We'll record a short video showing what's costing you enquiries — within 48 hours.</p>
+        <a href="/#audit" class="btn btn-light" data-track="Audit CTA" data-loc="sidebar">Get my audit<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a>
+        <a href="/#book" class="side-link" data-track="Book CTA" data-loc="sidebar">or book a 20-min call</a>
+      </div>
+    </aside>
+  </div>
+</article>
+
+
+<section class="light pad-sm">
+  <div class="wrap faq-grid">
+    <div><div class="kicker">FAQ</div><h2 class="h2">Common <em>questions.</em></h2></div>
+    <div class="faq">
+      <details open><summary>How many cold emails can I send per day?</summary><p>Start low with new mailboxes and increase gradually. Spreading volume across several warmed-up mailboxes at a natural pace is safer than sending a lot from one.</p></details>
+      <details><summary>Do I need a separate domain for cold email?</summary><p>It's a common and sensible practice, so any reputation issues don't affect your main company email. Set it up with a real website and proper authentication.</p></details>
+      <details><summary>Why do my emails go to spam?</summary><p>The usual causes are missing SPF, DKIM or DMARC records, sending too much too soon, high bounce rates, and emails that look like marketing blasts rather than personal messages.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="white pad-sm">
+  <div class="wrap">
+    <div class="kicker">Keep reading</div>
+    <h2 class="h2" style="margin-bottom:32px">Related <em>guides & services.</em></h2>
+    <div class="rel-grid">
+      <a class="rel" href="/services/automation"><span class="rel-k">Service</span><h3>Lead Follow-Up Automation</h3><p>Instant replies, follow-up sequences and CRM updates that run themselves.</p><span class="rel-go">Read more<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></span></a>
+      <a class="rel" href="/blog/business-automation-examples"><span class="rel-k">Guide</span><h3>12 Business Automation Examples</h3><p>Practical automations for leads, follow-ups, admin and reporting.</p><span class="rel-go">Read more<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></span></a>
+      <a class="rel" href="/blog/speed-to-lead"><span class="rel-k">Guide</span><h3>Speed to Lead: Why 5 Minutes Matters</h3><p>Why the first business to respond wins — and how to reply in minutes.</p><span class="rel-go">Read more<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></span></a>
+    </div>
+  </div>
+</section>
+<section class="dark pad-sm cta-band">
+  <div class="wrap">
+    <div class="kicker">Next step</div>
+    <h2 class="h2">Ready to see what we'd <em>build for you?</em></h2>
+    <p class="sub">Book a free 20-minute walkthrough. We'll look at where your business loses time or leads, and what we'd build — no obligation.</p>
+    <div class="hero-cta" style="margin-top:28px">
+      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="band">Book a free call<svg class="ico ico-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a>
+      <a href="/work/" class="btn btn-ghost">See our work</a>
+    </div>
+  </div>
+</section>
+</main>
+<footer>
+  <div class="wrap">
+    <div class="foot-cols">
+      <div class="fcol fcol-brand">
+        <a href="/" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="187" height="33"></a>
+        <p>Your in-house tech team: automation, AI voice and chat agents, websites, software and CMS. For businesses in the US, UK &amp; Europe.</p>
+        <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="footer">Book a free call</a>
+      </div>
+      <div class="fcol"><h2>Offers</h2><a href="/offers/lead-command-center">Lead Command Center</a><a href="/offers/follow-up-engine">Follow-Up Engine</a><a href="/offers/local-growth-engine">Local Growth Engine</a><a href="/offers/ai-workflow-agents">AI Workflow Agents</a><a href="/offers/knowledge-assistant">Knowledge Assistant</a><a href="/offers/ai-team-rollout">AI Team Rollout</a><a href="/offers/document-automation">Document &amp; Admin Automation</a></div>
+      <div class="fcol"><h2>Services</h2><a href="/services/web-design">Small Business Web Design</a><a href="/services/ai-chatbots">AI Chatbots for Small Business</a><a href="/services/automation">Lead Follow-Up Automation</a><a href="/services/seo">SEO for Service Businesses</a><a href="/services/ecommerce">WooCommerce &amp; E-commerce</a><a href="/services/website-redesign">Website Redesign</a><a href="/services/ai-voice-agents">AI Voice &amp; Chat Agents</a><a href="/services/in-house-tech-team">In-house Tech Team</a><a href="/services/cms-development">CMS Design &amp; Development</a><a href="/woocommerce">WooCommerce Sales Recovery Pilot</a></div>
+      <div class="fcol"><h2>Industries</h2><a href="/industries/contractors">Contractors &amp; Home Services</a><a href="/industries/home-builders">Home Builders &amp; Construction</a><a href="/industries/professional-services">Accounting &amp; Professional Services</a><a href="/industries/manufacturers">Manufacturers &amp; B2B Suppliers</a></div>
+      <div class="fcol"><h2>Guides</h2><a href="/blog/small-business-website-cost">How Much Does a Small Business Website Cost in 2026?</a><a href="/blog/ai-chatbot-cost">How Much Does an AI Chatbot Cost?</a><a href="/blog/speed-to-lead">Speed to Lead: Why 5 Minutes Matters</a><a href="/blog/wordpress-vs-custom-website">WordPress vs Custom Website</a><a href="/blog/contractor-website-checklist">Contractor Website Checklist: 15 Must-Haves</a></div>
+    </div>
+    <div class="foot-big" aria-hidden="true">WebersLink</div>
+    <div class="copy"><span>© <span id="yr">2026</span> WebersLink · United Kingdom · United States · Lahore, Pakistan</span><span><a href="/about">About</a> · <a href="/plugins/">Plugins</a> · <a href="/privacy">Privacy</a> · <a href="mailto:hassan@weberslink.org">hassan@weberslink.org</a></span></div>
+  </div>
+</footer>
+<aside aria-label="Quick contact">
+<div class="sticky-cta" id="stickyCta">
+  <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="sticky">Book a free call</a>
+  <a href="https://wa.me/message/2MT2JFO63P3LA1" class="btn btn-ghost" data-wa data-track="WhatsApp click" data-loc="sticky" target="_blank" rel="noopener">WhatsApp</a>
+</div>
+</aside>
+<script src="/config.js"></script>
+<script src="/assets/site.js?v=3" defer></script>
+<script src="/assets/chat-widget.js" defer></script>
+</body>
+</html>

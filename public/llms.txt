@@ -1,6 +1,6 @@
 # WebersLink
 
-> WebersLink is a forward-deployed engineering team for businesses in the US, UK and Europe. We build and run systems in-house: AI assistants and workflow agents, automation, websites, lead response and follow-up, local SEO and reporting. Contractors and home-service businesses are a core industry, not the limit. Based in Lahore, Pakistan. Plans are month-to-month. Lead System: $490/month plus a one-time $1,490 setup. Growth Engine: $990/month plus setup. Websites from $1,490 one-time.
+> WebersLink is an in-house tech team for growing businesses. We design, build and look after automation, AI voice and chat agents, websites and custom software, and CMS websites. We work with clients in the United Kingdom and the United States, with our engineering team in Lahore, Pakistan. Monthly plans are month-to-month; projects get a fixed quote after a free 20-minute call.
 
 ## Offers
 - [Lead Command Center](https://weberslink.org/offers/lead-command-center): A conversion website, an AI assistant on your site and WhatsApp, and estimates booked straight into your calendar. Built in-house by WebersLink for contractors and home-service businesses. Live in 2–3 weeks.
@@ -36,6 +36,18 @@
 - [WordPress vs Custom Website](https://weberslink.org/blog/wordpress-vs-custom-website): WordPress vs a custom-coded website for small businesses: cost, speed, security, SEO, editing and maintenance compared — plus which to choose for your situation.
 - [Contractor Website Checklist: 15 Must-Haves](https://weberslink.org/blog/contractor-website-checklist): A practical contractor website checklist: 15 things every roofing, remodeling, plumbing and HVAC website needs to rank locally and turn visitors into booked estimates.
 - [Why Is My Website Not Getting Leads?](https://weberslink.org/blog/website-not-generating-leads): Website getting visitors but no enquiries? 9 common reasons small business websites don't generate leads — and practical fixes you can make this week.
+- [How Much Does an AI Voice Agent Cost?](https://weberslink.org/blog/ai-voice-agent-cost): What an AI voice agent or AI receptionist really costs: per-minute usage, setup, phone numbers, integrations and ongoing tuning, plus how to work out if it pays for itself.
+- [AI Receptionist vs Answering Service](https://weberslink.org/blog/ai-receptionist-vs-answering-service): An honest comparison of AI receptionists and human answering services: cost, availability, call quality, bookings, and when a mix of both works best.
+- [12 Business Automation Examples](https://weberslink.org/blog/business-automation-examples): Practical automation examples for small and growing businesses: lead handling, follow-ups, invoices, onboarding, reporting and more, with what each one needs to work.
+- [Zapier & Make vs Custom Automation](https://weberslink.org/blog/zapier-vs-custom-automation): No-code tools like Zapier and Make are a great start. Here's when they stop being enough, what custom automation adds, and how to decide which is right for each workflow.
+- [Headless CMS vs WordPress](https://weberslink.org/blog/headless-cms-vs-wordpress): A plain-English guide to headless CMS platforms and WordPress: how they work, cost, speed, security, editing experience and which suits your business.
+- [How to Choose a CMS](https://weberslink.org/blog/how-to-choose-a-cms): A step-by-step checklist for choosing the right content management system: who edits, what you publish, features, SEO, security, cost and how to avoid getting locked in.
+- [Developer vs Agency vs Dedicated Team](https://weberslink.org/blog/developer-vs-agency-vs-dedicated-team): Compare hiring an in-house developer, using freelancers, working with an agency and using a dedicated tech team: cost, speed, skills, risk and which fits your business.
+- [Cold Email Deliverability](https://weberslink.org/blog/cold-email-deliverability): A practical guide to cold email deliverability: domain setup (SPF, DKIM, DMARC), warm-up, sending limits, list cleaning, bounces, replies and writing emails that reach the inbox.
+- [Choosing an Online Booking System](https://weberslink.org/blog/online-booking-system-guide): What to look for in online booking software for salons, clinics and service businesses: availability rules, staff, reminders, deposits, no-shows, integrations and pricing.
+
+## About
+- [About WebersLink](https://weberslink.org/about): Who we are, where we work (United Kingdom, United States, Lahore Pakistan) and how we work.
 
 ## Our work
 - [All projects](https://weberslink.org/work/): Automation, AI agent and software projects by the WebersLink team.
