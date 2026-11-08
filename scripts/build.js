@@ -18,6 +18,8 @@ const pages = [
   ...require("./content/services"),
   ...require("./content/industries"),
   ...require("./content/guides"),
+  ...require("./content/guides2"),
+  ...require("./content/guides3"),
   ...require("./content/offers"),
 ];
 const byPath = Object.fromEntries(pages.map((p) => [p.path, p]));
@@ -67,6 +69,12 @@ const MAIN_SERVICES = [
 
 // ---------- Projects (real work only; see scripts/content/projects.js) ----------
 const PROJECTS = require("./content/projects");
+// ---------- Google AdSense (see scripts/adsense.js) ----------
+const ADSENSE = String(require("./adsense").client || "").trim();
+if (ADSENSE && !/^ca-pub-\d{10,20}$/.test(ADSENSE)) throw new Error("scripts/adsense.js: client must look like ca-pub-1234567890123456");
+const adsMeta = () => (ADSENSE ? `<meta name="google-adsense-account" content="${ADSENSE}">\n` : "");
+const adsAllowed = (p) => p.type === "guide" || p.path === "/blog/" || p.path.startsWith("/plugins/");
+const adsScript = (p) => (ADSENSE && adsAllowed(p) ? `<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE}" crossorigin="anonymous"></script>\n` : "");
 const SVC_BY_ID = Object.fromEntries(MAIN_SERVICES.map((m) => [m.id, m]));
 const projectHref = (pj) => pj.href || `/work/${pj.slug}`;
 const projectCard = (pj, loc) => `<a class="pj" href="${projectHref(pj)}" data-s="${pj.services.join(" ")}" data-track="Project open" data-loc="${loc}-${pj.slug}">
@@ -132,7 +140,7 @@ function footer() {
       ${col("Guides", GUIDES.slice(0, 5))}
     </div>
     <div class="foot-big" aria-hidden="true">WebersLink</div>
-    <div class="copy"><span>© <span id="yr">${new Date().getFullYear()}</span> WebersLink · Lahore, Pakistan · Serving clients in the US &amp; Europe</span><span><a href="/plugins/">Plugins</a> · <a href="/privacy">Privacy</a> · <a href="mailto:hassan@weberslink.org">hassan@weberslink.org</a></span></div>
+    <div class="copy"><span>© <span id="yr">${new Date().getFullYear()}</span> WebersLink · United Kingdom · United States · Lahore, Pakistan</span><span><a href="/about">About</a> · <a href="/plugins/">Plugins</a> · <a href="/privacy">Privacy</a> · <a href="mailto:hassan@weberslink.org">hassan@weberslink.org</a></span></div>
   </div>
 </footer>`;
 }
@@ -209,7 +217,7 @@ function render(p) {
   const url = SITE + p.path;
   const crumbs = [["Home", "/"], ...(p.crumbs || [])];
   const related = (p.related || []).map((r) => byPath[r]).filter(Boolean);
-  const meta = p.type === "guide" ? `<p class="ph-meta">Updated ${new Date(p.updated || p.date).toLocaleDateString("en-US", { month: "long", year: "numeric" })} · ${p.readMins} min read</p>` : "";
+  const meta = p.type === "guide" ? `<p class="ph-meta">By <a href="/about">the WebersLink team</a> · Updated ${new Date(p.updated || p.date).toLocaleDateString("en-US", { month: "long", year: "numeric" })} · ${p.readMins} min read</p>` : "";
 
   return `<!doctype html>
 <html lang="en">
@@ -244,8 +252,8 @@ ${headExtra(url)}
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap"></noscript>
 <link rel="stylesheet" href="/assets/site.css?v=6">
-<link rel="stylesheet" href="/assets/v2.css?v=9">
-<script type="application/ld+json">
+<link rel="stylesheet" href="/assets/v2.css?v=10">
+${adsMeta()}${adsScript(p)}<script type="application/ld+json">
 ${schema(p)}
 </script>
 </head>
@@ -370,7 +378,8 @@ ${headExtra(url, p.noindex)}
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap"></noscript>
 <link rel="stylesheet" href="/assets/site.css?v=6">
-<link rel="stylesheet" href="/assets/v2.css?v=9">
+<link rel="stylesheet" href="/assets/v2.css?v=10">
+${adsMeta()}
 <script type="application/ld+json">
 ${schema(p)}
 </script>
@@ -571,7 +580,7 @@ function contactPage() {
       <a class="contact-card" href="https://wa.me/message/2MT2JFO63P3LA1" data-wa data-track="WhatsApp click" data-loc="contact" target="_blank" rel="noopener"><span class="offer-n">03 · WhatsApp</span><h2>Message on WhatsApp</h2><p>Quick question? Send it there. We reply within 24 hours.</p><span class="rel-go">Open WhatsApp →</span></a>
       <a class="contact-card" href="/#audit" data-track="Audit CTA" data-loc="contact"><span class="offer-n">04 · Free audit</span><h2>Get a free website audit</h2><p>We'll record a short video showing what's costing you enquiries, within 48 hours.</p><span class="rel-go">Request the audit →</span></a>
     </div>
-    <p class="contact-note">Based in Lahore, Pakistan · Serving clients in the US &amp; Europe · Calls scheduled in your time zone.</p>
+    <p class="contact-note">United Kingdom · United States · Lahore, Pakistan · Calls scheduled in your time zone. <a href="/about">About us</a></p>
   </div>
 </section>`;
   return pageShell({
@@ -1200,6 +1209,8 @@ function enhanceHome(html) {
   const canon = `<link rel="canonical" href="${SITE}/">`;
   if (!html.includes('hreflang="x-default"')) html = html.replace(canon, () => `${canon}\n${headExtra(SITE + "/")}`);
   if (!html.includes('class="skip"')) html = html.replace(/<body>/, `<body>\n${SKIP}`);
+  html = html.replace(/<meta name="google-adsense-account"[^>]*>\n?/, "");
+  if (ADSENSE) html = html.replace(canon, () => `${canon}\n${adsMeta().trim()}`);
   html = html.replace(/<main>/, '<main id="main">');
   const re = /<script type="application\/ld\+json">\s*([\s\S]*?)\s*<\/script>/;
   const m = html.match(re);
@@ -1225,6 +1236,9 @@ function enhanceHome(html) {
   }
   return html;
 }
+
+// ---------- About ----------
+write("/about", render(require("./content/about")).replace('<div class="wrap prose-wrap">', '<div class="wrap prose-wrap">'));
 
 // ---------- Our work (/work/ and /work/<slug>) ----------
 write("/work/", render({
@@ -1281,13 +1295,18 @@ const updated = home
 if (updated === home && !home.includes("<!-- FOOTER -->")) console.warn("Homepage footer markers not found.");
 fs.writeFileSync(homeFile, iconify(enhanceHome(updated)));
 
+// ---------- ads.txt (only when an AdSense publisher ID is set) ----------
+const adsTxt = path.join(PUBLIC, "ads.txt");
+if (ADSENSE) fs.writeFileSync(adsTxt, `google.com, ${ADSENSE.replace(/^ca-/, "")}, DIRECT, f08c47fec0942fa0\n`);
+else if (fs.existsSync(adsTxt)) fs.unlinkSync(adsTxt);
+
 // ---------- Sitemap ----------
 const urls = [
   ["/", "1.0"], ["/offers/", "0.9"], ...OFFERS.map((o) => [o.path, "0.9"]), ["/contact", "0.6"], ["/services/", "0.9"], ["/industries/", "0.8"], ["/blog/", "0.8"],
   ...SERVICES.map((p) => [p.path, "0.9"]),
   ...INDUSTRIES.map((p) => [p.path, "0.8"]),
   ...GUIDES.map((p) => [p.path, "0.7"]),
-  ["/work/", "0.8"], ...PROJECTS.filter((pj) => pj.detail).map((pj) => [`/work/${pj.slug}`, "0.7"]),
+  ["/about", "0.6"], ["/work/", "0.8"], ...PROJECTS.filter((pj) => pj.detail).map((pj) => [`/work/${pj.slug}`, "0.7"]),
   ["/plugins/", "0.7"], ["/plugins/weberslink-forms-pro", "0.7"], ["/plugins/weberslink-smtp", "0.7"], ["/plugins/weberslink-redirects", "0.7"], ["/plugins/weberslink-security", "0.7"], ["/plugins/weberslink-seo", "0.7"], ["/plugins/weberslink-cookies", "0.7"], ["/plugins/weberslink-images", "0.7"], ["/plugins/weberslink-popups", "0.7"],
   ["/privacy", "0.2"],
 ];
@@ -1302,7 +1321,7 @@ const oneLine = (t) => strip(String(t)).replace(/\s+/g, " ").trim();
 const llmLink = (p, name, desc) => `- [${oneLine(name)}](${SITE}${p}): ${oneLine(desc)}`;
 fs.writeFileSync(path.join(PUBLIC, "llms.txt"), `# WebersLink
 
-> WebersLink is a forward-deployed engineering team for businesses in the US, UK and Europe. We build and run systems in-house: AI assistants and workflow agents, automation, websites, lead response and follow-up, local SEO and reporting. Contractors and home-service businesses are a core industry, not the limit. Based in Lahore, Pakistan. Plans are month-to-month. Lead System: $490/month plus a one-time $1,490 setup. Growth Engine: $990/month plus setup. Websites from $1,490 one-time.
+> WebersLink is an in-house tech team for growing businesses. We design, build and look after automation, AI voice and chat agents, websites and custom software, and CMS websites. We work with clients in the United Kingdom and the United States, with our engineering team in Lahore, Pakistan. Monthly plans are month-to-month; projects get a fixed quote after a free 20-minute call.
 
 ## Offers
 ${OFFERS.map((o) => llmLink(o.path, o.name, o.description)).join("\n")}
@@ -1315,6 +1334,9 @@ ${INDUSTRIES.map((p) => llmLink(p.path, p.card.title, p.description)).join("\n")
 
 ## Guides
 ${GUIDES.map((p) => llmLink(p.path, p.card.title, p.description)).join("\n")}
+
+## About
+- [About WebersLink](${SITE}/about): Who we are, where we work (United Kingdom, United States, Lahore Pakistan) and how we work.
 
 ## Our work
 - [All projects](${SITE}/work/): Automation, AI agent and software projects by the WebersLink team.
