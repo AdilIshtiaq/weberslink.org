@@ -56,14 +56,24 @@ const SERVICES = pages.filter((p) => p.type === "service");
 const INDUSTRIES = pages.filter((p) => p.type === "industry");
 const GUIDES = pages.filter((p) => p.type === "guide");
 
+// The five main services, shown in the header menu and on the homepage (#svc-<id> opens that service).
+const MAIN_SERVICES = [
+  { id: "automation", name: "Automation", line: "Software that does your repetitive work" },
+  { id: "voice", name: "AI Voice & Chat Agents", line: "An AI receptionist for calls and chat, 24/7" },
+  { id: "inhouse", name: "In-house Tech Team", line: "Your own engineers, without hiring" },
+  { id: "web", name: "Web & Software Development", line: "Websites, web apps and custom software" },
+  { id: "cms", name: "CMS Design & Development", line: "A website your team can update itself" },
+];
+
 function nav(cls = "nav scrolled", logoHref = "/") {
   return `<header class="${cls}" id="nav">
   <div class="wrap">
     <a href="${logoHref}" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="187" height="33"></a>
     <nav class="nav-links" id="navLinks" aria-label="Main">
-      <div class="nav-dd"><a href="/offers/" class="dd-t">What we do <i aria-hidden="true"></i></a><div class="dd-menu">${OFFERS.map((o) => `<a href="${o.path}"><b>${o.n}</b>${esc(o.name)}</a>`).join("")}</div></div>
+      <div class="nav-dd"><a href="/#services" class="dd-t">Services <i aria-hidden="true"></i></a><div class="dd-menu dd-svc">${MAIN_SERVICES.map((m, i) => `<a href="/#svc-${m.id}"><b>0${i + 1}</b><span>${esc(m.name)}<small>${esc(m.line)}</small></span></a>`).join("")}<a href="/offers/" class="dd-all">All packages and offers →</a></div></div>
       <a href="/#work">Work</a>
       <a href="/#pricing">Pricing</a>
+      <a href="/plugins/">Free plugins</a>
       <a href="/blog/">Guides</a>
       <a href="/contact">Contact</a>
     </nav>
@@ -81,7 +91,7 @@ function footer() {
     <div class="foot-cols">
       <div class="fcol fcol-brand">
         <a href="/" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="187" height="33"></a>
-        <p>Websites and AI assistants that answer, follow up and book your leads for you. For service businesses in the US, UK &amp; Europe.</p>
+        <p>Your in-house tech team: automation, AI voice and chat agents, websites, software and CMS. For businesses in the US, UK &amp; Europe.</p>
         <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="footer">Book a free call</a>
       </div>
       ${col("Offers", OFFERS)}
@@ -178,7 +188,7 @@ function render(p) {
 <meta name="description" content="${esc(p.description)}">
 <link rel="canonical" href="${url}">
 ${headExtra(url)}
-<meta name="theme-color" content="#ffffff">
+<meta name="theme-color" content="#090807">
 <link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48"><link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta property="og:type" content="${p.type === "guide" ? "article" : "website"}">
@@ -202,7 +212,7 @@ ${headExtra(url)}
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap"></noscript>
 <link rel="stylesheet" href="/assets/site.css?v=6">
-<link rel="stylesheet" href="/assets/v2.css?v=1">
+<link rel="stylesheet" href="/assets/v2.css?v=2">
 <script type="application/ld+json">
 ${schema(p)}
 </script>
@@ -303,7 +313,7 @@ function pageShell(p, main) {
 <meta name="description" content="${esc(p.description)}">
 <link rel="canonical" href="${url}">
 ${headExtra(url, p.noindex)}
-<meta name="theme-color" content="#ffffff">
+<meta name="theme-color" content="#090807">
 <link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48"><link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta property="og:type" content="website">
@@ -327,7 +337,7 @@ ${headExtra(url, p.noindex)}
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap"></noscript>
 <link rel="stylesheet" href="/assets/site.css?v=6">
-<link rel="stylesheet" href="/assets/v2.css?v=1">
+<link rel="stylesheet" href="/assets/v2.css?v=2">
 <script type="application/ld+json">
 ${schema(p)}
 </script>
