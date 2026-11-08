@@ -82,7 +82,7 @@ function footer() {
       <div class="fcol fcol-brand">
         <a href="/" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="187" height="33"></a>
         <p>Websites and AI assistants that answer, follow up and book your leads for you. For service businesses in the US, UK &amp; Europe.</p>
-        <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="footer">Book a walkthrough</a>
+        <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="footer">Book a free call</a>
       </div>
       ${col("Offers", OFFERS)}
       ${col("Services", SERVICES)}
@@ -98,7 +98,7 @@ function footer() {
 function stickyCta() {
   return `<aside aria-label="Quick contact">
 <div class="sticky-cta" id="stickyCta">
-  <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="sticky">Book a walkthrough</a>
+  <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="sticky">Book a free call</a>
   <a href="https://wa.me/message/2MT2JFO63P3LA1" class="btn btn-ghost" data-wa data-track="WhatsApp click" data-loc="sticky" target="_blank" rel="noopener">WhatsApp</a>
 </div>
 </aside>`;
@@ -178,7 +178,7 @@ function render(p) {
 <meta name="description" content="${esc(p.description)}">
 <link rel="canonical" href="${url}">
 ${headExtra(url)}
-<meta name="theme-color" content="#090807">
+<meta name="theme-color" content="#ffffff">
 <link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48"><link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta property="og:type" content="${p.type === "guide" ? "article" : "website"}">
@@ -201,7 +201,8 @@ ${headExtra(url)}
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap"></noscript>
-<link rel="stylesheet" href="/assets/site.css?v=5">
+<link rel="stylesheet" href="/assets/site.css?v=6">
+<link rel="stylesheet" href="/assets/v2.css?v=1">
 <script type="application/ld+json">
 ${schema(p)}
 </script>
@@ -219,7 +220,7 @@ ${nav()}
     <p class="lead">${p.lead}</p>
     ${meta}
     ${p.heroCta || `<div class="hero-cta">
-      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="${p.path}">Book a walkthrough →</a>
+      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="${p.path}">Book a free call →</a>
       <a href="/#audit" class="btn btn-ghost" data-track="Audit CTA" data-loc="${p.path}">Get a free website audit</a>
     </div>`}
   </div>
@@ -274,7 +275,7 @@ ${related.map((r) => `      <a class="rel" href="${r.path}"><span class="rel-k">
     <h2 class="h2">Ready to see what we'd <em>build for you?</em></h2>
     <p class="sub">Book a free 20-minute walkthrough. We'll look at where your business loses time or leads, and what we'd build — no obligation.</p>
     <div class="hero-cta" style="margin-top:28px">
-      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="band">Book a walkthrough →</a>
+      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="band">Book a free call →</a>
       <a href="/#pricing" class="btn btn-ghost">See pricing</a>
     </div>
   </div>
@@ -302,7 +303,7 @@ function pageShell(p, main) {
 <meta name="description" content="${esc(p.description)}">
 <link rel="canonical" href="${url}">
 ${headExtra(url, p.noindex)}
-<meta name="theme-color" content="#090807">
+<meta name="theme-color" content="#ffffff">
 <link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48"><link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta property="og:type" content="website">
@@ -325,7 +326,8 @@ ${headExtra(url, p.noindex)}
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap"></noscript>
-<link rel="stylesheet" href="/assets/site.css?v=5">
+<link rel="stylesheet" href="/assets/site.css?v=6">
+<link rel="stylesheet" href="/assets/v2.css?v=1">
 <script type="application/ld+json">
 ${schema(p)}
 </script>
@@ -352,7 +354,7 @@ const ctaBand = (loc, h2, sub) => `<section class="dark pad cta-band final-cta">
     <h2 class="h2">${h2}</h2>
     <p class="sub">${sub}</p>
     <div class="hero-cta" style="margin-top:28px">
-      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="${loc}">Book a walkthrough →</a>
+      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="${loc}">Book a free call →</a>
       <a href="mailto:hassan@weberslink.org" class="btn btn-ghost" data-track="Email CTA" data-loc="${loc}">Or email us directly</a>
     </div>
   </div>
@@ -369,7 +371,7 @@ function renderOffer(o) {
     <h1>${o.h1}</h1>
     <p class="lead">${o.lead}</p>
     <div class="hero-cta">
-      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="${o.path}">Book a walkthrough →</a>
+      <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="${o.path}">Book a free call →</a>
       <a href="/#audit" class="btn btn-ghost" data-track="Audit CTA" data-loc="${o.path}">Get a free website audit</a>
     </div>
     <p class="cta-note">${esc(o.price)} · ${esc(o.timeline || "Live in 2–3 weeks")}</p>
@@ -521,7 +523,7 @@ function contactPage() {
 <section class="dark pad">
   <div class="wrap">
     <div class="contact-cards">
-      <a class="contact-card primary" href="/#book" data-track="Book CTA" data-loc="contact"><span class="offer-n">01 · Walkthrough</span><h2>Book a walkthrough</h2><p>20 minutes about your services, your area and how leads are handled today. We usually reply within 24 hours.</p><span class="rel-go">Pick a time →</span></a>
+      <a class="contact-card primary" href="/#book" data-track="Book CTA" data-loc="contact"><span class="offer-n">01 · Walkthrough</span><h2>Book a free call</h2><p>20 minutes about your services, your area and how leads are handled today. We usually reply within 24 hours.</p><span class="rel-go">Pick a time →</span></a>
       <a class="contact-card" href="mailto:hassan@weberslink.org" data-track="Email CTA" data-loc="contact"><span class="offer-n">02 · Email</span><h2>Email us directly</h2><p>Describe what's breaking in one paragraph. hassan@weberslink.org</p><span class="rel-go">Write to us →</span></a>
       <a class="contact-card" href="https://wa.me/message/2MT2JFO63P3LA1" data-wa data-track="WhatsApp click" data-loc="contact" target="_blank" rel="noopener"><span class="offer-n">03 · WhatsApp</span><h2>Message on WhatsApp</h2><p>Quick question? Send it there. We reply within 24 hours.</p><span class="rel-go">Open WhatsApp →</span></a>
       <a class="contact-card" href="/#audit" data-track="Audit CTA" data-loc="contact"><span class="offer-n">04 · Free audit</span><h2>Get a free website audit</h2><p>We'll record a short video showing what's costing you enquiries, within 48 hours.</p><span class="rel-go">Request the audit →</span></a>
