@@ -56,13 +56,13 @@ const SERVICES = pages.filter((p) => p.type === "service");
 const INDUSTRIES = pages.filter((p) => p.type === "industry");
 const GUIDES = pages.filter((p) => p.type === "guide");
 
-// The five main services, shown in the header menu and on the homepage (#svc-<id> opens that service).
+// The five main services, shown in the header menu (each links to its own page) and on the homepage (#svc-<id>).
 const MAIN_SERVICES = [
-  { id: "automation", name: "Automation", line: "Software that does your repetitive work" },
-  { id: "voice", name: "AI Voice & Chat Agents", line: "An AI receptionist for calls and chat, 24/7" },
-  { id: "inhouse", name: "In-house Tech Team", line: "Your own engineers, without hiring" },
-  { id: "web", name: "Web & Software Development", line: "Websites, web apps and custom software" },
-  { id: "cms", name: "CMS Design & Development", line: "A website your team can update itself" },
+  { id: "automation", href: "/services/automation", name: "Automation", line: "Software that does your repetitive work" },
+  { id: "voice", href: "/services/ai-voice-agents", name: "AI Voice & Chat Agents", line: "An AI receptionist for calls and chat, 24/7" },
+  { id: "inhouse", href: "/services/in-house-tech-team", name: "In-house Tech Team", line: "Your own engineers, without hiring" },
+  { id: "web", href: "/services/web-design", name: "Web & Software Development", line: "Websites, web apps and custom software" },
+  { id: "cms", href: "/services/cms-development", name: "CMS Design & Development", line: "A website your team can update itself" },
 ];
 
 function nav(cls = "nav scrolled", logoHref = "/") {
@@ -70,7 +70,7 @@ function nav(cls = "nav scrolled", logoHref = "/") {
   <div class="wrap">
     <a href="${logoHref}" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="187" height="33"></a>
     <nav class="nav-links" id="navLinks" aria-label="Main">
-      <div class="nav-dd"><a href="/#services" class="dd-t">Services <i aria-hidden="true"></i></a><div class="dd-menu dd-svc">${MAIN_SERVICES.map((m, i) => `<a href="/#svc-${m.id}"><b>0${i + 1}</b><span>${esc(m.name)}<small>${esc(m.line)}</small></span></a>`).join("")}<a href="/offers/" class="dd-all">All packages and offers →</a></div></div>
+      <div class="nav-dd"><a href="/#services" class="dd-t">Services <i aria-hidden="true"></i></a><div class="dd-menu dd-svc">${MAIN_SERVICES.map((m, i) => `<a href="${m.href}"><b>0${i + 1}</b><span>${esc(m.name)}<small>${esc(m.line)}</small></span></a>`).join("")}<a href="/services/" class="dd-all">All services →</a></div></div>
       <a href="/#work">Work</a>
       <a href="/#pricing">Pricing</a>
       <a href="/plugins/">Free plugins</a>
@@ -212,7 +212,7 @@ ${headExtra(url)}
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap"></noscript>
 <link rel="stylesheet" href="/assets/site.css?v=6">
-<link rel="stylesheet" href="/assets/v2.css?v=2">
+<link rel="stylesheet" href="/assets/v2.css?v=3">
 <script type="application/ld+json">
 ${schema(p)}
 </script>
@@ -337,7 +337,7 @@ ${headExtra(url, p.noindex)}
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,500..900;1,62..125,500..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap"></noscript>
 <link rel="stylesheet" href="/assets/site.css?v=6">
-<link rel="stylesheet" href="/assets/v2.css?v=2">
+<link rel="stylesheet" href="/assets/v2.css?v=3">
 <script type="application/ld+json">
 ${schema(p)}
 </script>

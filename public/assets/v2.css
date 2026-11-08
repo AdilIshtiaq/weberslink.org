@@ -327,3 +327,22 @@
   .x-marquee-track span{font-size:18px}
 }
 @media(max-width:480px){.x-h1{font-size:34px;font-stretch:108%;max-width:none}}
+
+/* ---------- Service pages: real images ---------- */
+.prose .svc-fig{margin:34px 0;padding:0;border:0}
+.prose .svc-fig img{display:block;width:100%;height:auto;border-radius:14px;border:1px solid var(--line-l);box-shadow:0 24px 50px -28px rgba(0,0,0,.35);background:#fff}
+.prose .svc-fig figcaption{margin-top:12px;font-size:14px;line-height:1.55;color:var(--grey-5)}
+.prose .svc-fig figcaption strong{color:var(--ink)}
+.prose .svc-fig-split{display:grid;grid-template-columns:minmax(0,260px) 1fr;gap:26px;align-items:center;padding:22px;border-radius:18px;background:linear-gradient(150deg,#141110,#0a0908);border:1px solid rgba(0,0,0,.2)}
+.prose .svc-fig-split img{border-color:rgba(255,255,255,.1);background:#0a0908}
+.prose .svc-fig-split figcaption{margin:0;font-size:15px;color:rgba(244,242,237,.7)}
+.prose .svc-fig-split figcaption strong{color:#f4f2ed}
+.prose .svc-fig-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.prose .svc-fig-grid img{aspect-ratio:16/10;object-fit:cover}
+.prose .svc-fig-grid-3{grid-template-columns:repeat(3,1fr)}
+.prose .svc-fig-grid figcaption{grid-column:1/-1;margin-top:2px}
+@media(max-width:620px){.prose .svc-fig-split{grid-template-columns:1fr;max-width:340px}.prose .svc-fig-grid-3{grid-template-columns:1fr}}
+.prose .svc-fig-grid-3{grid-template-columns:1fr 1fr}
+.prose .svc-fig-grid-3 img:first-child{grid-column:1/-1;aspect-ratio:auto}
+.prose .svc-fig > img[src*="figma-elementor"]{aspect-ratio:4/3;object-fit:cover;object-position:50% 40%}
+@media(max-width:620px){.prose .svc-fig-grid-3{grid-template-columns:1fr 1fr}}

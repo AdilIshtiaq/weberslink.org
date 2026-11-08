@@ -18,6 +18,9 @@
 - [SEO for Service Businesses](https://weberslink.org/services/seo): SEO for service businesses and contractors in the US and Europe: technical SEO, local SEO, Google Business Profile, content and links that bring in enquiries.
 - [WooCommerce & E-commerce](https://weberslink.org/services/ecommerce): WooCommerce store design and development for small brands: product variations, payments, WhatsApp ordering, fast checkout and SEO. See our live store work.
 - [Website Redesign](https://weberslink.org/services/website-redesign): Website redesign for small businesses with outdated or underperforming sites. We audit first, keep what works, protect your SEO and rebuild for speed and conversions.
+- [AI Voice & Chat Agents](https://weberslink.org/services/ai-voice-agents): An AI receptionist that answers your phone calls, website chat and WhatsApp 24/7, answers questions about your services and books appointments into your calendar. For businesses in the US, UK and Europe.
+- [In-house Tech Team](https://weberslink.org/services/in-house-tech-team): Your own engineering team without the hiring: one dedicated team for websites, software, AI agents and automation that learns your business. Month-to-month, for businesses in the US, UK and Europe.
+- [CMS Design & Development](https://weberslink.org/services/cms-development): Custom CMS websites your team can update without a developer: branded WordPress or headless CMS builds, easy page blocks, SEO fields, roles and content migration. From $1,490.
 - [WooCommerce Sales Recovery Pilot](https://weberslink.org/woocommerce): Free 14-day pilot for WooCommerce stores: an AI shopping assistant that answers shoppers 24/7, automatic abandoned-cart follow-up, and mobile speed fixes. Set up in 48 hours.
 
 ## Industries
