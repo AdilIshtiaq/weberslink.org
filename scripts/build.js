@@ -67,6 +67,12 @@ const MAIN_SERVICES = [
   { id: "cms", href: "/services/cms-development", name: "CMS Design & Development", line: "A website your team can update itself" },
 ];
 
+// ---------- Clipper (scripts/content/clipper.js): header button goes to the app once it's live, else to /clips ----------
+const CLIPPER = require("./content/clipper");
+const clipperNav = () => (CLIPPER.appUrl
+  ? `<a href="${CLIPPER.appUrl}" class="nav-clipper" target="_blank" rel="noopener" data-track="Clipper click" data-loc="nav">Clipper <span class="nav-new">New</span><span class="sr-only"> (opens in a new tab)</span></a>`
+  : `<a href="/clips" class="nav-clipper" data-track="Clipper click" data-loc="nav">Clipper <span class="nav-new">New</span></a>`);
+
 // ---------- Projects (real work only; see scripts/content/projects.js) ----------
 const PROJECTS = require("./content/projects");
 // ---------- Google AdSense (see scripts/adsense.js) ----------
@@ -113,7 +119,7 @@ function nav(cls = "nav scrolled", logoHref = "/") {
     <nav class="nav-links" id="navLinks" aria-label="Main">
       <div class="nav-dd"><a href="/#services" class="dd-t">Services <i aria-hidden="true"></i></a><div class="dd-menu dd-svc">${MAIN_SERVICES.map((m, i) => `<a href="${m.href}"><b>0${i + 1}</b><span>${esc(m.name)}<small>${esc(m.line)}</small></span></a>`).join("")}<a href="/services/" class="dd-all">All services →</a></div></div>
       <a href="/work/">Work</a>
-      <a href="https://clips.weberslink.org" class="nav-clipper" target="_blank" rel="noopener" data-track="Clipper click" data-loc="nav">Clipper <span class="nav-new">New</span><span class="sr-only"> (opens in a new tab)</span></a>
+      ${clipperNav()}
       <a href="/plugins/">Free plugins</a>
       <a href="/blog/">Guides</a>
       <a href="/contact">Contact</a>
@@ -1240,6 +1246,14 @@ function enhanceHome(html) {
   return html;
 }
 
+// ---------- Clipper page ----------
+write("/clips", render({
+  ...CLIPPER.page,
+  heroCta: CLIPPER.appUrl
+    ? `<div class="hero-cta"><a href="${CLIPPER.appUrl}" class="btn btn-light" target="_blank" rel="noopener" data-track="Clipper open" data-loc="clipper-hero">Open Clipper →</a><a href="/#book" class="btn btn-ghost">Talk to us</a></div>`
+    : `<div class="hero-cta"><a href="/#book" class="btn btn-light" data-track="Clipper early access" data-loc="clipper-hero">Request early access →</a><a href="mailto:hassan@weberslink.org?subject=Clipper%20early%20access" class="btn btn-ghost">Email us</a></div>`,
+}));
+
 // ---------- About ----------
 write("/about", render(require("./content/about")).replace('<div class="wrap prose-wrap">', '<div class="wrap prose-wrap">'));
 
@@ -1309,7 +1323,7 @@ const urls = [
   ...SERVICES.map((p) => [p.path, "0.9"]),
   ...INDUSTRIES.map((p) => [p.path, "0.8"]),
   ...GUIDES.map((p) => [p.path, "0.7"]),
-  ["/about", "0.6"], ["/work/", "0.8"], ...PROJECTS.filter((pj) => pj.detail).map((pj) => [`/work/${pj.slug}`, "0.7"]),
+  ["/about", "0.6"], ["/clips", "0.6"], ["/work/", "0.8"], ...PROJECTS.filter((pj) => pj.detail).map((pj) => [`/work/${pj.slug}`, "0.7"]),
   ["/plugins/", "0.7"], ["/plugins/weberslink-forms-pro", "0.7"], ["/plugins/weberslink-smtp", "0.7"], ["/plugins/weberslink-redirects", "0.7"], ["/plugins/weberslink-security", "0.7"], ["/plugins/weberslink-seo", "0.7"], ["/plugins/weberslink-cookies", "0.7"], ["/plugins/weberslink-images", "0.7"], ["/plugins/weberslink-popups", "0.7"],
   ["/privacy", "0.2"],
 ];
@@ -1340,6 +1354,9 @@ ${GUIDES.map((p) => llmLink(p.path, p.card.title, p.description)).join("\n")}
 
 ## About
 - [About WebersLink](${SITE}/about): Who we are, where we work (United Kingdom, United States, Lahore Pakistan) and how we work.
+
+## Clipper
+- [WebersLink Clipper](${SITE}/clips): AI that finds viral moments in long videos and live streams and turns them into vertical clips (in development, early access).
 
 ## Our work
 - [All projects](${SITE}/work/): Automation, AI agent and software projects by the WebersLink team.

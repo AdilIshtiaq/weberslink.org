@@ -216,7 +216,7 @@ function redirect(res, location) {
   res.writeHead(301, { Location: location, "Cache-Control": "public, max-age=86400" });
   res.end();
 }
-const LEGACY_REDIRECTS = { "/weberslink-forms-pro": "/plugins/weberslink-forms-pro" };
+const LEGACY_REDIRECTS = { "/weberslink-forms-pro": "/plugins/weberslink-forms-pro", "/clipper": "/clips" };
 function seoRedirect(req, res) {
   const host = (req.headers.host || "").toLowerCase();
   const [rawPath, query] = req.url.split("?");

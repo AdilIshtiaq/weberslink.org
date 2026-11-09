@@ -49,6 +49,9 @@
 ## About
 - [About WebersLink](https://weberslink.org/about): Who we are, where we work (United Kingdom, United States, Lahore Pakistan) and how we work.
 
+## Clipper
+- [WebersLink Clipper](https://weberslink.org/clips): AI that finds viral moments in long videos and live streams and turns them into vertical clips (in development, early access).
+
 ## Our work
 - [All projects](https://weberslink.org/work/): Automation, AI agent and software projects by the WebersLink team.
 - [Outreach Engine](https://weberslink.org/work/outreach-engine): A cold-email platform that runs itself: multi-mailbox sending with warm-up, reply and bounce detection, link-click tracking, AI personalisation and a full dashboard.
