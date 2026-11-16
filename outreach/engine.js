@@ -274,6 +274,16 @@ function normCountry(c) {
   const u = String(c || "").trim().toUpperCase();
   return COUNTRY_ALIAS[u] || u;
 }
+/** One address per business from a cell holding several ("a@x.com; b@x.com"): prefer a business-domain address over free mail. */
+function pickEmail(cell) {
+  const all = String(cell || "").split(/[;\n]+/).map((e) => e.trim()).filter((e) => store.isEmail(e));
+  return all.find((e) => !FREE_MAIL.test(emailDomain(e))) || all[0] || "";
+}
+/** Spreadsheets without a country column: a US ZIP code in the address or a (###) ###-#### phone means US. */
+function guessCountry(r, pick) {
+  const addr = pick(r, "address");
+  return /\b[A-Z]{2} \d{5}\b/.test(addr) || /^\(\d{3}\) \d{3}-\d{4}/.test(pick(r, "phone (maps)", "phone")) ? "US" : "";
+}
 function emailDomain(e) { return String(e).toLowerCase().split("@")[1] || ""; }
 function suppressed(addr, sup) {
   const e = addr.toLowerCase();
@@ -313,13 +323,13 @@ function importLeads(rows, cfg) {
   const pick = (r, ...names) => { for (const n of names) for (const k of Object.keys(r)) if (k.trim().toLowerCase() === n) return String(r[k] == null ? "" : r[k]).trim(); return ""; };
   const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? String(Math.round(n)) : ""; };
   for (const r of rows) {
-    const email = pick(r, "email").slice(0, 254);
+    const email = (pick(r, "email") || pickEmail(pick(r, "email(s) found (unverified)", "email(s) found", "emails"))).slice(0, 254);
     if (!store.isEmail(email)) { res.invalid++; continue; }
     const key = email.toLowerCase();
     const lcp = pick(r, "lcp", "homepage lcp (sec)");
     const lead = {
-      email, first_name: (pick(r, "first_name", "owner name").split(/\s+/)[0] || "").slice(0, 60), store: pick(r, "store").slice(0, 150),
-      domain: tpl.prettyDomain(pick(r, "domain", "website") || emailDomain(email)).slice(0, 150), country: normCountry(pick(r, "country")),
+      email, first_name: (pick(r, "first_name", "owner name").split(/\s+/)[0] || "").slice(0, 60), store: pick(r, "store", "business").slice(0, 150),
+      domain: tpl.prettyDomain(pick(r, "domain", "website") || emailDomain(email)).slice(0, 150), country: normCountry(pick(r, "country") || guessCountry(r, pick)),
       category: pick(r, "category").slice(0, 100), niche: pick(r, "niche").slice(0, 100),
       psi: num(pick(r, "psi", "mobile pagespeed (0-100)")), lcp: /^\d+(\.\d+)?$/.test(lcp) ? lcp : "",
     };
