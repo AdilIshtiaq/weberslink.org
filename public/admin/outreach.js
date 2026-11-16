@@ -369,6 +369,10 @@
     var v = prompt("Email address or whole domain (like @example.com) that must never be emailed:");
     if (v) api("POST", "/api/outreach/dnc", { value: v }).then(function () { toast("Added to the never-contact list"); loadLeads(); refresh(); }).catch(fail);
   });
+  $("rmBouncedBtn").addEventListener("click", function () {
+    if (!confirm("Delete every bounced lead from the list? Their addresses are added to the never-contact list so they can't be emailed again. This can't be undone.")) return;
+    api("POST", "/api/outreach/leads/remove-bounced", {}).then(function (r) { toast("Removed " + r.removed + " bounced lead" + (r.removed === 1 ? "" : "s")); state.leadPage = 0; loadLeads(); refresh(); }).catch(fail);
+  });
   $("importFile").addEventListener("change", function (e) {
     var f = e.target.files[0]; e.target.value = ""; if (!f) return;
     if (f.size > 8 * 1024 * 1024) return fail(new Error("That file is over 8 MB."));
