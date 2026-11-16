@@ -137,22 +137,45 @@ function renderHtml(main, cfg) {
   const href = /^https?:/i.test(site) ? site : "https://" + site;
   let logoUrl = "";
   if (sig.logo !== false) { try { logoUrl = new URL(href).origin + "/assets/email-logo.png"; } catch (e) { /* no valid website: no logo */ } }
-  const logoRow = logoUrl ? `<tr><td style="padding:0 0 10px 0;"><a href="${esc(href)}"><img src="${esc(logoUrl)}" width="168" height="37" alt="${esc(sig.company)}" style="display:block;border:0;height:auto;"></a></td></tr>\n` : "";
+  const logoRow = logoUrl ? `<tr><td style="padding:0 0 10px 0;"><a href="${esc(href)}"><img src="${esc(logoUrl)}" width="168" height="37" class="wl-logo" alt="${esc(sig.company)}" style="display:block;border:0;width:168px;max-width:100%;height:auto;"></a></td></tr>\n` : "";
   const role = sig.title ? `${esc(sig.title)}, ${esc(sig.company)}` : esc(sig.company);
+  // Responsive: fluid 100% width capped at 600px, viewport meta, and a small-screen media query (clients that
+  // strip <style> still get the fluid inline layout). Table-based shell for Outlook.
   return `<!DOCTYPE html>
-<html><body style="margin:0;padding:0;background:#ffffff;">
-<div style="max-width:580px;padding:8px 4px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#222222;">
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="x-apple-disable-message-reformatting">
+<style>
+  body{margin:0;padding:0;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;}
+  img{border:0;max-width:100%;height:auto;}
+  a{word-break:break-word;}
+  @media only screen and (max-width:480px){
+    .wl-wrap{padding:16px 16px !important;}
+    .wl-body{font-size:16px !important;line-height:1.55 !important;}
+    .wl-foot{font-size:12px !important;}
+    .wl-logo{width:140px !important;height:auto !important;}
+  }
+</style></head>
+<body style="margin:0;padding:0;background:#ffffff;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background:#ffffff;"><tr><td align="left" style="padding:0;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;border-collapse:collapse;"><tr><td class="wl-wrap" style="padding:16px 20px;">
+<div class="wl-body" style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#222222;word-wrap:break-word;overflow-wrap:break-word;">
 ${blocks.join("")}
-<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:8px;border-collapse:collapse;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px;border-collapse:collapse;max-width:100%;">
 ${logoRow}<tr><td style="border-left:3px solid ${accent};padding:2px 0 2px 12px;font-family:Arial,Helvetica,sans-serif;">
 <div style="font-size:15px;font-weight:bold;color:#111111;">${esc(sig.name)}</div>
 <div style="font-size:13px;color:#555555;">${role}</div>
 <div style="font-size:13px;"><a href="${esc(href)}" style="color:${accent};text-decoration:none;">${esc(site)}</a></div>
 </td></tr></table>
-<div style="margin-top:28px;padding-top:12px;border-top:1px solid #eeeeee;font-size:11px;line-height:1.5;color:#999999;">
+<div class="wl-foot" style="margin-top:28px;padding-top:12px;border-top:1px solid #eeeeee;font-size:11px;line-height:1.5;color:#999999;">
 ${esc(sig.postal_address)}<br>${esc(OPT_OUT_TEXT)}
 </div>
-</div></body></html>`;
+</div>
+</td></tr></table>
+</td></tr></table>
+</body></html>`;
 }
 
 /** Returns { subject, text, html } for email `step` to `lead`. */
