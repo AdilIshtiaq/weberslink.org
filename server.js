@@ -154,7 +154,7 @@ function handleLead(req, res) {
 
 // ---------- Static files ----------
 function cacheHeader(ext, urlPath) {
-  if (ext === ".html") return "no-cache";
+  if (ext === ".html" || urlPath.startsWith("/admin/")) return "no-cache"; // dashboard script must never be stale after an update
   if (urlPath.startsWith("/vendor/") || urlPath.startsWith("/images/")) return "public, max-age=2592000";
   return "public, max-age=86400";
 }
