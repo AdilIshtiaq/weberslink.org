@@ -140,3 +140,16 @@ test("cautious defaults: bounce auto-pause is 3% unless you choose otherwise", (
 });
 
 test.after(() => fs.rmSync(DIR, { recursive: true, force: true }));
+
+test("removeBounced deletes bounced leads, blocks re-import, leaves everyone else alone", () => {
+  reset();
+  eng.importLeads([row("dead1@shop1.com"), row("dead2@shop2.com"), row("fine@shop3.com")], CONFIG);
+  store.updateLead("dead1@shop1.com", { status: "bounced" });
+  store.updateLead("dead2@shop2.com", { status: "bounced" });
+  assert.deepStrictEqual(cleaner.removeBounced(), { ok: true, removed: 2 });
+  assert.deepStrictEqual(store.loadTracking().map((t) => t.email), ["fine@shop3.com"]);
+  assert.ok(store.loadSuppression().has("dead1@shop1.com"));
+  eng.importLeads([row("dead1@shop1.com")], CONFIG);
+  assert.notStrictEqual(rowOf("dead1@shop1.com").status, "new", "a removed address is never queued again");
+  assert.deepStrictEqual(cleaner.removeBounced(), { ok: true, removed: 0 });
+});

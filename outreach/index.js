@@ -263,6 +263,10 @@ async function route(req, res, url, method) {
     const r = cleaner.applyScan({ skipRoles: body.skipRoles === true });
     return send(res, r.ok ? 200 : 400, r);
   }
+  if (p === "/leads/remove-bounced" && method === "POST") {
+    if (eng.status().running) return send(res, 409, { ok: false, error: "A run is in progress. Wait for it to finish, then try again." });
+    return send(res, 200, cleaner.removeBounced());
+  }
   if (p === "/leads/action" && method === "POST") {
     const body = await readJson(req);
     const email = String(body.email || "");

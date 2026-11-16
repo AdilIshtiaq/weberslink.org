@@ -144,6 +144,20 @@ function applyScan({ skipRoles = false } = {}) {
   return { ok: true, ...out };
 }
 
+/**
+ * Delete every bounced lead from the list. Each address is first added to the never-contact list, so a later import
+ * of the same address is refused instead of being emailed again. The sent log keeps the history. Not reversible.
+ */
+function removeBounced() {
+  const rows = store.loadTracking();
+  const gone = rows.filter((t) => t.status === "bounced");
+  if (!gone.length) return { ok: true, removed: 0 };
+  const have = store.loadSuppression();
+  for (const t of gone) if (!have.has(t.email.toLowerCase())) store.addSuppression(t.email);
+  store.saveTracking(rows.filter((t) => t.status !== "bounced"));
+  return { ok: true, removed: gone.length };
+}
+
 /** Undo for a single lead the cleaner skipped. */
 function restore(email) {
   const row = store.loadTracking().find((t) => t.email.toLowerCase() === String(email).toLowerCase());
@@ -155,4 +169,4 @@ function restore(email) {
 const SHARED_HOSTS = new Set(["myshopify.com", "etsy.com", "wixsite.com", "squarespace.com", "weebly.com", "blogspot.com", "wordpress.com", "facebook.com", "instagram.com",
   "linktr.ee", "amazon.com", "ebay.com", "godaddysites.com", "business.site", "webflow.io", "carrd.co", "tumblr.com", "medium.com", "github.io", "sites.google.com"]);
 
-module.exports = { FREE_MAIL, SHARED_HOSTS, SKIPPED, assess, startScan, jobStatus, applyScan, restore };
+module.exports = { FREE_MAIL, SHARED_HOSTS, SKIPPED, assess, startScan, jobStatus, applyScan, restore, removeBounced };
