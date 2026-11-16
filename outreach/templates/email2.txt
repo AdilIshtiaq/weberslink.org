@@ -1,9 +1,9 @@
-Subject: {domain} after midnight
+Subject: {store} calls
 
 {greeting}
 
-One number: Baymard's research puts average cart abandonment at about 70%. Some of those carts are simply a question nobody answered in time. If {store} gets 100 carts a week at {currency}60 each, that is roughly {currency}4,200 left behind every week.
+Quick follow-up. For a roofing company, one missed call can be a repair or a full roof, so even a few unanswered calls a month add up.
 
-An assistant trained on your products, shipping and returns, that answers in seconds and hands over to you when it isn't sure, is one of the first things we build. The video shows what it would look like on {domain}. It is free and takes me 3 minutes to record. Should I send it?
+AI call answering picks up in seconds, asks what is going on, books the estimate and sends you a text with the details. If it isn't sure, it hands the call to you. The video shows how that would sound for {store}. It is free and takes me a few minutes to record. Should I send it?
 
 {sender_first_name}

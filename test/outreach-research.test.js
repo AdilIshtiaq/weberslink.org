@@ -119,10 +119,10 @@ test("review: edit+approve, reject, approve-all-high; bad edits are refused; onl
   assert.strictEqual(research.review("owner1@shop1.com", "approve", "Visit https://evil.com").error.includes("can't be used"), true);
   assert.ok(!research.review("owner1@shop1.com", "approve", "I saw that Shop 1 sells hand-stitched leather bags in six colours.").error);
   const mail = tpl.render(1, lead(), CONFIG, "a").text;
-  assert.match(mail, /^Hi there,\n\nI saw that Shop 1 sells hand-stitched leather bags in six colours\.\n\nShoppers on shop1\.com/);
+  assert.match(mail, /^Hi there,\n\nI saw that Shop 1 sells hand-stitched leather bags in six colours\.\n\nWhen a roofer is up on a job/);
   assert.ok(!research.review("owner2@shop2.com", "reject").error);
   assert.ok(!tpl.render(1, { ...rowOf("owner2@shop2.com"), email: "owner2@shop2.com", domain: "shop2.com" }, CONFIG, "a").text.includes("handmade"));
-  assert.match(tpl.render(1, { email: "x@y.com", domain: "y.com", store: "Y" }, CONFIG, "a").text, /^Hi there,\n\nShoppers on y\.com/, "no line: the normal email, no gap");
+  assert.match(tpl.render(1, { email: "x@y.com", domain: "y.com", store: "Y" }, CONFIG, "a").text, /^Hi there,\n\nWhen a roofer is up on a job/, "no line: the normal email, no gap");
   const shown3 = [{ email: "owner3@shop3.com", line: rowOf("owner3@shop3.com").custom_line }];
   assert.strictEqual(research.approveShown(shown3), 0, "medium confidence is never bulk-approved");
   store.updateLead("owner3@shop3.com", { research_conf: "high" });

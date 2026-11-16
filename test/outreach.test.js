@@ -44,18 +44,16 @@ test("every bundled template renders with no leftover fields; A/B differ only in
   assert.notStrictEqual(a.subject, b.subject);
   assert.strictEqual(a.text, b.text);
   assert.match(a.text, /Hi Sara,/);
-  assert.match(a.text, /frame sizes/);
-  assert.match(a.text, /41\/100/);
+  assert.match(a.text, /AI call answering/);
   assert.doesNotMatch(a.text, /\$|£|\{|\}/); // email 1 never sells or quotes money
   assert.doesNotMatch(a.text, /https?:|www\./i, "email 1 has no links");
-  assert.match(a.text, /engineers who build and run AI assistants and automation/, "new positioning: an engineering team, not a lead-system agency");
+  assert.match(a.text, /We build and run AI call answering for local businesses/, "roofing campaign leads with AI call answering");
   assert.match(a.text, /I'm [A-Za-z]+ from WebersLink/, "says who is writing and from where");
-  assert.doesNotMatch(a.text, /contractor|home.service/i, "not limited to one industry");
-  assert.match(tpl.render(2, lead, CONFIG).text, /£4,200/);
+  assert.match(a.text, /Lens Hub/, "uses the business name");
   for (const step of [1, 2, 3, 4]) {
     for (const v of tpl.variantsFor(step)) {
       const r = tpl.render(step, lead, CONFIG, v);
-      assert.doesNotMatch(r.text + r.subject, /contractor|home.service|lead system/i, `email ${step}${v} keeps to the new positioning`);
+      assert.doesNotMatch(r.text + r.subject, /shoppers|cart|lead system/i, `email ${step}${v} has no leftover online-store wording`);
       assert.match(r.text, /Prefer not to hear from me\?/, `email ${step}${v} carries the opt-out line`);
       assert.match(r.text, /1 Example St/, `email ${step}${v} carries the postal address`);
     }
@@ -305,4 +303,20 @@ test("automatic running: on by default, only while Live and sending is allowed, 
   const win = cfg({ dry_run: false, window_enabled: true, window_start: "19:00", window_end: "07:00", timezone: "UTC" });
   assert.strictEqual(eng.autoRunDue(win, new Date("2026-03-09T20:00:00Z"), noEnv), true, "window open");
   assert.strictEqual(eng.autoRunDue(win, new Date("2026-03-09T12:00:00Z"), noEnv), false, "window closed");
+});
+
+test("import accepts the roofing-leads spreadsheet layout: one address per business, US guessed from address", () => {
+  reset();
+  const rows = [
+    { Business: "JF Roofing", "Email(s) found (unverified)": "jfroofinggc@gmail.com; info@jfroofing.com", Address: "531 El Dorado Blvd A, Webster, TX 77598", Website: "https://jfroofing.com/", Category: "Roofing contractor" },
+    { Business: "Free Mail Only", "Email(s) found (unverified)": "owner@yahoo.com", "Phone (Maps)": "(281) 488-2977", Website: "https://x-roofing.com/" },
+    { Business: "No Email", "Email(s) found (unverified)": "" },
+  ];
+  const res = eng.importLeads(rows, CONFIG);
+  assert.deepStrictEqual([res.added, res.invalid], [2, 1]);
+  const t = store.loadTracking();
+  const jf = t.find((x) => x.email === "info@jfroofing.com");
+  assert.ok(jf, "business-domain address preferred over free mail");
+  assert.deepStrictEqual([jf.store, jf.country, jf.domain, jf.status], ["JF Roofing", "US", "jfroofing.com", jf.status]);
+  assert.strictEqual(t.find((x) => x.email === "owner@yahoo.com").country, "US");
 });
