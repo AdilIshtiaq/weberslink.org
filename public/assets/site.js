@@ -56,11 +56,11 @@
     $$('#navLinks a').forEach(function (a) { a.addEventListener('click', function () { nav.classList.remove('open'); menuBtn.setAttribute('aria-expanded', false); }); });
   }
 
-  // The site owner's own Outreach dashboard link only appears in the site owner's browser. Visitors see no sign-in.
+  // Dashboard link in the menu (the outreach dashboard asks for a password, so the link alone gives nothing away).
   try {
     var navLinks = $('#navLinks');
-    if (navLinks && localStorage.getItem('wl_owner') === '1') {
-      var ol = document.createElement('a'); ol.href = '/admin/outreach'; ol.rel = 'nofollow'; ol.textContent = 'Outreach';
+    if (navLinks && !navLinks.querySelector('a[href="/admin/outreach"]')) {
+      var ol = document.createElement('a'); ol.href = '/admin/outreach'; ol.rel = 'nofollow'; ol.textContent = 'Dashboard';
       navLinks.appendChild(ol);
     }
   } catch (e) {}
