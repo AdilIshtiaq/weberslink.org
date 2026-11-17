@@ -1057,6 +1057,7 @@ function setupSteps(cfg, mailboxes, leadCount) {
     { id: "details", label: "Add your sender details", hint: "Your name, company, website and postal address appear in every email (the address is required by law).", done: sigOk, view: "settings", tab: "sender" },
     { id: "mailboxes", label: "Connect a mailbox", hint: "Add the mailbox, then set its password on the server (the variable name is shown under it).", done: mailboxes.some((m) => m.enabled && m.passwordSet), view: "settings", tab: "mailboxes" },
     { id: "leads", label: "Import your leads", hint: "Upload a spreadsheet (.xlsx) or a CSV file.", done: leadCount > 0, view: "leads" },
+    { id: "gemini", label: "Connect Gemini", hint: "Optional: replies get labelled, and you get suggested answers, lead scores, a campaign builder and an email writer.", done: ai.configured(), view: "settings", tab: "ai", optional: true },
     { id: "campaign", label: "Group leads into campaigns", hint: "Optional: email each place or business type with its own mailboxes, limit and wording.", done: (cfg.campaigns || []).length > 0, view: "campaigns", optional: true },
     { id: "test", label: "Send yourself a test email", hint: "Check it lands in your inbox, not spam.", done: Boolean(flags.test_sent), view: "settings", tab: "checks" },
     { id: "dns", label: "Check your domain's email setup", hint: "SPF, DKIM and DMARC protect your emails from the spam folder.", done: Boolean(flags.dns_ok), view: "settings", tab: "checks" },

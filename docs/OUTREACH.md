@@ -5,6 +5,28 @@ on a phone or desktop use "Install app" / "Add to Home screen" for an icon).
 
 It is **off until `ADMIN_PASSWORD` is set**, and every run is a **test (nothing is sent) until you switch the top-bar switch from Test mode to Live**.
 
+## Finding leads, and what Gemini can do (v2.6)
+**Lead filters** (Leads tab) use plain-language groups instead of raw statuses: stage (waiting, in sequence, replied, interested, paused for out-of-office,
+finished, bounced or opted out, set aside, clicked, high fit, in no campaign, referred, needs your check; each with its count), place (country, state or city), business
+type, campaign and sort (best fit first, latest activity first). Only stages that have leads are listed. **Ask AI** next to the search box turns a sentence like "roofers in
+Texas we haven't emailed, best fit first" into those filters (it can only choose values that exist in your leads).
+
+**Honest counts.** "Leads waiting" and "days to finish" count only leads that can actually be emailed: with campaigns, a lead in no campaign or in a paused one is not in the queue.
+The Overview says so ("N waiting leads match no campaign"), warns when a campaign targets a country Settings does not allow, and warns when a campaign without its own
+emails would send the default ones (which are written for roofing companies).
+
+**Gemini tools** (all need `GEMINI_OUTREACH_KEY`; each call counts toward `GEMINI_OUTREACH_AI_DAILY_MAX`, default 300; none can send anything):
+- **Describe a campaign** (Campaigns tab): "roofing companies in Texas and Florida" becomes a campaign with real places and business-type words from your leads; you see the live match count before saving.
+- **Write the emails with Gemini** (Emails tab, or **Write with AI** on a campaign): a 4-email sequence from a short brief and a tone. Every email is checked: no links, only the
+  allowed placeholders, sensible length, greeting and sign-off enforced, copy score shown. Nothing is saved until you press **Save these emails** (for that campaign, or for everyone).
+- **Improve with AI** (Emails editor): shorter, friendlier, more direct, or less spammy; **Undo** brings the old text back.
+- **AI brief** (Overview): a short read of your numbers and the one thing to do next, cached for 4 hours.
+- The older tools (reply labels, suggested answers, lead scores, copy check, objection summary) are described above.
+
+**Email layout.** Emails now look like a personal message: your text, a short signature (name, title, company, website, optional small logo), and a small footer with the postal
+address and a real **unsubscribe here** link next to "reply unsubscribe". The default accent colour is the brand red (`#ef1421`); a colour you already saved is kept. The editor
+shows each email with its timing ("Email 2 · 3 days later"), offers only the placeholders that make sense, and previews on desktop or phone width.
+
 ## Using the dashboard
 Six sections, left to right in the menu:
 - **Overview:** what needs you right now. A **Get ready to send** checklist (sender details, mailbox, leads, optional campaigns, test email, domain check, go live)
@@ -268,7 +290,7 @@ Every email carries the postal address and an opt-out line. A mailbox pauses its
 A/B versions share one body and differ only in subject; judge after about 100 leads each.
 
 ## Tests
-`npm test` (about 158 tests: engine, API, auth, regression tests for an independent code review; no network or real
+`npm test` (about 167 tests: engine, API, auth, regression tests for an independent code review; no network or real
 mailboxes needed).
 
 ## Not covered by tests

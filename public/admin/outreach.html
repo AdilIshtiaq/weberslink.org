@@ -56,6 +56,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--panel-2);padding:1p
 .page{padding:24px clamp(16px,3vw,40px) 70px;max-width:1160px}
 .seg{display:inline-flex;border:1px solid var(--line-2);border-radius:99px;padding:3px;background:var(--panel)}
 .seg button{border:0;background:none;border-radius:99px;padding:6px 14px;font-size:13px;font-weight:600;color:var(--dim)}
+.seg button.on{background:var(--panel-2);color:var(--text)}
 .seg button.on.test{background:rgba(251,191,36,.16);color:var(--warn)}
 .seg button.on.live{background:rgba(52,211,153,.16);color:var(--ok)}
 .runstate{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--accent);font-weight:600}
@@ -269,6 +270,7 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
       <div class="panel" id="heldBox" hidden style="border-color:rgba(251,191,36,.4)"><h3>Needs your check <small>a send was interrupted: look in your Sent folder, then choose</small></h3><div id="heldList"></div></div>
       <div class="attn" id="attnBox"><div id="attnList"></div></div>
       <div class="kpis" id="kpis"></div>
+      <div class="panel" id="briefBox"><h3>✨ AI brief <small id="briefAt"></small><button class="btn sm" id="briefBtn" type="button" style="margin-left:auto">Write today's brief</button></h3><div id="briefBody" class="hint"></div></div>
       <div class="panel"><h3>Last 14 days <small id="lastRun"></small></h3><div class="chart" id="chart"></div><div class="legend"><span><i style="background:var(--accent)"></i>Emails sent</span><span><i style="background:var(--ok)"></i>Replies</span></div><p class="hint" id="lastRunText" style="margin-top:10px"></p></div>
       <h3 class="sec">Campaigns</h3>
       <div class="panel" id="campBox"><div class="scroll"><table id="campTable"></table></div><div id="campEmpty" class="empty-cta" hidden><b>No campaigns yet</b><p>Campaigns let you email a place or business type with its own mailboxes, daily limit and wording. Until you make one, every lead is emailed.</p><button class="btn primary sm" data-view-go="campaigns">Create a campaign</button></div></div>
@@ -294,6 +296,10 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
 
     <section id="v-campaigns" hidden>
       <div class="tabs"><button class="on" data-goview="campaigns">Campaigns</button><button data-goview="templates">Emails</button></div>
+      <div class="panel" id="aiCampBox"><h3>✨ Describe a campaign <span class="chip" id="aiCampChip"></span></h3>
+        <div class="toolbar" style="margin-bottom:6px"><input type="text" id="aiCampText" placeholder="e.g. roofing companies in Texas and Florida" style="flex:1;min-width:240px" maxlength="400"><button class="btn primary sm" id="aiCampBtn" type="button">Build with AI</button></div>
+        <p class="hint" id="aiCampNote">Gemini sets the places and business types from your leads. You check the live count, then save.</p>
+      </div>
       <p class="hint" id="campIntro" style="margin:0 0 14px"></p>
       <div id="campList"></div>
       <div class="toolbar" style="margin:12px 0 0"><button class="btn sm" id="addCamp" type="button">Add campaign</button><button class="btn primary sm" id="saveCamps" type="button">Save campaigns</button><span class="hint" id="campMsg"></span></div>
@@ -340,9 +346,8 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
 
     <section id="v-leads" hidden>
       <div class="toolbar">
-        <input type="search" id="leadQ" placeholder="Search store, email or domain">
-        <select id="leadStatus"><option value="">All statuses</option></select>
-        <select id="leadCampaign"><option value="">All campaigns</option></select>
+        <input type="search" id="leadQ" placeholder="Search by name, email or city, or describe who you want" style="max-width:420px;flex:1">
+        <button class="btn sm" id="aiFilter" type="button" title="Describe who you want in plain English and let Gemini set the filters">✨ Ask AI</button>
         <span style="flex:1"></span>
         <details class="menu"><summary class="btn sm">Tools ▾</summary><div class="pop" id="leadTools">
           <button id="aiBtn" type="button">Personalise first lines (Gemini)</button>
@@ -358,6 +363,15 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
         </div></details>
         <label class="btn primary sm" style="margin:0;cursor:pointer">Import leads<input type="file" id="importFile" accept=".xlsx,.xls,.csv" hidden></label>
       </div>
+      <div class="toolbar" id="leadFilters">
+        <select id="leadStage" aria-label="Stage"></select>
+        <select id="leadPlace" aria-label="Place"></select>
+        <select id="leadType" aria-label="Business type"></select>
+        <select id="leadCampaign" aria-label="Campaign"><option value="">All campaigns</option></select>
+        <select id="leadSort" aria-label="Sort"><option value="">Original order</option><option value="score">Best fit first</option><option value="recent">Latest activity first</option></select>
+        <button class="btn ghost sm" id="clearFilters" type="button" hidden>Clear filters</button>
+        <span class="hint" id="leadCount"></span>
+      </div>
       <p class="hint" id="scoreInfo" style="margin:-6px 0 12px"></p>
       <div class="panel" id="aiBox" hidden><h3>Personalise with Gemini <small>one factual opening line per store, from its own website. You approve every line.</small></h3><div id="aiBody"></div></div>
       <div class="panel" id="cleanBox" hidden><h3>List cleaner <small>finds addresses that would bounce or hurt your sender reputation</small></h3><div id="cleanBody"></div></div>
@@ -368,6 +382,12 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
     <section id="v-templates" hidden>
       <div class="tabs"><button data-goview="campaigns">Campaigns</button><button class="on" data-goview="templates">Emails</button></div>
       <div class="toolbar" id="tplCampBar"><label class="hint" for="tplCampaign">Emails for</label><select id="tplCampaign"><option value="">Everyone (default)</option></select><span class="hint">A campaign can have its own wording; anything you don't change there uses the default emails.</span></div>
+      <details class="fold" id="writerBox"><summary>✨ Write the emails with Gemini</summary><div class="in">
+        <div class="field"><label>Who are you writing to, and what do you offer?</label><textarea id="wBrief" rows="3" maxlength="600" placeholder="e.g. Roofing companies in Texas. We build AI call answering that picks up every call and books the estimate."></textarea></div>
+        <div class="row"><div class="field"><label>Tone</label><select id="wTone"><option value="friendly">Friendly</option><option value="direct">Direct</option><option value="professional">Professional</option></select></div></div>
+        <div class="toolbar"><button class="btn primary sm" id="wGo" type="button">Write 4 emails</button><span class="hint" id="wMsg"></span></div>
+        <div id="wOut"></div>
+      </div></details>
       <div class="tpl">
         <div class="tpl-list" id="tplList"></div>
         <div>
@@ -375,10 +395,11 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
             <div class="field"><label>Email text <span class="hint">(first line is the subject)</span></label><textarea class="editor" id="tplText" spellcheck="true"></textarea></div>
             <div class="toolbar" id="fieldChips"></div>
             <div class="toolbar"><button class="btn primary sm" id="tplSave">Save</button><button class="btn sm" id="tplReset" hidden>Reset to default</button><span class="hint" id="tplStats"></span></div>
+            <div class="toolbar"><select id="tplImprove" style="max-width:190px"><option value="shorter">Make it shorter</option><option value="friendlier">Friendlier</option><option value="direct">More direct</option><option value="spam">Less spammy</option></select><button class="btn sm" id="tplImproveBtn" type="button">✨ Improve with AI</button><button class="btn ghost sm" id="tplUndo" type="button" hidden>Undo</button></div>
             <div class="toolbar"><button class="btn sm" id="tplCheck">Check copy</button><label class="check" style="margin:0"><input type="checkbox" id="tplCheckAi"> also ask Gemini</label></div>
             <div id="copyCheckOut"></div>
           </div>
-          <div class="panel"><h3>Preview <small>sample store; the real email is personalised per lead</small></h3><p style="font-weight:600;margin-bottom:10px" id="pvSubject"></p><iframe class="preview" id="pvFrame" sandbox="" title="Email preview"></iframe></div>
+          <div class="panel"><h3>Preview <small>sample store; the real email is personalised per lead</small><span class="seg" style="margin-left:auto"><button type="button" class="on" id="pvDesk">Desktop</button><button type="button" id="pvPhone">Phone</button></span></h3><p style="font-weight:600;margin-bottom:10px" id="pvSubject"></p><iframe class="preview" id="pvFrame" sandbox="" title="Email preview"></iframe></div>
           <div class="panel"><h3>Preview real leads <small>next emails in the queue, nothing is sent</small></h3><div id="queuePv"><button class="btn sm" id="queueBtn">Show next 3</button></div></div>
         </div>
       </div>

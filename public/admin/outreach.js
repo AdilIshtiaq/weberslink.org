@@ -55,7 +55,7 @@
     if (history.replaceState) history.replaceState(null, "", "#" + view);
     window.scrollTo(0, 0);
     if (view === "campaigns") loadCampaigns();
-    if (view === "leads") loadLeads();
+    if (view === "leads") { loadFacets().then(loadLeads); }
     if (view === "templates") loadTemplates();
     if (view === "settings") { if (!state.dirty) loadSettings(); showDataInfo(); showSettingsTab(tab || state.stab || "sender"); }
     if (state.status) renderStatus();
@@ -88,7 +88,7 @@
       var w = s.window || {};
       $("subtitle").textContent = !live ? "Test mode: runs only plan emails, nothing is sent" : w.enabled ? "Live · sending window " + w.start + "–" + w.end + " (" + w.timezone + ") is " + (w.open ? "open, closes in " + fmtMin(w.minutesToClose) : "closed, opens in " + fmtMin(w.minutesToOpen)) : "Live · sending around the clock";
     }
-    renderSetup(); renderAttention(); renderKpis(); renderChart(); renderCampaignCards(); renderMailboxCards(); fillCampaignSelects();
+    renderSetup(); renderAttention(); renderKpis(); renderBrief(); loadBrief(); renderChart(); renderCampaignCards(); renderMailboxCards(); fillCampaignSelects();
     $("heldBox").hidden = !s.held.length;
     $("heldList").innerHTML = s.held.map(function (x) {
       return '<div class="reply"><div><div class="who">' + esc(x.store || x.email) + '</div><div class="meta">' + esc(x.email) + " · email " + esc(x.step) + " · " + esc(x.mailbox || "") + '</div></div><div class="acts"><button class="btn sm" data-held="retry_held" data-email="' + esc(x.email) + '">It was NOT sent: allow retry</button><button class="btn sm danger" data-held="skip_held" data-email="' + esc(x.email) + '">It WAS sent: never email again</button></div></div>';
@@ -155,6 +155,18 @@
   $("attnBox").addEventListener("click", function (e) {
     if (e.target.id === "attnMore") { state.attnAll = !state.attnAll; return renderAttention(); }
     var b = e.target.closest("button[data-attn]"); if (b) go(b.dataset.attn, b.dataset.tab || undefined);
+  });
+  function renderBrief() {
+    var on = aiOn(), b = state.brief;
+    $("briefBtn").hidden = !on; $("briefBtn").textContent = b ? "Refresh" : "Write today's brief";
+    $("briefAt").textContent = b && b.at ? ago(b.at) : "";
+    $("briefBody").innerHTML = !on ? 'Connect Gemini (Settings, AI &amp; automation) and it will summarise your numbers and tell you the one thing to do next.' :
+      b ? '<div style="color:var(--text);font-weight:600;margin-bottom:6px">' + esc(b.headline) + "</div><ul style=\"margin:0 0 8px 18px\">" + b.bullets.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" + (b.next_action ? '<div><span class="chip okc">Next</span> ' + esc(b.next_action) + "</div>" : "") : "Press the button for a short read on how things are going.";
+  }
+  function loadBrief() { if (state.briefLoaded || !aiOn()) return; state.briefLoaded = true; api("GET", "/api/outreach/ai/brief").then(function (r) { state.brief = r.brief; renderBrief(); }).catch(function () {}); }
+  $("briefBtn").addEventListener("click", function () {
+    var b = this; b.disabled = true; b.textContent = "Reading your numbers…";
+    api("POST", "/api/outreach/ai/brief", { force: true }).then(function (r) { state.brief = r.brief; }).catch(fail).then(function () { b.disabled = false; renderBrief(); });
   });
   function renderKpis() {
     var s = state.status, o = s.overview || {}, pos = o.positive7 || 0;
@@ -437,11 +449,31 @@
   });
 
   // ---------------------------------------------------------------- leads
-  var STATUSES = ["new", "active", "finished", "replied", "unsubscribed", "bounced", "do-not-contact", "skipped-bad-address", "skipped-country", "skipped-no-mailserver"];
-  $("leadStatus").innerHTML += STATUSES.map(function (s) { return '<option value="' + s + '">' + s + "</option>"; }).join("") + '<option value="clicked">clicked a link</option>';
+  var STAGE_NAMES = { "": "All leads", waiting: "Waiting to be emailed", sequence: "In sequence", replied: "Replied", interested: "Interested", snoozed: "Out of office (paused)", finished: "Finished the sequence",
+    stopped: "Bounced or opted out", aside: "Set aside by the cleaner", clicked: "Clicked a link", highfit: "High fit (7+ of 10)", nocampaign: "In no campaign", referral: "Referred by a reply", held: "Needs your check" };
+  function fillSelect(el, groups, allLabel, keep) {
+    var html = '<option value="">' + esc(allLabel) + "</option>" + groups.map(function (g) {
+      var opts = g.items.map(function (o) { return '<option value="' + esc(g.prefix + o.value) + '">' + esc(o.label || o.value) + (o.count != null ? " (" + o.count + ")" : "") + "</option>"; }).join("");
+      return g.label ? (opts ? '<optgroup label="' + esc(g.label) + '">' + opts + "</optgroup>" : "") : opts;
+    }).join("");
+    el.innerHTML = html; el.value = keep || ""; if (el.value !== (keep || "")) el.value = "";
+  }
+  function loadFacets() {
+    return api("GET", "/api/outreach/leads/facets").then(function (f) {
+      var o = f.options || {};
+      fillSelect($("leadStage"), [{ label: "", prefix: "", items: Object.keys(STAGE_NAMES).filter(function (k) { return k && (f.stages[k] || k === $("leadStage").value) && (k !== "nocampaign" || f.campaigns); }).map(function (k) { return { value: k, label: STAGE_NAMES[k], count: f.stages[k] }; }) }], STAGE_NAMES[""] + " (" + f.total + ")", $("leadStage").value);
+      fillSelect($("leadPlace"), [{ label: "Countries", prefix: "country:", items: o.countries || [] }, { label: "States", prefix: "state:", items: o.states || [] }, { label: "Cities", prefix: "city:", items: o.cities || [] }], "Anywhere", $("leadPlace").value);
+      fillSelect($("leadType"), [{ label: "", prefix: "", items: o.types || [] }], "Any business type", $("leadType").value);
+    }).catch(function () {});
+  }
+  function leadFilterActive() { return Boolean($("leadStage").value || $("leadPlace").value || $("leadType").value || $("leadCampaign").value || $("leadSort").value || state.minScore || $("leadQ").value.trim()); }
   function loadLeads() {
-    var q = new URLSearchParams({ q: $("leadQ").value, status: $("leadStatus").value, campaign: $("leadCampaign").value, limit: PAGE, offset: state.leadPage * PAGE });
+    var q = new URLSearchParams({ q: $("leadQ").value, stage: $("leadStage").value, campaign: $("leadCampaign").value, type: $("leadType").value, sort: $("leadSort").value, limit: PAGE, offset: state.leadPage * PAGE });
+    var pl = $("leadPlace").value.split(":"); if (pl[0]) q.set(pl[0], pl.slice(1).join(":"));
+    if (state.minScore) q.set("minScore", state.minScore);
+    $("clearFilters").hidden = !leadFilterActive();
     api("GET", "/api/outreach/leads?" + q).then(function (r) {
+      $("leadCount").textContent = r.total + " lead" + (r.total === 1 ? "" : "s") + (leadFilterActive() ? " match" : "") + (state.minScore ? " · fit " + state.minScore + "+" : "");
       $("leadTable").innerHTML = r.rows.length ? "<tr><th>Lead</th><th>Where</th><th>Status</th><th>Progress</th><th>Details</th></tr>" + r.rows.map(function (t) {
         var sent = Number(t.step) || 0, place = [t.city, t.state, t.country].filter(Boolean).join(", ");
         var cname = campName(t.campaign); cname = cname === "–" || cname === "none" ? "" : cname;
@@ -458,7 +490,20 @@
   }
   var qT; $("leadQ").addEventListener("input", function () { clearTimeout(qT); qT = setTimeout(function () { state.leadPage = 0; loadLeads(); }, 250); });
   $("leadCampaign").addEventListener("change", function () { state.leadPage = 0; loadLeads(); });
-  $("leadStatus").addEventListener("change", function () { state.leadPage = 0; loadLeads(); });
+  ["leadStage", "leadPlace", "leadType", "leadSort"].forEach(function (id) { $(id).addEventListener("change", function () { state.leadPage = 0; loadLeads(); }); });
+  $("clearFilters").addEventListener("click", function () {
+    ["leadStage", "leadPlace", "leadType", "leadCampaign", "leadSort"].forEach(function (id) { $(id).value = ""; }); $("leadQ").value = ""; state.minScore = 0; state.leadPage = 0; loadLeads();
+  });
+  $("aiFilter").addEventListener("click", function () {
+    var qs = $("leadQ").value.trim(); if (!qs) return toast("Type who you want first, for example: roofers in Texas we haven't emailed", true);
+    var b = this; b.disabled = true; b.textContent = "Thinking…";
+    api("POST", "/api/outreach/ai/filter", { query: qs }).then(function (r) {
+      var f = r.filter;
+      $("leadStage").value = f.stage; $("leadType").value = f.type; $("leadSort").value = f.sort; $("leadCampaign").value = ""; state.minScore = f.minScore || 0;
+      $("leadPlace").value = f.city ? "city:" + f.city : f.state ? "state:" + f.state : f.country ? "country:" + f.country : "";
+      $("leadQ").value = f.text || ""; state.leadPage = 0; loadLeads(); toast(f.summary || "Filters set");
+    }).catch(fail).then(function () { b.disabled = false; b.textContent = "✨ Ask AI"; });
+  });
   $("prevPg").addEventListener("click", function () { state.leadPage--; loadLeads(); });
   $("nextPg").addEventListener("click", function () { state.leadPage++; loadLeads(); });
   $("dncBtn").addEventListener("click", function () {
@@ -623,14 +668,19 @@
   }
 
   // ---------------------------------------------------------------- templates
-  function tplLabel(t) { return "Email " + t.step + (t.step === 1 ? " · version " + t.variant.toUpperCase() : ""); }
+  var FIELD_LABELS = [["greeting", "Hi Name,"], ["custom_line_para", "Personal line"], ["store", "Business name"], ["domain", "Website"], ["category", "Business type"], ["sender_first_name", "Your first name"], ["company", "Your company"]];
+  function tplLabel(t) {
+    var g = (state.gaps || [])[t.step - 2];
+    return "Email " + t.step + (t.step === 1 ? " · first email" + (t.variant !== "a" ? " (version " + t.variant.toUpperCase() + ")" : "") : g ? " · " + g + " day" + (g === 1 ? "" : "s") + " later" : " · follow-up");
+  }
   function loadTemplates() {
     $("tplCampaign").value = state.tplCampaign || "";
     return api("GET", "/api/outreach/templates" + (state.tplCampaign ? "?campaign=" + encodeURIComponent(state.tplCampaign) : "")).then(function (r) {
-      state.templates = r.templates; state.fields = r.fields;
+      state.templates = r.templates; state.fields = r.fields; state.gaps = r.gaps;
       if (!state.tpl || !r.templates.some(function (t) { return t.name === state.tpl; })) state.tpl = r.templates[0] && r.templates[0].name;
-      $("fieldChips").innerHTML = '<span class="hint">Insert:</span>' + r.fields.filter(function (f) { return ["psi", "lcp", "speed_line", "sender_name", "niche", "country", "first_name"].indexOf(f) < 0; }).map(function (f) { return '<span class="chip field-chip" data-f="' + f + '">{' + f + "}</span>"; }).join("");
-      renderTplList(); selectTpl(state.tpl);
+      $("fieldChips").innerHTML = '<span class="hint">Insert:</span>' + FIELD_LABELS.filter(function (f) { return r.fields.indexOf(f[0]) >= 0; }).map(function (f) { return '<span class="chip field-chip" data-f="' + f[0] + '" title="Inserts {' + f[0] + '}">' + f[1] + "</span>"; }).join("");
+      renderTplList(); selectTpl(state.tpl); prefillWriter();
+      if (state.openWriter) { state.openWriter = false; $("writerBox").open = true; }
     }).catch(fail);
   }
   function renderTplList() {
@@ -643,6 +693,47 @@
     state.tpl = name; var t = state.templates.filter(function (x) { return x.name === name; })[0]; if (!t) return;
     $("tplText").value = t.text; $("tplReset").hidden = !t.edited; renderTplList(); previewTpl();
   }
+  // ---- Gemini: improve one email, or write the whole sequence
+  var aiOn = function () { return Boolean(state.status && state.status.ai && state.status.ai.configured); };
+  $("tplImproveBtn").addEventListener("click", function () {
+    if (!aiOn()) return fail(new Error("Connect Gemini first (Settings, AI & automation)."));
+    var b = this, step = Number((state.tpl || "email1.txt")[5]) || 1; b.disabled = true; b.textContent = "Improving…";
+    var before = $("tplText").value;
+    api("POST", "/api/outreach/ai/rewrite", { text: before, instruction: $("tplImprove").value, step: step }).then(function (r) {
+      state.prevText = before; $("tplText").value = r.text; $("tplUndo").hidden = false; previewTpl(); toast("Rewritten. Read it, then Save.");
+    }).catch(fail).then(function () { b.disabled = false; b.textContent = "✨ Improve with AI"; });
+  });
+  $("tplUndo").addEventListener("click", function () { if (state.prevText != null) { $("tplText").value = state.prevText; state.prevText = null; $("tplUndo").hidden = true; previewTpl(); } });
+  function prefillWriter() {
+    var c = camps().filter(function (x) { return String(x.id) === String(state.tplCampaign); })[0];
+    if (c && !$("wBrief").value.trim()) $("wBrief").value = (c.types.length ? c.types.join(", ") + " businesses" : c.name) + ([].concat(c.states, c.cities, c.countries).length ? " in " + [].concat(c.cities, c.states, c.countries).join(", ") : "") + ". We offer: ";
+  }
+  $("wGo").addEventListener("click", function () {
+    if (!aiOn()) return fail(new Error("Connect Gemini first (Settings, AI & automation)."));
+    var b = this, brief = $("wBrief").value.trim(); if (brief.length < 10) return fail(new Error("Describe who you are writing to and what you offer."));
+    b.disabled = true; $("wMsg").textContent = "Writing… about 15 seconds."; $("wOut").innerHTML = "";
+    api("POST", "/api/outreach/ai/templates", { brief: brief, tone: $("wTone").value, campaign: state.tplCampaign || undefined }).then(function (r) {
+      state.drafts = r.emails; $("wMsg").textContent = r.errors.length ? "Some emails were rejected by the safety checks: " + r.errors.join("; ") : "";
+      $("wOut").innerHTML = (r.emails.length ? '<div class="toolbar"><button class="btn primary sm" id="wSave" type="button">Save these ' + r.emails.length + " emails for " + esc(state.tplCampaign ? campName(state.tplCampaign) : "everyone") + '</button><span class="hint">Nothing is saved until you press this. You can also edit one first.</span></div>' : "") +
+        r.emails.map(function (e) {
+          var ck = e.check || { score: 0, issues: [] };
+          return '<div class="panel" style="margin-bottom:10px"><h3>Email ' + e.step + " · " + esc(e.subject) + ' <span class="chip ' + (ck.score >= 8 ? "okc" : ck.score >= 5 ? "warnc" : "badc") + '">copy score ' + ck.score + '/10</span><small>' + e.words + ' words</small><button class="btn sm" data-wedit="' + e.step + '" type="button" style="margin-left:auto">Edit this one</button></h3><div class="hint" style="white-space:pre-wrap;color:var(--text)">' + esc(e.preview) + "</div>" +
+            (ck.issues.length ? '<ul style="margin:8px 0 0 18px" class="hint">' + ck.issues.map(function (i) { return "<li>" + esc(i.text) + "</li>"; }).join("") + "</ul>" : "") + "</div>";
+        }).join("");
+    }).catch(fail).then(function () { b.disabled = false; });
+  });
+  $("wOut").addEventListener("click", function (e) {
+    var ed = e.target.closest("[data-wedit]"), sv = e.target.closest("#wSave");
+    if (ed) { var d = (state.drafts || []).filter(function (x) { return x.step === Number(ed.dataset.wedit); })[0]; if (d) { selectTpl("email" + d.step + ".txt"); $("tplText").value = d.text; previewTpl(); window.scrollTo(0, $("tplText").getBoundingClientRect().top + window.scrollY - 120); toast("Loaded into the editor. Press Save to keep it."); } }
+    if (sv) {
+      if (!confirm("Save these emails" + (state.tplCampaign ? " for " + campName(state.tplCampaign) : " as your default emails") + "? They replace the current wording for steps 1 to " + state.drafts.length + ".")) return;
+      sv.disabled = true;
+      state.drafts.reduce(function (p, d) { return p.then(function () { return api("PUT", "/api/outreach/templates", { name: "email" + d.step + ".txt", text: d.text, campaign: state.tplCampaign || undefined }); }); }, Promise.resolve())
+        .then(function () { toast("Saved " + state.drafts.length + " emails"); $("wOut").innerHTML = ""; $("wMsg").textContent = ""; return loadTemplates(); }).then(refresh).catch(fail);
+    }
+  });
+  $("pvDesk").addEventListener("click", function () { $("pvFrame").style.width = "100%"; $("pvDesk").className = "on"; $("pvPhone").className = ""; });
+  $("pvPhone").addEventListener("click", function () { $("pvFrame").style.width = "375px"; $("pvFrame").style.display = "block"; $("pvFrame").style.margin = "0 auto"; $("pvPhone").className = "on"; $("pvDesk").className = ""; });
   $("tplCampaign").addEventListener("change", function () { state.tplCampaign = this.value; state.tpl = null; loadTemplates(); });
   $("tplList").addEventListener("click", function (e) { var b = e.target.closest("button[data-t]"); if (b) selectTpl(b.dataset.t); });
   $("fieldChips").addEventListener("click", function (e) {
@@ -755,6 +846,10 @@
   $("campBox").addEventListener("click", function (e) { var b = e.target.closest("[data-view-go]"); if (b) go(b.dataset.viewGo); });
   var campOpts = null, campMbs = [];
   var FILTERS = [["countries", "Countries", "US, UK"], ["states", "States / regions", "TX, Florida"], ["cities", "Cities", "Austin, Dallas"], ["types", "Business types", "roofing, hvac, dentist"]];
+  function emailsRow(c) {
+    var st = camps().filter(function (x) { return x.id === c.id; })[0], own = st && st.ownEmails;
+    return '<div class="toolbar" style="margin:0"><span class="chip ' + (own ? "okc" : "warnc") + '">' + (own ? "Has its own emails" : "Sends the default emails") + '</span><button type="button" class="btn sm" data-emails="' + esc(c.id) + '">' + (own ? "Edit emails" : "Edit emails") + '</button><button type="button" class="btn sm" data-aiwrite="' + esc(c.id) + '">✨ Write with AI</button></div>';
+  }
   function campBlock(c) {
     c = c || {};
     var f = FILTERS.map(function (k) {
@@ -767,7 +862,7 @@
       '<button type="button" class="btn sm" data-mv="-1" title="Earlier: fits leads first">↑</button><button type="button" class="btn sm" data-mv="1" title="Later">↓</button><button type="button" class="btn sm danger" data-rmc="1">Remove</button></div>' +
       '<div class="row">' + f.slice(0, 2).join("") + '</div><div class="row">' + f.slice(2).join("") + "</div>" +
       '<div class="row"><div class="field"><label>Send from <span class="hint">(none ticked = every mailbox)</span></label><div>' + (mbs || '<span class="hint">Add mailboxes in Settings first.</span>') + '</div></div><div class="field"><label>Daily limit for this campaign <span class="hint">(0 = only the mailboxes\' limits)</span></label><input type="number" data-n="daily_limit" min="0" max="1000" value="' + esc(c.daily_limit || 0) + '"></div></div>' +
-      '<p class="hint cp" style="margin:6px 0">Checking…</p>' + (c.id ? '<button type="button" class="btn sm" data-emails="' + esc(c.id) + '">Edit emails for this campaign</button>' : '<span class="hint">Save to give it its own emails.</span>') + "</div>";
+      '<p class="hint cp" style="margin:6px 0">Checking…</p>' + (c.id ? emailsRow(c) : '<span class="hint">Save the campaign to give it its own emails.</span>') + "</div>";
   }
   function collectCamps() {
     return [].map.call($("campList").querySelectorAll(".camp"), function (el) {
@@ -783,13 +878,14 @@
     [].forEach.call($("campList").querySelectorAll(".camp"), previewCamp);
   }
   function loadCampaigns() {
+    aiCampState();
     api("GET", "/api/outreach/campaigns").then(function (r) { campOpts = r.options; campMbs = r.mailboxes; renderCamps(r.campaigns); }).catch(fail);
   }
   var cpT = {};
   function previewCamp(el) {
     var c = collectCamps()[[].indexOf.call($("campList").querySelectorAll(".camp"), el)], out = el.querySelector(".cp");
     api("POST", "/api/outreach/campaigns/preview", { filters: c, id: c.id }).then(function (r) {
-      out.innerHTML = "<b>" + r.total + "</b> lead" + (r.total === 1 ? "" : "s") + " match, <b>" + r.waiting + "</b> still waiting to be emailed" + (r.claimed ? ' <span class="warn">(' + r.claimed + " already belong to a campaign above)</span>" : "") +
+      out.innerHTML = "<b>" + r.total + "</b> lead" + (r.total === 1 ? "" : "s") + " match, <b>" + r.waiting + "</b> still waiting to be emailed" + (r.claimed ? ' <span class="warn">(' + r.claimed + " already belong to a campaign above)</span>" : "") + (r.blocked ? ' <span class="warn">(' + r.blocked + " are in countries your Settings do not allow)</span>" : "") +
         (r.sample.length ? '<br><span class="hint">e.g. ' + r.sample.map(function (s) { return esc(s.store + (s.place ? " (" + s.place + ")" : "")); }).join(" · ") + "</span>" : "");
     }).catch(function () { out.textContent = ""; });
   }
@@ -805,6 +901,18 @@
     if (mv) { var list = collectCamps(), i = [].indexOf.call($("campList").querySelectorAll(".camp"), el), j = i + Number(mv.dataset.mv); if (j >= 0 && j < list.length) { var t = list[i]; list[i] = list[j]; list[j] = t; renderCamps(list); } }
     if (rm && confirm("Remove this campaign? Its leads that are still waiting stop being emailed unless another campaign fits them.")) { var l2 = collectCamps(); l2.splice([].indexOf.call($("campList").querySelectorAll(".camp"), el), 1); renderCamps(l2); }
     if (em) { state.tplCampaign = em.dataset.emails; state.tpl = null; go("templates"); }
+    var aw = e.target.closest("[data-aiwrite]"); if (aw) { state.tplCampaign = aw.dataset.aiwrite; state.tpl = null; state.openWriter = true; go("templates"); }
+  });
+  function aiCampState() { var on = aiOn(); $("aiCampBtn").disabled = !on; $("aiCampChip").textContent = on ? "Gemini connected" : "Gemini not connected"; $("aiCampChip").className = "chip " + (on ? "okc" : "warnc"); }
+  $("aiCampBtn").addEventListener("click", function () {
+    var text = $("aiCampText").value.trim(); if (text.length < 5) return fail(new Error("Describe who you want to email, for example: roofing companies in Texas."));
+    var b = this; b.disabled = true; b.textContent = "Building…";
+    api("POST", "/api/outreach/ai/campaign", { description: text }).then(function (r) {
+      var list = collectCamps(); if (list.length >= 20) throw new Error("You already have 20 campaigns.");
+      var c = r.campaign; delete c.id; list.push(c); renderCamps(list);
+      $("aiCampNote").textContent = (r.note ? r.note + " " : "") + "Matches " + r.preview.total + " of your leads. Check it below, then Save campaigns.";
+      var last = $("campList").lastElementChild; if (last) last.scrollIntoView({ behavior: "smooth", block: "center" });
+    }).catch(fail).then(function () { b.textContent = "Build with AI"; aiCampState(); });
   });
   $("addCamp").addEventListener("click", function () { var l = collectCamps(); if (l.length >= 20) return; l.push({ name: "", enabled: true }); renderCamps(l); });
   $("saveCamps").addEventListener("click", function () {
