@@ -42,7 +42,7 @@ const COUNTRY_ALIAS = { "UNITED STATES": "US", USA: "US", "UNITED KINGDOM": "UK"
 // so it is not written here: set OUTREACH_NOTIFY_EMAIL in Hostinger and it becomes the default (see loadConfig).
 const DEFAULT_CONFIG = {
   signature: { name: "Hassan Ali", title: "Founder", company: "WebersLink", website: "weberslink.org",
-    postal_address: "2315 Chestnut Street, Montgomery, Alabama 36107, United States", accent_color: "#5b2ee5", logo: true },
+    postal_address: "2315 Chestnut Street, Montgomery, Alabama 36107, United States", accent_color: "#ef1421", logo: true },
   sending: {
     dry_run: true, countries: ["US", "UK"], send_days: ["Mon", "Tue", "Wed", "Thu", "Fri"], timezone: "America/New_York",
     daily_limit: 20, ramp: [5, 10, 15, 20], followup_gaps_days: [3, 4, 7], min_delay_seconds: 600, max_delay_seconds: 1200,
@@ -785,7 +785,7 @@ async function runOnce(opts = {}, deps = {}) {
       t.mailbox = t.mailbox || mailboxHint;
 
       const variant = tpl.pickVariant(t, step);
-      const r = tpl.render(step, t, cfgFor(cfg, box), variant);
+      const r = tpl.render(step, t, cfgFor(cfg, box), variant, null, { unsubscribeUrl: unsub.urlFor(t.email, cfg) });
       let html = cfg.sending.html_emails ? r.html : undefined;
       const subject = step > 1 ? (/^re:/i.test(t.subject) ? t.subject : "Re: " + t.subject) : r.subject;
       const refs = [...new Set([t.first_message_id, t.last_message_id].filter(Boolean))];
@@ -1010,7 +1010,8 @@ function status(cfg = loadConfig(), now = new Date()) {
       health: healthScore({ bounceRate: b.rate, paused: b.paused, spamRate: spam }), spamRate: Math.round(spam * 1000) / 10, placement: (warmupState.placement || {})[key] || null };
   });
   const daily = mailboxes.filter((m) => m.enabled && !m.paused).reduce((a, m) => a + m.todayLimit, 0);
-  const remaining = track.filter((t) => t.status === "new").length;
+  // Only leads that can actually be emailed count as waiting: with campaigns, a lead in no campaign or a paused one is not in the queue.
+  const remaining = track.filter((t) => t.status === "new" && campaignAllows(t, cfg)).length;
   return {
     version: VERSION, dryRun: cfg.sending.dry_run, autoRun: cfg.sending.auto_run !== false && process.env.OUTREACH_AUTO_RUN !== "off", sendDay: isSendDay(cfg, now), today: today(cfg, now), window: windowState(cfg, now),
     total: track.length, byStatus: count(track, (t) => t.status), byMailbox: group((t) => t.mailbox || "?"), byVariant: group((t) => t.variant || "a"),
@@ -1026,7 +1027,7 @@ function status(cfg = loadConfig(), now = new Date()) {
     ai: ai.status(), aiConfig: { icp: Boolean(cfg.ai.icp), booking: Boolean(cfg.ai.booking_link) }, warmup: { ...warmupState, enabled: cfg.warmup.enabled },
     clicks: (() => { const ls = Object.fromEntries(track.map((t) => [t.email.toLowerCase(), t])); return clicks.recent(40).map((c) => ({ ...c, store: (ls[c.email] || {}).store || "", status: (ls[c.email] || {}).status || "" })); })(),
     trackingBase: clicks.baseUrl(cfg), trackClicks: cfg.sending.track_clicks && cfg.sending.html_emails,
-    scheduled: listScheduled(),
+    scheduled: listScheduled(), waitingBlocked: track.filter((t) => t.status === "new" && !campaignAllows(t, cfg)).length,
     held: track.filter((t) => t.sending).map((t) => ({ email: t.email, store: t.store, step: t.sending, mailbox: t.mailbox })),
     problems: readiness(cfg, cfg.mailboxes.filter((m) => m.enabled && m.email).map((m) => new Mailbox(m)), { live: !cfg.sending.dry_run }),
     liveProblems: readiness(cfg, cfg.mailboxes.filter((m) => m.enabled && m.email).map((m) => new Mailbox(m)), { live: true }), // what must be fixed before Live can be switched on
@@ -1064,6 +1065,9 @@ function setupSteps(cfg, mailboxes, leadCount) {
   return { steps, done: steps.filter((s) => s.done).length, total: steps.length, complete: steps.every((s) => s.done || s.optional) };
 }
 
+/** Has this campaign got email copy of its own (otherwise it sends your default emails)? */
+function hasOwnEmails(id) { try { const d = tpl.campaignDir(id); return Boolean(d) && fs.readdirSync(d).some((n) => tpl.FILE_RE.test(n)); } catch (e) { return false; } }
+
 /** One row per campaign for the dashboard: how many leads, how they are doing, and how long the waiting ones will take. */
 function campaignStats(track, cfg, now, mailboxes) {
   const t0 = today(cfg, now);
@@ -1077,7 +1081,7 @@ function campaignStats(track, cfg, now, mailboxes) {
     return { id: c.id, name: c.name, enabled: c.enabled, countries: c.countries, states: c.states, cities: c.cities, types: c.types, mailboxes: c.mailboxes, daily_limit: c.daily_limit,
       total: mine.length, waiting, active: n((t) => t.status === "active"), started: started.length, replied, positive, meetings: n((t) => ["meeting_booked", "won"].includes(t.outcome)), bounced,
       sentToday: n((t) => t.last_sent && campaignDate(cfg, new Date(t.last_sent)) === t0), replyRate: rate(replied), positiveRate: rate(positive), bounceRate: rate(bounced),
-      capacity, mailboxCount: boxes.length, daysLeft: waiting && capacity ? Math.ceil(waiting / capacity) : 0 };
+      ownEmails: hasOwnEmails(c.id), capacity, mailboxCount: boxes.length, daysLeft: waiting && capacity ? Math.ceil(waiting / capacity) : 0 };
   });
 }
 
@@ -1098,6 +1102,9 @@ function insights(track, cfg, now, mailboxes) {
       if (c.enabled && !c.mailboxCount) add("bad", `Campaign "${c.name}" has no mailbox that can send right now (switched off, paused or not chosen).`, "campaigns");
       else if (c.enabled && !c.waiting && !c.active) add("info", `Campaign "${c.name}" has no leads waiting. Import leads for it or widen its filters.`, "campaigns");
       if (!c.enabled && c.waiting) add("info", `Campaign "${c.name}" is paused with ${c.waiting} lead${c.waiting === 1 ? "" : "s"} waiting.`, "campaigns");
+      const blockedCountries = c.countries.filter((x) => !cfg.sending.countries.map((y) => y.toUpperCase()).includes(String(x).toUpperCase()));
+      if (c.enabled && blockedCountries.length) add("warn", `Campaign "${c.name}" targets ${blockedCountries.join(", ")}, which Settings does not allow, so those leads are skipped. Add the country under Settings, Sending, Customize the details.`, "settings:sending");
+      if (c.enabled && c.waiting && !c.ownEmails && c.types.length && !c.types.some((x) => /roof/i.test(x))) add("warn", `Campaign "${c.name}" would send your default emails, which are written for roofing companies. Give it its own emails (Gemini can draft them).`, "templates");
       if (c.started >= 20 && c.bounceRate >= cfg.sending.bounce_pause_percent) add("bad", `Campaign "${c.name}" bounces ${c.bounceRate}%. Its list needs cleaning before you send more.`, "leads");
     }
     const ranked = camps.filter((c) => c.started >= 20).sort((a, b) => b.replyRate - a.replyRate);
@@ -1114,9 +1121,42 @@ function insights(track, cfg, now, mailboxes) {
   return out.sort((a, b) => ["bad", "warn", "info"].indexOf(a.level) - ["bad", "warn", "info"].indexOf(b.level));
 }
 
+// ---------------------------------------------------------------- finding leads
+const STAGES = {
+  waiting: (t) => t.status === "new", sequence: (t) => t.status === "active", finished: (t) => t.status === "finished", replied: (t) => t.status === "replied",
+  interested: (t) => ai.POSITIVE.includes(t.reply_label), stopped: (t) => ["bounced", "unsubscribed", "do-not-contact"].includes(t.status),
+  aside: (t) => String(t.status).startsWith("skipped"), held: (t) => Boolean(t.sending), referral: (t) => Boolean(t.referred_by),
+};
+const STAGE_NAMES = Object.keys(STAGES).concat(["snoozed", "clicked", "nocampaign", "highfit"]);
+/**
+ * Filters the lead list the way the dashboard asks: by stage (a plain-language group of statuses), campaign, place, business type,
+ * minimum fit score and free text. q: { text, stage, status, campaign, country, state, city, type, minScore, sort }.
+ */
+function leadQuery(track, q, cfg, now = new Date(), clickMap = {}) {
+  const text = String(q.text || "").trim().toLowerCase(), clicked = (t) => ((clickMap[t.email.toLowerCase()] || {}).clicks || 0) > 0;
+  const stage = {
+    snoozed: (t) => t.status === "active" && snoozed(t, cfg, now), clicked, nocampaign: (t) => !t.campaign, highfit: (t) => Number(t.ai_score) >= 7, ...STAGES,
+  }[q.stage];
+  const same = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+  let out = track.filter((t) => (!text || `${t.email} ${t.store} ${t.domain} ${t.city}`.toLowerCase().includes(text)) &&
+    (!q.stage || (stage && stage(t))) && (!q.status || (q.status === "clicked" ? clicked(t) : t.status === q.status)) &&
+    (!q.campaign || (q.campaign === "none" ? !t.campaign : String(t.campaign) === String(q.campaign))) &&
+    (!q.country || normCountry(t.country) === normCountry(q.country)) && (!q.state || normState(t.state) === normState(q.state)) && (!q.city || same(t.city, q.city)) &&
+    (!q.type || same(t.category || t.niche, q.type)) && (!q.minScore || Number(t.ai_score) >= Number(q.minScore)));
+  if (q.sort === "score") out = out.slice().sort((a, b) => (Number(b.ai_score) || 0) - (Number(a.ai_score) || 0));
+  else if (q.sort === "recent") out = out.slice().sort((a, b) => String(b.last_sent || b.replied_at || "").localeCompare(String(a.last_sent || a.replied_at || "")));
+  return out;
+}
+/** What the filter bar offers: how many leads are in each stage, and the places and business types that exist. */
+function leadFacets(track, cfg, now = new Date(), clickMap = {}) {
+  const stages = {};
+  for (const k of STAGE_NAMES) stages[k] = leadQuery(track, { stage: k }, cfg, now, clickMap).length;
+  return { stages, total: track.length, options: campaignOptions(track), campaigns: (cfg.campaigns || []).length };
+}
+
 /** The most common countries, states, cities and business types among your leads, to build campaigns from. */
-function campaignOptions() {
-  const track = store.loadTracking(), top = (f) => { const m = new Map(); for (const t of track) { const v = f(t); if (v) m.set(v, (m.get(v) || 0) + 1); } return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([value, count]) => ({ value, count })); };
+function campaignOptions(track = store.loadTracking()) {
+  const top = (f) => { const m = new Map(); for (const t of track) { const v = f(t); if (v) m.set(v, (m.get(v) || 0) + 1); } return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([value, count]) => ({ value, count })); };
   return { countries: top((t) => normCountry(t.country)), states: top((t) => normState(t.state)), cities: top((t) => String(t.city || "").trim()), types: top((t) => String(t.category || t.niche || "").trim()), total: track.length };
 }
 /** How many leads a set of filters would catch, and how many of those another campaign already claims. */
@@ -1126,7 +1166,8 @@ function campaignPreview(filters, cfg, id) {
   const earlier = at < 0 ? camps : camps.slice(0, at);
   const hit = store.loadTracking().filter((t) => leadMatches(t, c));
   const waiting = hit.filter((t) => t.status === "new");
-  return { total: hit.length, waiting: waiting.length, claimed: waiting.filter((t) => earlier.some((x) => leadMatches(t, x))).length,
+  const allowed = cfg.sending.countries.map((x) => x.toUpperCase());
+  return { total: hit.length, waiting: waiting.length, blocked: hit.filter((t) => t.status === "skipped-country" || (t.status === "new" && !allowed.includes(normCountry(t.country)))).length, claimed: waiting.filter((t) => earlier.some((x) => leadMatches(t, x))).length,
     sample: hit.slice(0, 6).map((t) => ({ store: t.store || t.domain, place: [t.city, t.state, t.country].filter(Boolean).join(", "), type: t.category || t.niche })) };
 }
 
@@ -1318,4 +1359,4 @@ async function processScheduled(cfg = loadConfig(), deps = {}, now = new Date())
 }
 
 module.exports = { sendReply, scheduleReply, cancelScheduled, listScheduled, processScheduled, autoRunDue, MAX_PER_MAILBOX_PER_DAY, RESCAN_MS, logTail, markInterrupted, readLastRun, windowState, inWindow, campaignDate, domainReceivesMail, nextEmail, sendTest, dnsHealth, resolveHeld, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dueFollowups, runOnce,
-  startRun, requestStop, previewNext, status, markSetup, campaignOptions, campaignPreview, assignCampaigns, leadMatches, queueOrder, cfgFor, healthScore, analytics, loadState, tzParts, isSendDay, today, run, log };
+  startRun, requestStop, previewNext, status, markSetup, leadQuery, leadFacets, STAGE_NAMES, campaignOptions, campaignPreview, assignCampaigns, leadMatches, queueOrder, cfgFor, healthScore, analytics, loadState, tzParts, isSendDay, today, run, log };

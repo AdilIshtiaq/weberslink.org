@@ -136,12 +136,17 @@ const SAMPLE_LEAD = { custom_line: "I saw that Example Store sells organic cotto
 const URL_IN_TEXT = /\b(https?:\/\/[^\s<>"']+[^\s<>"'.,;:!?)\]])/gi;
 const linkify = (escaped, accent) => escaped.replace(URL_IN_TEXT, (u) => `<a href="${u}" style="color:${accent};">${u}</a>`);
 
-function renderHtml(main, cfg) {
+/**
+ * The HTML part. Deliberately close to a personal email (cold email lands better that way): your words, a short signature,
+ * a small footer with the postal address and a real unsubscribe link. Table-based and inline-styled for Outlook and Gmail;
+ * a media query only enlarges the text on phones, so clients that strip <style> still get a clean layout.
+ */
+function renderHtml(main, cfg, { unsubscribeUrl = "" } = {}) {
   const sig = cfg.signature;
-  const accent = /^#[0-9a-f]{3,8}$/i.test(sig.accent_color || "") ? sig.accent_color : "#5B2EE5";
+  const accent = /^#[0-9a-f]{3,8}$/i.test(sig.accent_color || "") ? sig.accent_color : "#EF1421";
   const first = String(sig.name || "").trim().split(/\s+/)[0];
   let paras = main.trim().split(/\n\s*\n/).map((p) => p.replace(/^\n+|\n+$/g, "")).filter((p) => p.trim());
-  if (paras.length && paras[paras.length - 1].trim() === first) paras = paras.slice(0, -1); // signature block replaces the sign-off
+  if (paras.length && paras[paras.length - 1].trim() === first) paras = paras.slice(0, -1); // the signature block replaces the sign-off
   const blocks = paras.map((p) => {
     const lines = p.split("\n");
     if (lines.every((l) => l.trim().startsWith("- "))) {
@@ -153,40 +158,42 @@ function renderHtml(main, cfg) {
   const href = /^https?:/i.test(site) ? site : "https://" + site;
   let logoUrl = "";
   if (sig.logo !== false) { try { logoUrl = new URL(href).origin + "/assets/email-logo.png"; } catch (e) { /* no valid website: no logo */ } }
-  const logoRow = logoUrl ? `<tr><td style="padding:0 0 10px 0;"><a href="${esc(href)}"><img src="${esc(logoUrl)}" width="168" height="28" class="wl-logo" alt="${esc(sig.company)}" style="display:block;border:0;width:168px;max-width:100%;height:auto;"></a></td></tr>\n` : "";
-  const role = sig.title ? `${esc(sig.title)}, ${esc(sig.company)}` : esc(sig.company);
-  // Responsive: fluid 100% width capped at 600px, viewport meta, and a small-screen media query (clients that
-  // strip <style> still get the fluid inline layout). Table-based shell for Outlook.
+  const role = sig.title ? `${esc(sig.title)} · ${esc(sig.company)}` : esc(sig.company);
+  const logoRow = logoUrl ? `<tr><td style="padding:14px 0 0 0;"><a href="${esc(href)}"><img src="${esc(logoUrl)}" width="132" height="22" class="wl-logo" alt="${esc(sig.company)}" style="display:block;border:0;width:132px;max-width:100%;height:auto;"></a></td></tr>` : "";
+  const optOut = unsubscribeUrl
+    ? `Prefer not to hear from me? Reply &ldquo;unsubscribe&rdquo; or <a href="${esc(unsubscribeUrl)}" style="color:#8a8a8f;text-decoration:underline;">unsubscribe here</a>.`
+    : esc(OPT_OUT_TEXT);
   return `<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="x-apple-disable-message-reformatting">
+<meta name="color-scheme" content="light">
 <style>
   body{margin:0;padding:0;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;}
   img{border:0;max-width:100%;height:auto;}
   a{word-break:break-word;}
   @media only screen and (max-width:480px){
-    .wl-wrap{padding:16px 16px !important;}
-    .wl-body{font-size:16px !important;line-height:1.55 !important;}
+    .wl-wrap{padding:18px 16px !important;}
+    .wl-body{font-size:16px !important;line-height:1.6 !important;}
     .wl-foot{font-size:12px !important;}
-    .wl-logo{width:140px !important;height:auto !important;}
   }
 </style></head>
 <body style="margin:0;padding:0;background:#ffffff;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background:#ffffff;"><tr><td align="left" style="padding:0;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;border-collapse:collapse;"><tr><td class="wl-wrap" style="padding:16px 20px;">
-<div class="wl-body" style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#222222;word-wrap:break-word;overflow-wrap:break-word;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:580px;border-collapse:collapse;"><tr><td class="wl-wrap" style="padding:20px 20px 28px 20px;">
+<div class="wl-body" style="font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.65;color:#1f1f23;word-wrap:break-word;overflow-wrap:break-word;">
 ${blocks.join("")}
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px;border-collapse:collapse;max-width:100%;">
-${logoRow}<tr><td style="border-left:3px solid ${accent};padding:2px 0 2px 12px;font-family:Arial,Helvetica,sans-serif;">
-<div style="font-size:15px;font-weight:bold;color:#111111;">${esc(sig.name)}</div>
-<div style="font-size:13px;color:#555555;">${role}</div>
-<div style="font-size:13px;"><a href="${esc(href)}" style="color:${accent};text-decoration:none;">${esc(site)}</a></div>
-</td></tr></table>
-<div class="wl-foot" style="margin-top:28px;padding-top:12px;border-top:1px solid #eeeeee;font-size:11px;line-height:1.5;color:#999999;">
-${esc(sig.postal_address)}<br>${esc(OPT_OUT_TEXT)}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:4px;border-collapse:collapse;max-width:100%;">
+<tr><td style="border-left:3px solid ${accent};padding:1px 0 1px 12px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<div style="font-size:15px;font-weight:600;color:#111114;line-height:1.4;">${esc(sig.name)}</div>
+<div style="font-size:13px;color:#5f5f66;line-height:1.5;">${role}</div>
+<div style="font-size:13px;line-height:1.5;"><a href="${esc(href)}" style="color:${accent};text-decoration:none;">${esc(site.replace(/^https?:\/\//i, "").replace(/\/$/, ""))}</a></div>
+</td></tr>
+${logoRow}</table>
+<div class="wl-foot" style="margin-top:30px;padding-top:12px;border-top:1px solid #ececee;font-size:11px;line-height:1.6;color:#8a8a8f;">
+${esc(sig.postal_address)}<br>${optOut}
 </div>
 </div>
 </td></tr></table>
@@ -195,14 +202,14 @@ ${esc(sig.postal_address)}<br>${esc(OPT_OUT_TEXT)}
 }
 
 /** Returns { subject, text, html } for email `step` to `lead`. */
-function render(step, lead, cfg, variant = "a", rawTemplate = null) {
+function render(step, lead, cfg, variant = "a", rawTemplate = null, { unsubscribeUrl = "" } = {}) {
   const { subject, body } = rawTemplate ? parseTemplate(rawTemplate) : loadTemplate(step, variant, lead.campaign);
   const fields = fieldsFor(lead, cfg);
   const sig = cfg.signature;
   const seed = `${String(lead.email || "").toLowerCase()}|${step}`;
   const main = fill(spin(body, seed), fields).trimEnd();
-  const footer = `\n\n--\n${sig.company} | ${sig.website}\n${sig.postal_address}\n${OPT_OUT_TEXT}`;
-  return { subject: fill(spin(subject, seed + "|s"), fields), text: main + footer, html: renderHtml(main, cfg) };
+  const footer = `\n\n--\n${sig.company} | ${sig.website}\n${sig.postal_address}\n${OPT_OUT_TEXT}${unsubscribeUrl ? `\nUnsubscribe: ${unsubscribeUrl}` : ""}`;
+  return { subject: fill(spin(subject, seed + "|s"), fields), text: main + footer, html: renderHtml(main, cfg, { unsubscribeUrl }) };
 }
 
 // ---------------------------------------------------------------- copy check (before launch, no AI needed)

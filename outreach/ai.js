@@ -225,6 +225,100 @@ async function reviewCopy(subject, body) {
   return { score: Number.isFinite(n) ? Math.min(10, Math.max(1, n)) : 0, issues: list(o.issues), suggestions: list(o.suggestions) };
 }
 
+// ---------------------------------------------------------------- campaign builder
+const CAMPAIGN_SYSTEM = `You turn a plain-English description of who to email into campaign filters for a cold-email tool.
+Use ONLY values that appear in the lists you are given for countries, states and cities (copy them exactly). "types" are short lowercase keywords (1-3 words) that match words inside a lead's business category, niche or name; prefer words from the business-type list. Leave a list empty when the description doesn't limit it.
+Return {"name": max 50 characters, "countries": [], "states": [], "cities": [], "types": [max 6], "note": max 120 characters explaining what you chose}.`;
+/** Returns { name, countries, states, cities, types, note }; the caller checks it against the leads and shows a live count. */
+async function buildCampaign(description, options = {}) {
+  const list = (k) => (options[k] || []).map((o) => clean(o.value, 40)).filter(Boolean).join(", ") || "(none)";
+  const o = await callJson(`Description:\n<data>\n${clean(description, 500)}\n</data>\n\nCountries in the leads: ${list("countries")}\nStates: ${list("states")}\nCities: ${list("cities")}\nBusiness types: ${list("types")}`, CAMPAIGN_SYSTEM);
+  const pick = (v, key) => { const have = new Set((options[key] || []).map((x) => String(x.value).toLowerCase())); return (Array.isArray(v) ? v : []).map((x) => clean(x, 40)).filter((x) => have.has(x.toLowerCase())).slice(0, 12); };
+  return { name: clean(o.name, 50) || "New campaign", countries: pick(o.countries, "countries"), states: pick(o.states, "states"), cities: pick(o.cities, "cities"),
+    types: (Array.isArray(o.types) ? o.types : []).map((x) => clean(x, 30).toLowerCase()).filter((x) => x.length > 1).slice(0, 6), note: clean(o.note, 120) };
+}
+
+// ---------------------------------------------------------------- email writer
+const TEMPLATE_FIELDS = ["greeting", "custom_line_para", "store", "domain", "category", "sender_first_name", "company"];
+const WRITER_SYSTEM = `You write short, honest cold emails for a small agency, to the owner of a local or online business. Plain text, no markup, no emojis, no exclamation marks, no flattery, no invented facts, numbers, prices or guarantees.
+Write a sequence of 4 emails: email 1 (max 110 words) introduces the problem and the offer in plain words and ends with a soft yes/no question; it has NO links. Emails 2, 3 and 4 are short follow-ups (max 80 words) that add one new angle each, never guilt-trip, and email 4 is a polite last note.
+You may use ONLY these placeholders, written in braces: {greeting} (the "Hi Name," line), {custom_line_para} (an optional personal opening line; use it once, right after the greeting, in email 1 only), {store}, {domain}, {category}, {sender_first_name}, {company}. You may vary wording with {Hi|Hey} style options.
+Start every body with {greeting} and end it with {sender_first_name} alone on the last line. Give each email a subject of at most 7 words, lower-case and specific, no clickbait.
+Return {"emails": [{"subject": string, "body": string}, ...4 items]}.`;
+
+/** One email as a template file ("Subject: ..." then the body), or { error }. step 1 has stricter rules (no links, must carry the personal line). */
+function checkedEmail(subject, body, step) {
+  const sub = clean(subject, 90).replace(/[{}]/g, "");
+  let b = String(body == null ? "" : body).replace(/\r\n/g, "\n").replace(/[\p{Cc}\p{Cf}]/gu, (c) => (c === "\n" ? "\n" : "")).replace(/<[^>]*>/g, "").trim();
+  if (!sub || sub.length < 3) return { error: "subject missing" };
+  if (/https?:|www\.|\.com\b|\[[A-Z ]{3,}\]/i.test(sub + b)) return { error: "contains a link or a placeholder in brackets" };
+  const words = (b.match(/\S+/g) || []).length;
+  if (words < 20 || words > (step === 1 ? 150 : 110)) return { error: `${words} words (expected ${step === 1 ? "20-150" : "20-110"})` };
+  for (const m of b.match(/\{[^{}]*\}/g) || []) {
+    if (m.includes("|")) continue; // spintax
+    if (!TEMPLATE_FIELDS.includes(m.slice(1, -1))) return { error: `unknown placeholder ${m}` };
+  }
+  if (!/^\{greeting\}/.test(b)) b = "{greeting}\n\n" + b.replace(/^(hi|hello|hey)\b[^,\n]{0,30},\s*/i, ""); // the model forgot the greeting field: use ours instead of its own "Hi Sam,"
+  if (step === 1 && !b.includes("{custom_line_para}")) b = b.replace(/^\{greeting\}\s*\n+/, "{greeting}\n\n{custom_line_para}");
+  if (step > 1) b = b.replace(/\{custom_line_para\}/g, "");
+  b = b.replace(/\n*\{sender_first_name\}\s*$/, "").trimEnd() + "\n\n{sender_first_name}";
+  return { text: `Subject: ${sub}\n\n${b}\n` };
+}
+
+/** Writes a 4-email sequence from a brief. Returns { emails: [{ step, subject, text, words }], errors: [string] }. */
+async function writeSequence({ brief, tone = "friendly", campaign = "", sender = "", company = "" }) {
+  const o = await callJson(`Who and what: <data>${clean(brief, 600)}</data>\nCampaign: ${clean(campaign, 80) || "(general)"}\nTone: ${["friendly", "direct", "professional"].includes(tone) ? tone : "friendly"}\nSender first name: ${clean(sender, 40)}\nCompany: ${clean(company, 60)}`, WRITER_SYSTEM);
+  const emails = [], errors = [];
+  (Array.isArray(o.emails) ? o.emails : []).slice(0, 4).forEach((e, i) => {
+    const r = checkedEmail(e && e.subject, e && e.body, i + 1);
+    if (r.error) errors.push(`Email ${i + 1}: ${r.error}`);
+    else emails.push({ step: i + 1, subject: clean(e.subject, 90).replace(/[{}]/g, ""), text: r.text, words: (r.text.match(/\S+/g) || []).length });
+  });
+  if (emails.length < 4 && !errors.length) errors.push("Gemini returned fewer than 4 emails");
+  return { emails, errors };
+}
+
+const REWRITE_SYSTEM = `You improve ONE cold email as asked. Keep it plain text, honest, no links, no emojis, no exclamation marks, no invented facts. Keep every {placeholder} that is already there exactly as written (do not add new ones except {greeting} and {sender_first_name}). Keep the greeting and the sign-off line.
+Return {"subject": string, "body": string}.`;
+const REWRITE_PRESETS = { shorter: "Make it noticeably shorter without losing the offer or the question.", friendlier: "Make the tone warmer and more conversational.", direct: "Make it more direct and confident, with a clearer ask.", spam: "Remove any wording that could trigger spam filters and make it sound less salesy." };
+async function rewriteEmail({ text, instruction = "shorter", step = 1 }) {
+  const m = /^subject:\s*(.*)\n+([\s\S]*)$/i.exec(String(text || "").replace(/\r\n/g, "\n").trim());
+  if (!m) throw new Error('The email must start with a "Subject:" line.');
+  const how = REWRITE_PRESETS[instruction] || clean(instruction, 200);
+  const o = await callJson(`Instruction: ${how}\n\nEmail:\n<data>\nSubject: ${clean(m[1], 120)}\n\n${m[2].slice(0, 3000)}\n</data>`, REWRITE_SYSTEM);
+  const r = checkedEmail(o.subject, o.body, step);
+  if (r.error) throw new Error("Gemini's rewrite did not pass the safety checks (" + r.error + "). Try again.");
+  return { text: r.text };
+}
+
+// ---------------------------------------------------------------- plain-English lead search
+const FILTER_SYSTEM = `You turn a plain-English request for a list of leads into filters. Use ONLY these stages: waiting (not emailed yet), sequence (being emailed), replied, interested (positive replies), snoozed (out of office), stopped (bounced or opted out), aside (skipped by the cleaner), clicked (clicked a link), highfit (fit score 7+), nocampaign.
+For country, state, city and type use ONLY values from the lists given (copy exactly). "minScore" is a number 1-10 only if the request is about fit or quality. "sort" is "score" (best fit first), "recent" (latest activity first) or "".
+Return {"stage": string, "country": string, "state": string, "city": string, "type": string, "minScore": number, "sort": string, "text": string with any leftover words to search for, "summary": max 100 characters in plain words}. Use "" or 0 for anything not mentioned.`;
+async function parseLeadFilter(query, facets = {}, stageNames = []) {
+  const opt = facets.options || {}, list = (k) => (opt[k] || []).map((o) => clean(o.value, 40)).join(", ") || "(none)";
+  const o = await callJson(`Request: <data>${clean(query, 300)}</data>\nCountries: ${list("countries")}\nStates: ${list("states")}\nCities: ${list("cities")}\nBusiness types: ${list("types")}`, FILTER_SYSTEM);
+  const inList = (v, k) => { const x = clean(v, 40); return (opt[k] || []).some((y) => String(y.value).toLowerCase() === x.toLowerCase()) ? (opt[k].find((y) => String(y.value).toLowerCase() === x.toLowerCase()).value) : ""; };
+  const min = Math.round(Number(o.minScore));
+  return { stage: stageNames.includes(String(o.stage)) ? String(o.stage) : "", country: inList(o.country, "countries"), state: inList(o.state, "states"), city: inList(o.city, "cities"), type: inList(o.type, "types"),
+    minScore: Number.isFinite(min) && min >= 1 && min <= 10 ? min : 0, sort: ["score", "recent"].includes(String(o.sort)) ? String(o.sort) : "", text: clean(o.text, 60), summary: clean(o.summary, 100) };
+}
+
+// ---------------------------------------------------------------- the daily brief
+const BRIEF_SYSTEM = `You are an analyst writing a short brief for the owner of a small cold-email operation, from the numbers you are given. Be specific, plain and honest; never invent numbers. If there is too little data to conclude something, say so.
+Return {"headline": max 90 characters, "bullets": [2-4 items, each max 140 characters], "next_action": the single most useful thing to do next, max 140 characters}.`;
+/** snapshot: plain numbers and sentences from the dashboard. Cached for 4 hours unless force. */
+async function brief(snapshot, { force = false, now = new Date() } = {}) {
+  const cached = store.readJson("ai_brief.json", null);
+  if (!force && cached && now.getTime() - Date.parse(cached.at) < 4 * 36e5) return cached;
+  const o = await callJson(`Numbers and notes:\n<data>\n${clean(JSON.stringify(snapshot), 3500)}\n</data>`, BRIEF_SYSTEM);
+  const out = { at: now.toISOString(), headline: clean(o.headline, 90), bullets: (Array.isArray(o.bullets) ? o.bullets : []).slice(0, 4).map((x) => clean(x, 140)).filter(Boolean), next_action: clean(o.next_action, 140) };
+  if (!out.headline && !out.bullets.length) throw new Error("no usable answer from Gemini");
+  store.writeJson("ai_brief.json", out);
+  return out;
+}
+const cachedBrief = () => store.readJson("ai_brief.json", null);
+
 // ---------------------------------------------------------------- background scoring job
 const job = { kind: "", running: false, stop: false, total: 0, done: 0, ok: 0, failed: 0, message: "", startedAt: null };
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -259,5 +353,5 @@ function status() {
   return { configured: configured(), usedToday: usageToday(), dailyMax: aiDailyCap(), job: { ...job }, objections: store.readJson("objections.json", null) };
 }
 
-module.exports = { POSITIVE, setGenerator, classifyReply, enrichReply, addReferral, draftReply, validDraft, scoreLead, mineObjections, reviewCopy, startScoring, stopJob, status,
+module.exports = { buildCampaign, writeSequence, rewriteEmail, checkedEmail, parseLeadFilter, brief, cachedBrief, TEMPLATE_FIELDS, POSITIVE, setGenerator, classifyReply, enrichReply, addReferral, draftReply, validDraft, scoreLead, mineObjections, reviewCopy, startScoring, stopJob, status,
   localReturnDate, validReturnDate, QuotaError, configured };
