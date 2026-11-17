@@ -188,3 +188,46 @@ test("API: campaigns are saved separately from Settings, survive a Settings save
     assert.strictEqual((await call("DELETE", "/api/outreach/templates?name=email1.txt&campaign=1", {}, c)).status, 404);
   } finally { server.close(); }
 });
+
+test("overview: sends and replies per day, 7-day totals, and the setup checklist", async () => {
+  reset();
+  const cfg = cfgWith([]);
+  const now = new Date();
+  const at = (daysAgo) => new Date(now.getTime() - daysAgo * 864e5).toISOString();
+  fs.writeFileSync(store.P("sent_log.csv"), "date,mode,mailbox,email,store,step,variant,subject\n" +
+    [[0, "live"], [0, "live"], [1, "live"], [3, "live"], [10, "live"], [0, "dry"], [2, "reply"]].map(([d, m]) => `${at(d)},${m},a@x.com,x@y.com,S,1,a,Hi`).join("\n") + "\n");
+  store.saveTracking([
+    L("r1@a.com", { status: "replied", step: "1", replied_at: at(1), reply_label: "interested" }),
+    L("r2@b.com", { status: "replied", step: "1", replied_at: at(2) }),
+    L("r3@c.com", { status: "replied", step: "1", replied_at: at(12) }),
+    L("w@d.com", { status: "new" }),
+  ]);
+  const o = eng.status(cfg, now).overview;
+  assert.strictEqual(o.series.length, 14);
+  assert.strictEqual(o.sentToday, 2, "dry-run and reply rows are not cold sends");
+  assert.strictEqual(o.sent7, 4, "the send 10 days ago is outside the window");
+  assert.deepStrictEqual([o.replies7, o.positive7, o.repliesWaiting], [2, 1, 3]);
+  assert.strictEqual(o.series[13].sent, 2);
+  assert.ok(o.series.reduce((a, d) => a + d.replies, 0) === 3);
+
+  const su = eng.status(cfgWith([]), now).setup;
+  const by = Object.fromEntries(su.steps.map((s) => [s.id, s]));
+  assert.strictEqual(by.details.done, true);
+  assert.strictEqual(by.leads.done, true);
+  assert.strictEqual(by.campaign.optional, true);
+  assert.strictEqual(by.mailboxes.done, false, "no password set in the test environment");
+  assert.strictEqual(by.live.done, !cfg.sending.dry_run);
+  assert.strictEqual(su.complete, false);
+  eng.markSetup("test_sent"); eng.markSetup("dns_ok");
+  const after = Object.fromEntries(eng.status(cfg, now).setup.steps.map((s) => [s.id, s]));
+  assert.deepStrictEqual([after.test.done, after.dns.done], [true, true]);
+  assert.ok(Array.isArray(eng.status(cfg, now).liveProblems));
+});
+
+test("insights tell you where to go to fix each problem", () => {
+  reset();
+  const cfg = cfgWith([{ id: 1, name: "Roofers", types: "roof" }]);
+  store.saveTracking([L("n@n.com", { category: "Bakery" })]);
+  const ins = eng.status(cfg, new Date()).insights;
+  assert.strictEqual(ins.find((i) => /matches? no campaign/.test(i.text)).go, "campaigns");
+});

@@ -220,7 +220,11 @@ async function route(req, res, url, method) {
     if (testSends.length >= 5) return send(res, 429, { ok: false, error: "Five test emails in 10 minutes is the limit. Try again shortly." });
     const body = await readJson(req);
     testSends.push(Date.now());
-    try { return send(res, 200, { ok: true, ...(await eng.sendTest(String(body.to || "").trim())) }); } catch (e) { return send(res, 400, { ok: false, error: e.message }); }
+    try {
+      const r = await eng.sendTest(String(body.to || "").trim());
+      if (r.results && r.results.some((x) => x.ok)) eng.markSetup("test_sent");
+      return send(res, 200, { ok: true, ...r });
+    } catch (e) { return send(res, 400, { ok: false, error: e.message }); }
   }
   // --- Gemini: scoring, drafts, objections ---
   if (p === "/ai/status" && method === "GET") return send(res, 200, { ok: true, ...ai.status() });
@@ -248,7 +252,11 @@ async function route(req, res, url, method) {
     if (eng.run.running) return send(res, 409, { ok: false, error: "A run is in progress. Try again when it finishes." });
     try { return send(res, 200, { ok: true, ...(await runWarmup({ force: true })) }); } catch (e) { return send(res, 400, { ok: false, error: String(e.message).slice(0, 200) }); }
   }
-  if (p === "/dns" && method === "GET") return send(res, 200, { ok: true, domains: await eng.dnsHealth() });
+  if (p === "/dns" && method === "GET") {
+    const domains = await eng.dnsHealth();
+    if (domains.length && domains.every((d) => d.checks.every((c) => c.status !== "bad"))) eng.markSetup("dns_ok");
+    return send(res, 200, { ok: true, domains });
+  }
 
   if (p === "/preview" && method === "GET") {
     const n = Math.min(20, Math.max(1, parseInt(url.searchParams.get("n"), 10) || 5));
