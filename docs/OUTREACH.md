@@ -3,19 +3,55 @@
 Cold-email sequencer built into the site. Open **https://weberslink.org/admin/outreach** (the menu has a **Login** link;
 on a phone or desktop use "Install app" / "Add to Home screen" for an icon).
 
-It is **off until `ADMIN_PASSWORD` is set**, and every run is a **dry run until you switch on Live sending** in Settings.
+It is **off until `ADMIN_PASSWORD` is set**, and every run is a **test (nothing is sent) until you switch the top-bar switch from Test mode to Live**.
+
+## Finding leads, and what Gemini can do (v2.6)
+**Lead filters** (Leads tab) use plain-language groups instead of raw statuses: stage (waiting, in sequence, replied, interested, paused for out-of-office,
+finished, bounced or opted out, set aside, clicked, high fit, in no campaign, referred, needs your check; each with its count), place (country, state or city), business
+type, campaign and sort (best fit first, latest activity first). Only stages that have leads are listed. **Ask AI** next to the search box turns a sentence like "roofers in
+Texas we haven't emailed, best fit first" into those filters (it can only choose values that exist in your leads).
+
+**Honest counts.** "Leads waiting" and "days to finish" count only leads that can actually be emailed: with campaigns, a lead in no campaign or in a paused one is not in the queue.
+The Overview says so ("N waiting leads match no campaign"), warns when a campaign targets a country Settings does not allow, and warns when a campaign without its own
+emails would send the default ones (which are written for roofing companies).
+
+**Gemini tools** (all need `GEMINI_OUTREACH_KEY`; each call counts toward `GEMINI_OUTREACH_AI_DAILY_MAX`, default 300; none can send anything):
+- **Describe a campaign** (Campaigns tab): "roofing companies in Texas and Florida" becomes a campaign with real places and business-type words from your leads; you see the live match count before saving.
+- **Write the emails with Gemini** (Emails tab, or **Write with AI** on a campaign): a 4-email sequence from a short brief and a tone. Every email is checked: no links, only the
+  allowed placeholders, sensible length, greeting and sign-off enforced, copy score shown. Nothing is saved until you press **Save these emails** (for that campaign, or for everyone).
+- **Improve with AI** (Emails editor): shorter, friendlier, more direct, or less spammy; **Undo** brings the old text back.
+- **AI brief** (Overview): a short read of your numbers and the one thing to do next, cached for 4 hours.
+- The older tools (reply labels, suggested answers, lead scores, copy check, objection summary) are described above.
+
+**Email layout.** Emails now look like a personal message: your text, a short signature (name, title, company, website, optional small logo), and a small footer with the postal
+address and a real **unsubscribe here** link next to "reply unsubscribe". The default accent colour is the brand red (`#ef1421`); a colour you already saved is kept. The editor
+shows each email with its timing ("Email 2 · 3 days later"), offers only the placeholders that make sense, and previews on desktop or phone width.
+
+## Using the dashboard
+Six sections, left to right in the menu:
+- **Overview:** what needs you right now. A **Get ready to send** checklist (sender details, mailbox, leads, optional campaigns, test email, domain check, go live)
+  stays on top until you are set up and ticks itself off. Below it: **needs attention** (the most important problem or opportunity first, each with an Open
+  button that takes you to the fix), six key numbers (sent today, last 7 days, replies, replies waiting for you, meetings), a 14-day chart of sends and replies, your campaigns and mailboxes.
+- **Inbox:** people who replied, with Gemini's label and suggested answer. Reply, schedule, mark the outcome.
+- **Campaigns:** groups of leads by place and business type, plus an **Emails** tab for the wording of each campaign.
+- **Leads:** search, filter, import. **Tools** holds the list cleaner, Gemini helpers, never-contact list, exports.
+- **Reports:** results by label, step and mailbox, subject-line test, link clicks, why people say no, and the run log.
+- **Settings:** five tabs (Sender, Mailboxes, Sending, AI & automation, Checks & backup) with one **Save changes** bar. Sending speed is three plain choices
+  (**Careful**, **Standard**, **Around the clock**) with a live estimate; every detailed number is under **Customize the details**.
+
+The **Test mode / Live** switch in the top bar decides whether runs send real emails. It refuses to go Live while anything needed is missing (for example a mailbox password).
 
 ## Runs by itself (automatic running)
-With **Live sending** ticked and **Run automatically** ticked (both in Settings; automatic is the default), the app starts
+With the top-bar switch on **Live** and **Run automatically** ticked (Settings -> Sending; automatic is the default), the app starts
 a run by itself, checking every 10 minutes and again 30 seconds after any restart. Nothing else is needed: no cron job and no
-environment variable. Dry runs never start by themselves. A run keeps going, waiting between emails, and re-reads the
+environment variable. Test runs never start by themselves. A run keeps going, waiting between emails, and re-reads the
 inboxes at least every 10 minutes while it runs, so a reply, "unsubscribe" or bounce stops that lead's sequence within minutes
 even in a run that lasts all day. If an inbox cannot be read mid-run, sending stops until the next run can read it.
 To switch it off, untick **Run automatically** in Settings, or set `OUTREACH_AUTO_RUN=off` on the server.
 Hostinger can stop idle Node apps, so keeping the cron job below as a wake-up call is still sensible.
 
 ## Sending 24/7 (one email every 15-20 minutes)
-Settings -> Sending rules -> **Use 24/7 settings**, then **Save settings**. It turns the sending window off, selects every
+Settings -> Sending -> **Around the clock**, then **Save changes**. It turns the sending window off, selects every
 day of the week, sets the wait between emails to 15-20 minutes (900-1200 seconds), and warms up at 25, 50, 75, then 100
 emails a day. One email every 17.5 minutes on average is about 82 a day from one mailbox. The hard cap is **100 a day per
 mailbox**. To skip the warm-up, set the warm-up field to `100`. Sending this many cold emails from one address, day and night,
@@ -26,7 +62,7 @@ Each run: reads each mailbox's inbox (replies, opt-outs, bounces) and emails you
 high bounce rate, sends follow-ups that are due (in the original thread, from the original mailbox), then starts new
 leads with per-mailbox warm-up (set in Settings; the 24/7 preset uses 25/50/75/100 a day by week). Emails 2-4 are replies in the same thread.
 When someone replies the sequence stops for them (and for their colleagues). Send the free video audit within 24 hours;
-the Replies tab tracks this. Click **Reply** there to write back from the dashboard: it is sent from the mailbox that
+the Inbox tab tracks this. Click **Reply** there to write back from the dashboard: it is sent from the mailbox that
 emailed them, in the same thread. The message box keeps links, bold/italic/underline and lists when you paste (from Google
 Docs, Word, Gmail…); the toolbar adds links (Ctrl+K), lists, images and file attachments (10 MB in total), and bare
 https:// addresses become links. It is sent as HTML with a plain-text copy. Tick **Send later** to schedule it; scheduled
@@ -76,7 +112,7 @@ Passwords are never stored in files or in the dashboard, and `outreach-data/` is
 Signing out ends the session immediately. Wrong passwords are throttled (per address, plus a global slow-down).
 
 ## Sending window (for example overnight, 7pm to 7am)
-Settings -> Sending rules -> **Only send during a daily window**. Pick when it opens and closes in the time zone set above (the
+Settings -> Sending -> Customize the details -> **Only send during a daily window**. Pick when it opens and closes in the time zone set above (the
 **Use 7pm-7am Pakistan time** button fills in Asia/Karachi and 19:00-07:00).
 - Between emails the app waits a random time between the minimum and maximum delay in Settings (default 10 to 20 minutes),
   but never longer than an even share of what is left of the window, so the day's emails always fit. The first goes out as soon as the window opens.
@@ -99,7 +135,7 @@ With a sending window, schedule it every 30 minutes instead (cron: `*/30 * * * *
 open and resumes after any restart; outside the window it only checks the inbox.
 
 It returns immediately (202) and the run continues in the background. A second trigger while one is running is refused.
-A crashed run's lock is taken over automatically. Runs use the Dry run / Live setting from Settings. Pick a time that
+A crashed run's lock is taken over automatically. Runs use the Test mode / Live switch in the top bar. Pick a time that
 is morning in the time zone of your leads.
 
 ## Defaults, and "why did my run stop?"
@@ -123,11 +159,11 @@ the mailbox password/inbox login failed. The Last-run panel names which.
 Everything you save (settings, leads and their progress, sent history, do-not-contact list, edited emails, the login key) is
 kept in files in the data folder, not in the code. **If that folder is inside the app's folder, a redeploy can erase it**
 (you would find your settings gone and be asked to log in again). So:
-1. Set `OUTREACH_DATA_DIR` to a folder outside the app (see the table below) and restart. Settings -> "Your data and backup"
+1. Set `OUTREACH_DATA_DIR` to a folder outside the app (see the table below) and restart. Settings -> Checks & backup
    and the startup log show which folder is in use; the dashboard warns if it is inside the app.
-2. **Download a backup** (Settings -> Your data and backup) after any big change and at least weekly (the dashboard reminds you).
+2. **Download a backup** (Settings -> Checks & backup) after any big change and at least weekly (the dashboard reminds you).
    It is one file with your settings, leads, history and email edits. It never contains passwords.
-3. If data ever disappears: log in, go to Settings -> **Restore from backup**, choose the file. The current data is validated
+3. If data ever disappears: log in, go to Settings -> Checks & backup -> **Restore from backup**, choose the file. The current data is validated
    first, a safety copy of whatever was there is saved, and a bad or wrong file changes nothing.
 After a redeploy you still need the environment variables (passwords etc.) in Hostinger; they are not part of the backup.
 
@@ -142,7 +178,7 @@ Keeps bad addresses out of the queue so bounces stay low:
 - Every set-aside lead stays in the list with its reason and a **Restore** button.
 - It cannot prove that one particular inbox exists (only paid verifiers can), so keep the bounce auto-pause on
   (default 3%) and start with a small first batch.
-- **Settings -> Use cautious settings** fills in a gentle plan for a single mailbox on your main domain: 5/10/15/20
+- **Settings -> Sending -> Careful** fills in a gentle plan for a single mailbox on your main domain: 5/10/15/20
   emails a day by week, at most 20 per mailbox, pause at 3% bounces. Click Save settings afterwards.
 
 ## Personalise with Gemini (optional, free tier)
@@ -172,7 +208,7 @@ line; only **approved** lines go into emails.
 
 ## Three mailboxes, AI replies, warm-up (v2.5)
 **Mailboxes.** A fresh install starts with `hassan@`, `adil_ishtiaq@` and `sienna_carter@weberslink.org`. If you already saved
-settings, add the two new ones in Settings -> Sending mailboxes (they get numbers 2 and 3) and set `OUTREACH_PASSWORD_2` and
+settings, add the two new ones in Settings -> Mailboxes (they get numbers 2 and 3) and set `OUTREACH_PASSWORD_2` and
 `OUTREACH_PASSWORD_3` on the server. A mailbox whose sender name differs from the Signature name signs emails as that
 person, with no job title unless you fill one in. New leads rotate across the mailboxes; follow-ups stay with the mailbox that started the thread.
 
@@ -182,13 +218,13 @@ still run first and decide who is stopped; Gemini can only make things safer (a 
 list missed stops the lead and adds the address to the never-contact list).
 - **Out of office:** the return date snoozes follow-ups until the day after (Leads shows "Paused until...", with a **Resume now** button).
 - **Wrong person with a named colleague:** that person is added as a new lead, marked "referred by", and is not blocked by the "a colleague replied" rule.
-- **Suggested reply** for interested/question replies (Replies tab, **Use suggested reply**): plain text, no links except your booking link
-  (Settings -> Gemini). A person always reviews and sends it; nothing is auto-sent.
+- **Suggested reply** for interested/question replies (Inbox, **Use suggested reply**): plain text, no links except your booking link
+  (Settings -> AI & automation). A person always reviews and sends it; nothing is auto-sent.
 - **Webhook:** set an https address in Settings and positive replies on live runs are posted there as JSON (CRM, Zapier, Slack).
 - Mark each reply's **Outcome** (meeting booked / won / lost). The Dashboard's Results panel shows replies by label, by email step, by mailbox, and meetings.
-- **Why people say no:** Dashboard -> Summarise objections groups the last 60 days of "no" and "not now" replies into themes with copy advice.
+- **Why people say no:** Reports -> Why people say no -> Summarise with Gemini groups the last 60 days of "no" and "not now" replies into themes with copy advice.
 
-**Lead scoring.** Describe your ideal customer in Settings -> Gemini, then Leads -> **Score leads (Gemini)**. Waiting leads are then emailed
+**Lead scoring.** Describe your ideal customer in Settings -> AI & automation, then Leads -> Tools -> **Score leads (Gemini)**. Waiting leads are then emailed
 best-score first; "Skip leads scoring below" sets a floor. Scores come only from the lead's own fields (category, niche, country, PageSpeed).
 
 **Copy tools.** Templates -> **Check copy** flags spam-filter words, pushy calls to action, long emails, too many links and ALL CAPS (add
@@ -202,7 +238,7 @@ confirm button; a POST unsubscribes, suppresses the address and stops its sequen
 mail) and spots catch-all domains. Only a clear "no such user" answer sets a lead aside. Many hosts, shared hosting included, block outgoing port 25; then
 every answer is "unknown" and nothing changes. Free-mail addresses are not probed.
 
-**Warm-up between your mailboxes** (Settings -> Gemini and warm-up, off by default). Every 30 minutes in daytime, each mailbox sends a few short
+**Warm-up between your mailboxes** (Settings -> Mailboxes, off by default). Every 30 minutes in daytime, each mailbox sends a few short
 messages to the others; the receiver opens them, moves any from spam back to the inbox, and answers a share. It never counts toward the cold-email limit and
 the dashboard shows where each mailbox's warm-up mail landed (inbox vs spam), which doubles as a free placement test and feeds the **Health** score
 (bounces, pauses, spam placement). With only three inboxes the effect is modest: keep ramp-up slow and lists clean. The IMAP part
@@ -212,7 +248,7 @@ the dashboard shows where each mailbox's warm-up mail landed (inbox vs spam), wh
 
 
 ## Campaigns (by place and business type)
-Dashboard -> **Campaigns**. A campaign is a group of leads defined by **countries, states, cities and business types** (leave a box empty
+**Campaigns** tab. A campaign is a group of leads defined by **countries, states, cities and business types** (leave a box empty
 for "any"), with its own **mailboxes**, **daily limit** and, optionally, its own **email copy**. Examples: "Texas roofers", "UK dentists", "Florida HVAC".
 - **Where the data comes from:** your spreadsheet's `country`, `state` and `city` columns; state and city are also read from a US street address
   ("12 Main St, Dallas, TX 75201"). "Texas", "texas" and "TX" are treated as the same. Business types match as words inside the lead's category,
@@ -232,12 +268,12 @@ for "any"), with its own **mailboxes**, **daily limit** and, optionally, its own
 ## First-time checklist
 1. Set the env variables above, restart the app, sign in.
 2. Settings: your name, company, **postal address**, notify email, mailboxes (lookalike domains, not weberslink.org). Save.
-3. Settings -> **Check domain DNS**: fix anything marked "Fix" (SPF/MX), and add DKIM/DMARC if flagged.
-4. Settings -> **Send test email** to your own address; confirm it lands in the inbox, not spam.
+3. Settings -> Checks & backup -> **Check now**: fix anything marked "Fix" (SPF/MX), and add DKIM/DMARC if flagged.
+4. Settings -> Checks & backup -> **Send test email** to your own address; confirm it lands in the inbox, not spam.
 5. Leads: import your spreadsheet (.xlsx sheet "Leads", or .csv).
 6. Emails: check the copy; use "Preview real leads".
 7. Run (dry) and read the log.
-8. Settings -> tick Live sending. Warm-up is automatic. Add the cron job.
+8. Switch the top bar from Test mode to **Live**. Warm-up is automatic. Add the cron job.
 
 ## Email copy
 The bundled emails (`outreach/templates/email1.txt`, `email1b.txt`, `email2.txt`, `email3.txt`, `email4.txt`) introduce WebersLink as a
@@ -254,7 +290,7 @@ Every email carries the postal address and an opt-out line. A mailbox pauses its
 A/B versions share one body and differ only in subject; judge after about 100 leads each.
 
 ## Tests
-`npm test` (about 156 tests: engine, API, auth, regression tests for an independent code review; no network or real
+`npm test` (about 167 tests: engine, API, auth, regression tests for an independent code review; no network or real
 mailboxes needed).
 
 ## Not covered by tests

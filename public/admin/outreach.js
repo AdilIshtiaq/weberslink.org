@@ -3,7 +3,7 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
-  var state = { view: "dashboard", status: null, config: null, leadPage: 0, tpl: null, templates: [], fields: [] };
+  var state = { view: "overview", status: null, config: null, leadPage: 0, tpl: null, templates: [], fields: [] };
   var PAGE = 50, pollTimer = null;
 
   function toast(msg, err) {
@@ -39,20 +39,32 @@
   $("logout").addEventListener("click", function () { try { localStorage.removeItem("wl_owner"); } catch (e) {} api("POST", "/api/outreach/logout", {}).finally(showLogin); });
 
   // ---------------------------------------------------------------- navigation
-  var TITLES = { dashboard: "Dashboard", replies: "Replies", campaigns: "Campaigns", leads: "Leads", templates: "Emails", settings: "Settings" };
-  function go(view) {
+  var VIEWS = {
+    overview: ["Overview", ""], replies: ["Inbox", "People who replied to you"], campaigns: ["Campaigns", "Group leads by place and business type"],
+    templates: ["Campaigns", "The emails each campaign sends"], leads: ["Leads", "Everyone you can email"], reports: ["Reports", "What is working and what is not"],
+    settings: ["Settings", "Sender, mailboxes and sending rules"]
+  };
+  var NAV_OF = { templates: "campaigns" };
+  function go(view, tab) {
+    if (view === "dashboard") view = "overview";
+    if (!VIEWS[view]) view = "overview";
     state.view = view;
-    ["dashboard", "replies", "campaigns", "leads", "templates", "settings"].forEach(function (v) { $("v-" + v).hidden = v !== view; });
-    document.querySelectorAll(".nav-btn[data-view]").forEach(function (b) { b.classList.toggle("on", b.dataset.view === view); });
-    $("title").textContent = TITLES[view];
+    Object.keys(VIEWS).forEach(function (v) { $("v-" + v).hidden = v !== view; });
+    document.querySelectorAll(".nav-btn[data-view]").forEach(function (b) { b.classList.toggle("on", b.dataset.view === (NAV_OF[view] || view)); });
+    $("title").textContent = VIEWS[view][0]; $("subtitle").textContent = VIEWS[view][1];
     if (history.replaceState) history.replaceState(null, "", "#" + view);
+    window.scrollTo(0, 0);
     if (view === "campaigns") loadCampaigns();
-    if (view === "leads") loadLeads();
+    if (view === "leads") { loadFacets().then(loadLeads); }
     if (view === "templates") loadTemplates();
-    if (view === "settings") { loadSettings(); showDataInfo(); }
-    if (view === "replies" || view === "dashboard") renderStatus();
+    if (view === "settings") { if (!state.dirty) loadSettings(); showDataInfo(); showSettingsTab(tab || state.stab || "sender"); }
+    if (state.status) renderStatus();
   }
   document.querySelectorAll(".nav-btn[data-view]").forEach(function (b) { b.addEventListener("click", function () { go(b.dataset.view); }); });
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("[data-goview]"); if (t) return go(t.dataset.goview);
+    var g = e.target.closest("[data-view-go]"); if (g) go(g.dataset.viewGo);
+  });
 
   // ---------------------------------------------------------------- status polling + dashboard
   function refresh() {
@@ -62,63 +74,34 @@
       pollTimer = setTimeout(refresh, s.running ? 3000 : 20000);
     }).catch(function (e) { if (!$("app").hidden) { fail(e); pollTimer = setTimeout(refresh, 30000); } });
   }
+  var fmtMin = function (m) { return Math.floor(m / 60) + "h " + (m % 60) + "m"; };
   function renderStatus() {
     var s = state.status; if (!s) return;
-    var pill = $("modePill");
-    pill.className = "pill " + (s.running ? "busy" : s.dryRun ? "dry" : "live");
-    pill.innerHTML = "<i></i>" + (s.running ? "Running (" + esc(s.runMode) + ")" : s.dryRun ? "Dry run mode" : "Live");
-    $("stopBtn").hidden = !s.running;
-    $("runBtn").disabled = s.running; $("testBtn").disabled = s.running;
-    $("runBtn").textContent = s.dryRun ? "Run (dry)" : "Run live now";
-    $("testBtn").hidden = s.dryRun;
-    var nr = s.replied.filter(function (r) { return !r.loomSent; }).length;
+    var live = !s.dryRun;
+    [].forEach.call($("modeSwitch").children, function (b) { b.className = (b.dataset.mode === "live") === live ? "on " + b.dataset.mode : ""; });
+    $("runState").hidden = !s.running; $("runText").textContent = s.running ? "Running" + (s.runMode === "dry" ? " (test)" : "") : "";
+    $("stopBtn").hidden = !s.running; $("runBtn").disabled = s.running; $("testBtn").disabled = s.running;
+    $("runBtn").textContent = live ? "Run now" : "Run test"; $("testBtn").hidden = !live;
+    var nr = (s.overview && s.overview.repliesWaiting) || 0;
     $("replyBadge").hidden = !nr; $("replyBadge").textContent = nr;
-
-    var c = s.byStatus || {};
-    $("cards").innerHTML = [
-      ["Leads", s.total], ["Not yet contacted", s.remaining], ["In sequence", c.active || 0], ["Replied", c.replied || 0],
-      ["Bounced", c.bounced || 0], ["Days to finish", s.daysLeft || "–"]
-    ].map(function (x) { return '<div class="card"><div class="n">' + esc(x[1]) + '</div><div class="l">' + esc(x[0]) + "</div></div>"; }).join("");
-
-    var w = s.window || {}, fmt = function (m) { return Math.floor(m / 60) + "h " + (m % 60) + "m"; };
-    $("windowBox").hidden = !w.enabled;
-    if (w.enabled) $("windowInfo").innerHTML = "Sending window " + esc(w.start) + "–" + esc(w.end) + " (" + esc(w.timezone) + "): " + (w.open ? '<b class="ok">OPEN now</b>, closes in ' + fmt(w.minutesToClose) : '<b class="warn">closed</b>, opens in ' + fmt(w.minutesToOpen)) + (s.dryRun ? ' <span class="hint">(Live sending is off, so nothing will be sent.)</span>' : "");
-    var d = s.data || {}, warns = [];
-    if (d.insideApp) warns.push("Your data folder (" + d.dir + ") is inside the app's folder, so a redeploy can erase it. Set OUTREACH_DATA_DIR in Hostinger to a folder outside the app, restart, then restore a backup.");
-    if (d.dir && !d.writable) warns.push("The data folder (" + d.dir + ") can't be written to, so nothing you save will stick. Set OUTREACH_DATA_DIR to a folder you can write to.");
-    var haveData = (s.total || 0) > 0 || (s.mailboxes || []).length > 0;
-    if (haveData && (!s.lastBackup || Date.now() - Date.parse(s.lastBackup) > 7 * 864e5)) warns.push((s.lastBackup ? "Your last backup was over a week ago." : "You have never downloaded a backup.") + " Download one in Settings → Your data and backup, so a redeploy or mistake can't cost you your work.");
-    $("dataWarn").hidden = !warns.length;
-    $("dataWarnList").innerHTML = warns.map(function (w) { return "<li>" + esc(w) + "</li>"; }).join("");
+    if (state.view === "overview") {
+      var w = s.window || {};
+      $("subtitle").textContent = !live ? "Test mode: runs only plan emails, nothing is sent" : w.enabled ? "Live · sending window " + w.start + "–" + w.end + " (" + w.timezone + ") is " + (w.open ? "open, closes in " + fmtMin(w.minutesToClose) : "closed, opens in " + fmtMin(w.minutesToOpen)) : "Live · sending around the clock";
+    }
+    renderSetup(); renderAttention(); renderKpis(); renderBrief(); loadBrief(); renderChart(); renderCampaignCards(); renderMailboxCards(); fillCampaignSelects();
     $("heldBox").hidden = !s.held.length;
     $("heldList").innerHTML = s.held.map(function (x) {
-      return '<div class="reply"><div><div class="who">' + esc(x.store || x.email) + '</div><div class="meta">' + esc(x.email) + " · email " + esc(x.step) + " · " + esc(x.mailbox || "") + '</div></div><div class="acts"><button class="btn sm" data-held="retry_held" data-email="' + esc(x.email) + '">It was NOT sent: allow retry</button><button class="btn sm danger" data-held="skip_held" data-email="' + esc(x.email) + '">It was sent: never email again</button></div></div>';
+      return '<div class="reply"><div><div class="who">' + esc(x.store || x.email) + '</div><div class="meta">' + esc(x.email) + " · email " + esc(x.step) + " · " + esc(x.mailbox || "") + '</div></div><div class="acts"><button class="btn sm" data-held="retry_held" data-email="' + esc(x.email) + '">It was NOT sent: allow retry</button><button class="btn sm danger" data-held="skip_held" data-email="' + esc(x.email) + '">It WAS sent: never email again</button></div></div>';
     }).join("");
-    $("problems").hidden = !s.problems.length;
-    $("problemList").innerHTML = s.problems.map(function (p) { return "<li>" + esc(p) + "</li>"; }).join("");
 
-    $("mbTable").innerHTML = s.mailboxes.length ? "<tr><th>Mailbox</th><th>Today</th><th>First live send</th><th>Bounces</th><th>Health</th><th>Warm-up mail</th><th>Password</th></tr>" + s.mailboxes.map(function (m) {
-      var pct = m.todayLimit ? Math.min(100, Math.round(100 * m.sentToday / m.todayLimit)) : 0;
-      return "<tr><td>" + esc(m.email) + (m.enabled ? "" : ' <span class="chip">off</span>') + (m.paused ? ' <span class="chip bounced">paused</span>' : "") + '</td><td><div class="bar"><b style="width:' + pct + '%"></b></div><span class="hint">' + m.sentToday + " of " + m.todayLimit + "</span></td><td>" +
-        esc(m.firstLiveSend || "not started") + "</td><td>" + m.bounceRate + "%</td><td>" + healthChip(m.health) + "</td><td class='hint'>" + (m.placement ? m.placement.inbox + " inbox · " + m.placement.spam + " spam" : "–") + "</td><td>" + (m.passwordSet ? '<span class="ok">set</span>' : '<span class="warn">not set</span>') + "</td></tr>";
-    }).join("") : '<tr><td class="empty">No mailbox yet. Add one in Settings.</td></tr>';
-
-    renderResults(); renderObjections(); renderInsights(); renderCampaignCards(); fillCampaignSelects();
+    // reports
+    renderResults(); renderObjections();
     var vs = Object.keys(s.byVariant || {}).sort();
     $("abBox").innerHTML = vs.length ? "<table><tr><th>Version</th><th>Started</th><th>Replied</th><th>Rate</th></tr>" + vs.map(function (v) {
       var x = s.byVariant[v]; return "<tr><td>Email 1 · " + esc(v.toUpperCase()) + "</td><td>" + x.started + "</td><td>" + x.replied + "</td><td>" + (x.started ? (100 * x.replied / x.started).toFixed(1) : "0.0") + "%</td></tr>";
     }).join("") + '</table><p class="hint" style="margin-top:10px">Wait for about 100 leads per version before judging a winner.</p>' : '<p class="empty">Results appear once emails go out.</p>';
-
     var fs = Object.keys(s.furthestStep || {}).sort();
     $("funnel").innerHTML = fs.length ? "<table>" + fs.map(function (k) { return "<tr><td>Reached " + esc(k) + "</td><td>" + s.furthestStep[k] + "</td></tr>"; }).join("") + "</table>" : '<p class="empty">Nothing sent yet.</p>';
-
-    var lr = s.lastRun; $("lastRun").textContent = lr ? "last run " + ago(lr.at) : "";
-    $("lastRunBox").hidden = !lr;
-    if (lr) {
-      var tone = lr.status === "failed" ? "bad" : lr.status === "interrupted" ? "warn" : lr.status === "running" ? "hint" : (lr.sent > 0 ? "ok" : "warn");
-      var label = { done: "Last run", failed: "Last run FAILED", interrupted: "Last run was cut off", running: "Running now" }[lr.status] || "Last run";
-      $("lastRunText").innerHTML = '<b class="' + tone + '">' + label + " (" + esc(lr.mode === "dry" ? "dry run" : lr.mode === "live" ? "live" : "") + (lr.source ? ", " + esc(lr.source) : "") + ", " + esc(ago(lr.at)) + ")</b><br>" + esc(lr.reason || "");
-    }
     var lg = $("log"), atEnd = lg.scrollTop + lg.clientHeight >= lg.scrollHeight - 30;
     lg.innerHTML = s.log.length ? s.log.map(function (line) {
       var cls = /SENT|Notified/.test(line) ? "sent" : /REPLIED|OPT-OUT/.test(line) ? "rep" : /failed|REFUSED|Could not|NOT SENDING/i.test(line) ? "err" : /PAUSED|waiting/.test(line) ? "wrn" : "";
@@ -129,15 +112,110 @@
     if (state.view === "replies") renderReplies();
   }
 
+  // ---- overview pieces
+  function renderSetup() {
+    var su = state.status.setup || { steps: [], complete: true };
+    $("setupBox").hidden = su.complete;
+    if (su.complete) return;
+    $("setupSub").textContent = su.done + " of " + su.total + " done. Finish these and you are sending.";
+    $("setupBar").style.width = Math.round(100 * su.done / su.total) + "%";
+    $("setupSteps").innerHTML = su.steps.map(function (st) {
+      return '<div class="step' + (st.done ? " done" : "") + '"><span class="tick">✓</span><div><div class="lbl">' + esc(st.label) + (st.optional ? ' <span class="chip">optional</span>' : "") + '</div><div class="hint">' + esc(st.hint) + "</div></div>" +
+        (st.done ? "" : '<button class="btn sm go' + (st.action === "live" ? " primary" : "") + '" data-setup="' + esc(st.id) + '" data-view="' + esc(st.view || "") + '" data-tab="' + esc(st.tab || "") + '" data-action="' + esc(st.action || "") + '">' + (st.action === "live" ? "Go live" : "Do this") + "</button>") + "</div>";
+    }).join("");
+  }
+  $("setupSteps").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-setup]"); if (!b) return;
+    if (b.dataset.action === "live") return setMode("live");
+    go(b.dataset.view, b.dataset.tab || undefined);
+  });
+  function attentionItems() {
+    var s = state.status, out = [], d = s.data || {};
+    var lr = s.lastRun;
+    if (lr && (lr.status === "failed" || lr.status === "interrupted")) out.push({ level: "warn", text: (lr.status === "failed" ? "The last run failed: " : "The last run was cut off: ") + (lr.reason || "") });
+    if (s.setup && s.setup.complete) (s.problems || []).forEach(function (p) { out.push({ level: "bad", text: p, go: "settings" }); });
+    (s.insights || []).forEach(function (i) { out.push(i); });
+    if (d.insideApp) out.push({ level: "bad", text: "Your data folder is inside the app's folder, so a redeploy can erase it. Set OUTREACH_DATA_DIR in Hostinger to a folder outside the app, restart, then restore a backup.", go: "settings:checks" });
+    if (d.dir && !d.writable) out.push({ level: "bad", text: "The data folder (" + d.dir + ") can't be written to, so nothing you save will stick. Set OUTREACH_DATA_DIR to a folder you can write to." });
+    var haveData = (s.total || 0) > 0 || (s.mailboxes || []).length > 0;
+    if (haveData && (!s.lastBackup || Date.now() - Date.parse(s.lastBackup) > 7 * 864e5)) out.push({ level: "info", text: (s.lastBackup ? "Your last backup was over a week ago." : "You have never downloaded a backup.") + " A backup protects you from a redeploy or a mistake.", go: "settings:checks" });
+    var rank = { bad: 0, warn: 1, info: 2 };
+    if (s.setup && !s.setup.complete) out = out.filter(function (i) { return i.level !== "info"; }); // while setting up, only real problems compete with the guide
+    return out.sort(function (a, b) { return rank[a.level] - rank[b.level]; });
+  }
+  function renderAttention() {
+    var items = attentionItems(), show = state.attnAll ? items : items.slice(0, 5);
+    $("attnBox").hidden = !items.length && Boolean(state.status.setup && !state.status.setup.complete);
+    $("attnList").innerHTML = items.length ? show.map(function (i) {
+      var g = (i.go || "").split(":");
+      return '<div class="attn-item ' + esc(i.level) + '"><span class="dot"></span><div>' + esc(i.text) + "</div>" + (g[0] ? '<button class="btn sm go" data-attn="' + esc(g[0]) + '" data-tab="' + esc(g[1] || "") + '">Open</button>' : "") + "</div>";
+    }).join("") + (items.length > 5 ? '<div class="attn-item"><button class="btn sm ghost" id="attnMore">' + (state.attnAll ? "Show fewer" : "Show " + (items.length - 5) + " more") + "</button></div>" : "") :
+      '<div class="attn-ok"><span>✓</span> All clear. Nothing needs your attention.</div>';
+  }
+  $("attnBox").addEventListener("click", function (e) {
+    if (e.target.id === "attnMore") { state.attnAll = !state.attnAll; return renderAttention(); }
+    var b = e.target.closest("button[data-attn]"); if (b) go(b.dataset.attn, b.dataset.tab || undefined);
+  });
+  function renderBrief() {
+    var on = aiOn(), b = state.brief;
+    $("briefBtn").hidden = !on; $("briefBtn").textContent = b ? "Refresh" : "Write today's brief";
+    $("briefAt").textContent = b && b.at ? ago(b.at) : "";
+    $("briefBody").innerHTML = !on ? 'Connect Gemini (Settings, AI &amp; automation) and it will summarise your numbers and tell you the one thing to do next.' :
+      b ? '<div style="color:var(--text);font-weight:600;margin-bottom:6px">' + esc(b.headline) + "</div><ul style=\"margin:0 0 8px 18px\">" + b.bullets.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" + (b.next_action ? '<div><span class="chip okc">Next</span> ' + esc(b.next_action) + "</div>" : "") : "Press the button for a short read on how things are going.";
+  }
+  function loadBrief() { if (state.briefLoaded || !aiOn()) return; state.briefLoaded = true; api("GET", "/api/outreach/ai/brief").then(function (r) { state.brief = r.brief; renderBrief(); }).catch(function () {}); }
+  $("briefBtn").addEventListener("click", function () {
+    var b = this; b.disabled = true; b.textContent = "Reading your numbers…";
+    api("POST", "/api/outreach/ai/brief", { force: true }).then(function (r) { state.brief = r.brief; }).catch(fail).then(function () { b.disabled = false; renderBrief(); });
+  });
+  function renderKpis() {
+    var s = state.status, o = s.overview || {}, pos = o.positive7 || 0;
+    var tiles = [
+      ["Sent today", o.sentToday || 0, "of " + (o.capToday || 0) + " possible today"],
+      ["Sent, last 7 days", o.sent7 || 0, s.remaining ? s.remaining + " leads waiting" + (s.daysLeft ? " · about " + s.daysLeft + " day" + (s.daysLeft === 1 ? "" : "s") + " to finish" : "") : "no leads waiting"],
+      ["Replies, last 7 days", o.replies7 || 0, pos + " positive"],
+      ["Waiting for your answer", o.repliesWaiting || 0, o.repliesWaiting ? "open your Inbox" : "you are on top of it"],
+      ["Meetings booked", o.meetings || 0, "all time"]
+    ];
+    $("kpis").innerHTML = tiles.map(function (t) { return '<div class="kpi"><div class="l">' + esc(t[0]) + '</div><div class="n">' + esc(t[1]) + '</div><div class="s">' + esc(t[2]) + "</div></div>"; }).join("");
+  }
+  function renderChart() {
+    var s = state.status, ser = (s.overview && s.overview.series) || [], max = Math.max.apply(null, [1].concat(ser.map(function (d) { return Math.max(d.sent, d.replies); })));
+    $("chart").innerHTML = ser.map(function (d) {
+      return '<div class="col" title="' + esc(d.date + ": " + d.sent + " sent, " + d.replies + " replies") + '"><div class="bars"><div class="b" style="height:' + Math.round(100 * d.sent / max) + '%"></div><div class="r" style="height:' + Math.round(100 * d.replies / max) + '%"></div></div><div class="d">' + esc(d.date.slice(8)) + "</div></div>";
+    }).join("");
+    var lr = s.lastRun; $("lastRun").textContent = lr ? "last run " + ago(lr.at) : "";
+    $("lastRunText").textContent = lr ? (lr.reason || "") : "Nothing has run yet.";
+  }
+  function renderMailboxCards() {
+    var ms = state.status.mailboxes || [];
+    $("mbCards").innerHTML = ms.length ? ms.map(function (m) {
+      var st = !m.enabled ? ["Off", ""] : m.paused ? ["Paused", "badc"] : !m.passwordSet ? ["Password missing", "warnc"] : ["Ready", "okc"];
+      var pct = m.todayLimit ? Math.min(100, Math.round(100 * m.sentToday / m.todayLimit)) : 0;
+      return '<div class="mbcard"><div class="e">' + esc(m.email) + '</div><div class="row2"><span class="chip ' + st[1] + '">' + st[0] + "</span><span>Health " + healthChip(m.health) + '</span></div><div class="bar"><b style="width:' + pct + '%"></b></div><div class="row2"><span>' + m.sentToday + " of " + m.todayLimit + " today</span><span>" + m.bounceRate + "% bounced</span></div>" +
+        (m.placement ? '<div class="row2"><span>Warm-up mail: ' + m.placement.inbox + " inbox · " + m.placement.spam + " spam</span></div>" : "") + "</div>";
+    }).join("") : '<div class="mbcard empty-cta"><b>No mailbox yet</b><p>Add the mailbox you want to send from.</p><button class="btn primary sm" data-view-go="settings">Add a mailbox</button></div>';
+  }
+
   function start(dry) {
     var s = state.status;
     var live = !dry && !s.dryRun;
     if (live && !confirm("Start a LIVE run? Real emails will be sent now, up to each mailbox's daily limit.")) return;
-    api("POST", "/api/outreach/run", { dry: !!dry }).then(function () { toast(live ? "Live run started" : "Dry run started"); refresh(); }).catch(fail);
+    api("POST", "/api/outreach/run", { dry: !!dry }).then(function () { toast(live ? "Live run started" : "Test run started"); refresh(); }).catch(fail);
   }
   $("runBtn").addEventListener("click", function () { start(state.status.dryRun); });
   $("testBtn").addEventListener("click", function () { start(true); });
   $("stopBtn").addEventListener("click", function () { api("POST", "/api/outreach/stop", {}).then(function () { toast("Stopping after the current email…"); refresh(); }).catch(fail); });
+  function setMode(mode) {
+    var s = state.status; if (!s || (mode === "live") === !s.dryRun) return;
+    if (mode === "live") {
+      if ((s.liveProblems || []).length) return alert("Before you go live, fix this:\n\n• " + s.liveProblems.join("\n• "));
+      if (!confirm("Switch to LIVE?\n\nRuns will send real emails to your leads, up to each mailbox's daily limit.")) return;
+    }
+    api("GET", "/api/outreach/config").then(function (r) { r.config.sending.dry_run = mode !== "live"; return api("PUT", "/api/outreach/config", r.config); })
+      .then(function () { toast(mode === "live" ? "Live: runs now send real emails" : "Test mode: nothing will be sent"); if (state.view === "settings") loadSettings(); return refresh(); }).catch(fail);
+  }
+  $("modeSwitch").addEventListener("click", function (e) { var b = e.target.closest("button[data-mode]"); if (b) setMode(b.dataset.mode); });
 
   $("heldList").addEventListener("click", function (e) {
     var b = e.target.closest("button[data-held]"); if (!b) return;
@@ -371,14 +449,39 @@
   });
 
   // ---------------------------------------------------------------- leads
-  var STATUSES = ["new", "active", "finished", "replied", "unsubscribed", "bounced", "do-not-contact", "skipped-bad-address", "skipped-country", "skipped-no-mailserver"];
-  $("leadStatus").innerHTML += STATUSES.map(function (s) { return '<option value="' + s + '">' + s + "</option>"; }).join("") + '<option value="clicked">clicked a link</option>';
+  var STAGE_NAMES = { "": "All leads", waiting: "Waiting to be emailed", sequence: "In sequence", replied: "Replied", interested: "Interested", snoozed: "Out of office (paused)", finished: "Finished the sequence",
+    stopped: "Bounced or opted out", aside: "Set aside by the cleaner", clicked: "Clicked a link", highfit: "High fit (7+ of 10)", nocampaign: "In no campaign", referral: "Referred by a reply", held: "Needs your check" };
+  function fillSelect(el, groups, allLabel, keep) {
+    var html = '<option value="">' + esc(allLabel) + "</option>" + groups.map(function (g) {
+      var opts = g.items.map(function (o) { return '<option value="' + esc(g.prefix + o.value) + '">' + esc(o.label || o.value) + (o.count != null ? " (" + o.count + ")" : "") + "</option>"; }).join("");
+      return g.label ? (opts ? '<optgroup label="' + esc(g.label) + '">' + opts + "</optgroup>" : "") : opts;
+    }).join("");
+    el.innerHTML = html; el.value = keep || ""; if (el.value !== (keep || "")) el.value = "";
+  }
+  function loadFacets() {
+    return api("GET", "/api/outreach/leads/facets").then(function (f) {
+      var o = f.options || {};
+      fillSelect($("leadStage"), [{ label: "", prefix: "", items: Object.keys(STAGE_NAMES).filter(function (k) { return k && (f.stages[k] || k === $("leadStage").value) && (k !== "nocampaign" || f.campaigns); }).map(function (k) { return { value: k, label: STAGE_NAMES[k], count: f.stages[k] }; }) }], STAGE_NAMES[""] + " (" + f.total + ")", $("leadStage").value);
+      fillSelect($("leadPlace"), [{ label: "Countries", prefix: "country:", items: o.countries || [] }, { label: "States", prefix: "state:", items: o.states || [] }, { label: "Cities", prefix: "city:", items: o.cities || [] }], "Anywhere", $("leadPlace").value);
+      fillSelect($("leadType"), [{ label: "", prefix: "", items: o.types || [] }], "Any business type", $("leadType").value);
+    }).catch(function () {});
+  }
+  function leadFilterActive() { return Boolean($("leadStage").value || $("leadPlace").value || $("leadType").value || $("leadCampaign").value || $("leadSort").value || state.minScore || $("leadQ").value.trim()); }
   function loadLeads() {
-    var q = new URLSearchParams({ q: $("leadQ").value, status: $("leadStatus").value, campaign: $("leadCampaign").value, limit: PAGE, offset: state.leadPage * PAGE });
+    var q = new URLSearchParams({ q: $("leadQ").value, stage: $("leadStage").value, campaign: $("leadCampaign").value, type: $("leadType").value, sort: $("leadSort").value, limit: PAGE, offset: state.leadPage * PAGE });
+    var pl = $("leadPlace").value.split(":"); if (pl[0]) q.set(pl[0], pl.slice(1).join(":"));
+    if (state.minScore) q.set("minScore", state.minScore);
+    $("clearFilters").hidden = !leadFilterActive();
     api("GET", "/api/outreach/leads?" + q).then(function (r) {
-      $("leadTable").innerHTML = r.rows.length ? "<tr><th>Store</th><th>Email</th><th>Place</th><th>Campaign</th><th>Score</th><th>Status</th><th>Emails sent</th><th>Last sent</th><th>Next</th><th>Clicks</th><th>Mailbox</th><th>Ver.</th></tr>" + r.rows.map(function (t) {
-        var sent = Number(t.step) || 0;
-        return "<tr><td>" + esc(t.store || t.domain) + "</td><td>" + esc(t.email) + "</td><td>" + esc([t.city, t.state, t.country].filter(Boolean).join(", ")) + "</td><td>" + esc(campName(t.campaign)) + '</td><td title="' + esc(t.ai_score_reason || "") + '">' + esc(t.ai_score || "–") + '</td><td><span class="chip ' + esc(t.status) + '">' + esc(t.status === "skipped-bad-address" ? "set aside" : t.status) + "</span>" + (t.reply_label ? ' <span class="chip lab-' + esc(t.reply_label) + '">' + esc(LABEL[t.reply_label] || t.reply_label) + "</span>" : "") + (t.smtp === "catch-all" ? ' <span class="chip medium" title="This domain accepts any address, so the mailbox could not be verified">catch-all</span>' : "") + "</td><td>" + (sent ? sent + " of 4" : "–") + "</td><td>" + esc((t.last_sent || "").slice(0, 10) || "–") + "</td><td class='hint'>" + esc(t.next || "") + (t.snooze_until && t.status === "active" ? ' <button class="btn sm" data-unsnooze="' + esc(t.email) + '">Resume now</button>' : "") + (t.status === "skipped-bad-address" ? ' <button class="btn sm" data-restore="' + esc(t.email) + '">Restore</button>' : "") + "</td><td>" + (t.clicks ? '<span class="clicked">' + t.clicks + "</span>" : "–") + "</td><td>" + esc(t.mailbox) + "</td><td>" + esc((t.variant || "").toUpperCase()) + "</td></tr>";
+      $("leadCount").textContent = r.total + " lead" + (r.total === 1 ? "" : "s") + (leadFilterActive() ? " match" : "") + (state.minScore ? " · fit " + state.minScore + "+" : "");
+      $("leadTable").innerHTML = r.rows.length ? "<tr><th>Lead</th><th>Where</th><th>Status</th><th>Progress</th><th>Details</th></tr>" + r.rows.map(function (t) {
+        var sent = Number(t.step) || 0, place = [t.city, t.state, t.country].filter(Boolean).join(", ");
+        var cname = campName(t.campaign); cname = cname === "–" || cname === "none" ? "" : cname;
+        return '<tr><td><div style="font-weight:600">' + esc(t.store || t.domain) + '</div><div class="hint">' + esc(t.email) + "</div></td>" +
+          "<td>" + esc(place || "–") + (cname ? '<div class="hint">' + esc(cname) + "</div>" : "") + "</td>" +
+          '<td><span class="chip ' + esc(t.status) + '">' + esc(t.status === "skipped-bad-address" ? "set aside" : t.status) + "</span>" + (t.reply_label ? ' <span class="chip lab-' + esc(t.reply_label) + '">' + esc(LABEL[t.reply_label] || t.reply_label) + "</span>" : "") + "</td>" +
+          "<td>" + (sent ? "Email " + sent + " of 4" : "Not started") + '<div class="hint">' + esc(t.next || "") + (t.snooze_until && t.status === "active" ? ' <button class="btn sm ghost" data-unsnooze="' + esc(t.email) + '">Resume now</button>' : "") + (t.status === "skipped-bad-address" ? ' <button class="btn sm" data-restore="' + esc(t.email) + '">Restore</button>' : "") + "</div></td>" +
+          '<td class="hint">' + [t.ai_score ? '<span title="' + esc(t.ai_score_reason || "") + '">Fit ' + esc(t.ai_score) + "/10</span>" : "", t.clicks ? '<span class="clicked">' + t.clicks + " click" + (t.clicks === 1 ? "" : "s") + "</span>" : "", t.smtp === "catch-all" ? '<span class="warn" title="This domain accepts any address, so the mailbox could not be verified">catch-all</span>' : "", t.mailbox ? esc(t.mailbox) : ""].filter(Boolean).join("<br>") + "</td></tr>";
       }).join("") : '<tr><td class="empty">No leads match.</td></tr>';
       var from = r.total ? state.leadPage * PAGE + 1 : 0;
       $("pgInfo").textContent = from + "–" + Math.min(r.total, (state.leadPage + 1) * PAGE) + " of " + r.total;
@@ -387,7 +490,20 @@
   }
   var qT; $("leadQ").addEventListener("input", function () { clearTimeout(qT); qT = setTimeout(function () { state.leadPage = 0; loadLeads(); }, 250); });
   $("leadCampaign").addEventListener("change", function () { state.leadPage = 0; loadLeads(); });
-  $("leadStatus").addEventListener("change", function () { state.leadPage = 0; loadLeads(); });
+  ["leadStage", "leadPlace", "leadType", "leadSort"].forEach(function (id) { $(id).addEventListener("change", function () { state.leadPage = 0; loadLeads(); }); });
+  $("clearFilters").addEventListener("click", function () {
+    ["leadStage", "leadPlace", "leadType", "leadCampaign", "leadSort"].forEach(function (id) { $(id).value = ""; }); $("leadQ").value = ""; state.minScore = 0; state.leadPage = 0; loadLeads();
+  });
+  $("aiFilter").addEventListener("click", function () {
+    var qs = $("leadQ").value.trim(); if (!qs) return toast("Type who you want first, for example: roofers in Texas we haven't emailed", true);
+    var b = this; b.disabled = true; b.textContent = "Thinking…";
+    api("POST", "/api/outreach/ai/filter", { query: qs }).then(function (r) {
+      var f = r.filter;
+      $("leadStage").value = f.stage; $("leadType").value = f.type; $("leadSort").value = f.sort; $("leadCampaign").value = ""; state.minScore = f.minScore || 0;
+      $("leadPlace").value = f.city ? "city:" + f.city : f.state ? "state:" + f.state : f.country ? "country:" + f.country : "";
+      $("leadQ").value = f.text || ""; state.leadPage = 0; loadLeads(); toast(f.summary || "Filters set");
+    }).catch(fail).then(function () { b.disabled = false; b.textContent = "✨ Ask AI"; });
+  });
   $("prevPg").addEventListener("click", function () { state.leadPage--; loadLeads(); });
   $("nextPg").addEventListener("click", function () { state.leadPage++; loadLeads(); });
   $("dncBtn").addEventListener("click", function () {
@@ -521,25 +637,50 @@
     $("x_tz").value = "Asia/Karachi"; $("x_win").checked = true; $("x_wstart").value = "19:00"; $("x_wend").value = "07:00";
     toast("Set to 7pm–7am Pakistan time. Click Save settings to keep it.");
   });
-  $("roundclock").addEventListener("click", function () {
-    $("x_win").checked = false; $("x_days").value = "Mon,Tue,Wed,Thu,Fri,Sat,Sun"; $("x_min").value = 900; $("x_max").value = 1200;
-    $("x_ramp").value = "25,50,75,100"; $("x_limit").value = 100; $("x_bounce").value = 3; $("x_auto").checked = true;
-    toast("24/7 settings filled in: one email every 15–20 minutes, every day. Click Save settings to keep them.");
+  // ---- sending presets (plain-language choices that fill the detailed fields)
+  var PRESETS = {
+    careful: { ramp: "5,10,15,20", limit: 20, days: "Mon,Tue,Wed,Thu,Fri", min: 600, max: 1200 },
+    standard: { ramp: "10,20,30,40", limit: 40, days: "Mon,Tue,Wed,Thu,Fri", min: 600, max: 1200 },
+    nonstop: { ramp: "25,50,75,100", limit: 100, days: "Mon,Tue,Wed,Thu,Fri,Sat,Sun", min: 900, max: 1200, noWindow: true }
+  };
+  var compact = function (v) { return String(v).replace(/\s+/g, "").toLowerCase(); };
+  function currentPreset() {
+    return Object.keys(PRESETS).filter(function (k) {
+      var p = PRESETS[k];
+      return compact($("x_ramp").value) === compact(p.ramp) && Number($("x_limit").value) === p.limit && compact($("x_days").value) === compact(p.days) &&
+        Number($("x_min").value) === p.min && Number($("x_max").value) === p.max && (!p.noWindow || !$("x_win").checked);
+    })[0] || "";
+  }
+  function markPreset() { var cur = currentPreset(); [].forEach.call($("presets").children, function (b) { b.classList.toggle("on", b.dataset.preset === cur); }); }
+  $("presets").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-preset]"); if (!b) return;
+    var p = PRESETS[b.dataset.preset];
+    $("x_ramp").value = p.ramp; $("x_limit").value = p.limit; $("x_days").value = p.days; $("x_min").value = p.min; $("x_max").value = p.max; $("x_bounce").value = 3;
+    if (p.noWindow) $("x_win").checked = false;
+    markDirty();
   });
-  $("cautious").addEventListener("click", function () {
-    $("x_ramp").value = "5,10,15,20"; $("x_limit").value = 20; $("x_bounce").value = 3;
-    toast("Cautious settings filled in. Click Save settings to keep them.");
-  });
+  function updateEstimate() {
+    var n = [].filter.call($("mbList").querySelectorAll(".mb"), function (el) { return el.querySelector('[data-k="email"]').value.trim() && el.querySelector('[data-k="enabled"]').checked; }).length;
+    var ramp = $("x_ramp").value.split(",").map(Number).filter(function (x) { return x > 0; }), lim = Number($("x_limit").value) || 0;
+    var first = Math.min(ramp[0] || 0, lim), last = Math.min(ramp[ramp.length - 1] || 0, lim);
+    var gaps = $("x_gaps").value.split(",").map(Number).filter(function (x) { return x > 0; }).reduce(function (a, b) { return a + b; }, 0);
+    $("estimate").innerHTML = !n ? "Add a mailbox to start sending." : "With <b>" + n + " mailbox" + (n === 1 ? "" : "es") + "</b> you start at about <b>" + (first * n) + " emails a day</b> and reach up to <b>" + (last * n) + " a day</b> once warmed up. A lead's four emails are spread over about <b>" + (gaps + 1) + " days</b>.";
+  }
 
   // ---------------------------------------------------------------- templates
-  function tplLabel(t) { return "Email " + t.step + (t.step === 1 ? " · version " + t.variant.toUpperCase() : ""); }
+  var FIELD_LABELS = [["greeting", "Hi Name,"], ["custom_line_para", "Personal line"], ["store", "Business name"], ["domain", "Website"], ["category", "Business type"], ["sender_first_name", "Your first name"], ["company", "Your company"]];
+  function tplLabel(t) {
+    var g = (state.gaps || [])[t.step - 2];
+    return "Email " + t.step + (t.step === 1 ? " · first email" + (t.variant !== "a" ? " (version " + t.variant.toUpperCase() + ")" : "") : g ? " · " + g + " day" + (g === 1 ? "" : "s") + " later" : " · follow-up");
+  }
   function loadTemplates() {
     $("tplCampaign").value = state.tplCampaign || "";
     return api("GET", "/api/outreach/templates" + (state.tplCampaign ? "?campaign=" + encodeURIComponent(state.tplCampaign) : "")).then(function (r) {
-      state.templates = r.templates; state.fields = r.fields;
+      state.templates = r.templates; state.fields = r.fields; state.gaps = r.gaps;
       if (!state.tpl || !r.templates.some(function (t) { return t.name === state.tpl; })) state.tpl = r.templates[0] && r.templates[0].name;
-      $("fieldChips").innerHTML = '<span class="hint">Insert:</span>' + r.fields.filter(function (f) { return ["psi", "lcp", "speed_line", "sender_name", "niche", "country", "first_name"].indexOf(f) < 0; }).map(function (f) { return '<span class="chip field-chip" data-f="' + f + '">{' + f + "}</span>"; }).join("");
-      renderTplList(); selectTpl(state.tpl);
+      $("fieldChips").innerHTML = '<span class="hint">Insert:</span>' + FIELD_LABELS.filter(function (f) { return r.fields.indexOf(f[0]) >= 0; }).map(function (f) { return '<span class="chip field-chip" data-f="' + f[0] + '" title="Inserts {' + f[0] + '}">' + f[1] + "</span>"; }).join("");
+      renderTplList(); selectTpl(state.tpl); prefillWriter();
+      if (state.openWriter) { state.openWriter = false; $("writerBox").open = true; }
     }).catch(fail);
   }
   function renderTplList() {
@@ -552,6 +693,47 @@
     state.tpl = name; var t = state.templates.filter(function (x) { return x.name === name; })[0]; if (!t) return;
     $("tplText").value = t.text; $("tplReset").hidden = !t.edited; renderTplList(); previewTpl();
   }
+  // ---- Gemini: improve one email, or write the whole sequence
+  var aiOn = function () { return Boolean(state.status && state.status.ai && state.status.ai.configured); };
+  $("tplImproveBtn").addEventListener("click", function () {
+    if (!aiOn()) return fail(new Error("Connect Gemini first (Settings, AI & automation)."));
+    var b = this, step = Number((state.tpl || "email1.txt")[5]) || 1; b.disabled = true; b.textContent = "Improving…";
+    var before = $("tplText").value;
+    api("POST", "/api/outreach/ai/rewrite", { text: before, instruction: $("tplImprove").value, step: step }).then(function (r) {
+      state.prevText = before; $("tplText").value = r.text; $("tplUndo").hidden = false; previewTpl(); toast("Rewritten. Read it, then Save.");
+    }).catch(fail).then(function () { b.disabled = false; b.textContent = "✨ Improve with AI"; });
+  });
+  $("tplUndo").addEventListener("click", function () { if (state.prevText != null) { $("tplText").value = state.prevText; state.prevText = null; $("tplUndo").hidden = true; previewTpl(); } });
+  function prefillWriter() {
+    var c = camps().filter(function (x) { return String(x.id) === String(state.tplCampaign); })[0];
+    if (c && !$("wBrief").value.trim()) $("wBrief").value = (c.types.length ? c.types.join(", ") + " businesses" : c.name) + ([].concat(c.states, c.cities, c.countries).length ? " in " + [].concat(c.cities, c.states, c.countries).join(", ") : "") + ". We offer: ";
+  }
+  $("wGo").addEventListener("click", function () {
+    if (!aiOn()) return fail(new Error("Connect Gemini first (Settings, AI & automation)."));
+    var b = this, brief = $("wBrief").value.trim(); if (brief.length < 10) return fail(new Error("Describe who you are writing to and what you offer."));
+    b.disabled = true; $("wMsg").textContent = "Writing… about 15 seconds."; $("wOut").innerHTML = "";
+    api("POST", "/api/outreach/ai/templates", { brief: brief, tone: $("wTone").value, campaign: state.tplCampaign || undefined }).then(function (r) {
+      state.drafts = r.emails; $("wMsg").textContent = r.errors.length ? "Some emails were rejected by the safety checks: " + r.errors.join("; ") : "";
+      $("wOut").innerHTML = (r.emails.length ? '<div class="toolbar"><button class="btn primary sm" id="wSave" type="button">Save these ' + r.emails.length + " emails for " + esc(state.tplCampaign ? campName(state.tplCampaign) : "everyone") + '</button><span class="hint">Nothing is saved until you press this. You can also edit one first.</span></div>' : "") +
+        r.emails.map(function (e) {
+          var ck = e.check || { score: 0, issues: [] };
+          return '<div class="panel" style="margin-bottom:10px"><h3>Email ' + e.step + " · " + esc(e.subject) + ' <span class="chip ' + (ck.score >= 8 ? "okc" : ck.score >= 5 ? "warnc" : "badc") + '">copy score ' + ck.score + '/10</span><small>' + e.words + ' words</small><button class="btn sm" data-wedit="' + e.step + '" type="button" style="margin-left:auto">Edit this one</button></h3><div class="hint" style="white-space:pre-wrap;color:var(--text)">' + esc(e.preview) + "</div>" +
+            (ck.issues.length ? '<ul style="margin:8px 0 0 18px" class="hint">' + ck.issues.map(function (i) { return "<li>" + esc(i.text) + "</li>"; }).join("") + "</ul>" : "") + "</div>";
+        }).join("");
+    }).catch(fail).then(function () { b.disabled = false; });
+  });
+  $("wOut").addEventListener("click", function (e) {
+    var ed = e.target.closest("[data-wedit]"), sv = e.target.closest("#wSave");
+    if (ed) { var d = (state.drafts || []).filter(function (x) { return x.step === Number(ed.dataset.wedit); })[0]; if (d) { selectTpl("email" + d.step + ".txt"); $("tplText").value = d.text; previewTpl(); window.scrollTo(0, $("tplText").getBoundingClientRect().top + window.scrollY - 120); toast("Loaded into the editor. Press Save to keep it."); } }
+    if (sv) {
+      if (!confirm("Save these emails" + (state.tplCampaign ? " for " + campName(state.tplCampaign) : " as your default emails") + "? They replace the current wording for steps 1 to " + state.drafts.length + ".")) return;
+      sv.disabled = true;
+      state.drafts.reduce(function (p, d) { return p.then(function () { return api("PUT", "/api/outreach/templates", { name: "email" + d.step + ".txt", text: d.text, campaign: state.tplCampaign || undefined }); }); }, Promise.resolve())
+        .then(function () { toast("Saved " + state.drafts.length + " emails"); $("wOut").innerHTML = ""; $("wMsg").textContent = ""; return loadTemplates(); }).then(refresh).catch(fail);
+    }
+  });
+  $("pvDesk").addEventListener("click", function () { $("pvFrame").style.width = "100%"; $("pvDesk").className = "on"; $("pvPhone").className = ""; });
+  $("pvPhone").addEventListener("click", function () { $("pvFrame").style.width = "375px"; $("pvFrame").style.display = "block"; $("pvFrame").style.margin = "0 auto"; $("pvPhone").className = "on"; $("pvDesk").className = ""; });
   $("tplCampaign").addEventListener("change", function () { state.tplCampaign = this.value; state.tpl = null; loadTemplates(); });
   $("tplList").addEventListener("click", function (e) { var b = e.target.closest("button[data-t]"); if (b) selectTpl(b.dataset.t); });
   $("fieldChips").addEventListener("click", function (e) {
@@ -583,15 +765,17 @@
   });
 
   // ---------------------------------------------------------------- settings
-  function mbBlock(m, i) {
+  function mbBlock(m) {
     m = m || {};
-    return '<div class="mb" data-id="' + esc(m.id || "") + '"><div class="mb-head"><span class="mb-title">' + (m.id ? "Mailbox " + esc(m.id) : "New mailbox") + '</span><button type="button" class="btn sm danger" data-rm="1">Remove</button></div><div class="row">' +
-      '<div class="field"><label>Email address</label><input type="email" data-k="email" value="' + esc(m.email || "") + '" placeholder="hassan@getweberslink.com"></div>' +
-      '<div class="field"><label>Sender name</label><input type="text" data-k="from_name" value="' + esc(m.from_name || "") + '"></div></div>' +
-      '<div class="field"><label>Job title <span class="hint">(blank for none; used only when the sender name differs from yours in Signature)</span></label><input type="text" data-k="title" value="' + esc(m.title || "") + '" maxlength="100"></div>' +
-      '<div class="row"><div class="field"><label>SMTP host / port</label><div style="display:flex;gap:8px"><input type="text" data-k="smtp_host" value="' + esc(m.smtp_host || "smtp.hostinger.com") + '"><input type="number" data-k="smtp_port" value="' + esc(m.smtp_port || 465) + '" style="width:90px"></div></div>' +
-      '<div class="field"><label>IMAP host / port</label><div style="display:flex;gap:8px"><input type="text" data-k="imap_host" value="' + esc(m.imap_host || "imap.hostinger.com") + '"><input type="number" data-k="imap_port" value="' + esc(m.imap_port || 993) + '" style="width:90px"></div></div></div>' +
-      '<label class="check"><input type="checkbox" data-k="enabled"' + (m.enabled === false ? "" : " checked") + '> Use this mailbox</label><p class="hint" style="margin-top:8px">Password variable on the server: <code>' + (m.id ? "OUTREACH_PASSWORD_" + esc(m.id) : "OUTREACH_PASSWORD_(number shown after saving)") + "</code></p></div>";
+    var live = ((state.status && state.status.mailboxes) || []).filter(function (x) { return x.id === m.id; })[0];
+    var pw = m.id ? (live && live.passwordSet ? '<span class="chip okc">Password set</span>' : '<span class="chip warnc">Password missing</span> Set <code>OUTREACH_PASSWORD_' + esc(m.id) + "</code> in Hostinger.") : '<span class="hint">Save first: the password variable name will appear here.</span>';
+    return '<div class="mb" data-id="' + esc(m.id || "") + '"><div class="mb-head"><span>' + esc(m.email || "New mailbox") + '</span><label class="check"><input type="checkbox" data-k="enabled"' + (m.enabled === false ? "" : " checked") + '> On</label><button type="button" class="btn sm danger" data-rm="1">Remove</button></div>' +
+      '<div class="row"><div class="field"><label>Email address</label><input type="email" data-k="email" value="' + esc(m.email || "") + '" placeholder="name@yourdomain.com"></div>' +
+      '<div class="field"><label>Sender name</label><input type="text" data-k="from_name" value="' + esc(m.from_name || "") + '"></div>' +
+      '<div class="field"><label>Job title <span class="hint" style="display:inline">(optional)</span></label><input type="text" data-k="title" value="' + esc(m.title || "") + '" maxlength="100"></div></div>' +
+      '<div class="hint" style="margin-bottom:8px">' + pw + "</div>" +
+      '<details class="adv"><summary>Server settings</summary><div class="row" style="margin-top:10px"><div class="field"><label>SMTP host / port</label><div style="display:flex;gap:8px"><input type="text" data-k="smtp_host" value="' + esc(m.smtp_host || "smtp.hostinger.com") + '"><input type="number" data-k="smtp_port" value="' + esc(m.smtp_port || 465) + '" style="width:90px"></div></div>' +
+      '<div class="field"><label>IMAP host / port</label><div style="display:flex;gap:8px"><input type="text" data-k="imap_host" value="' + esc(m.imap_host || "imap.hostinger.com") + '"><input type="number" data-k="imap_port" value="' + esc(m.imap_port || 993) + '" style="width:90px"></div></div></div></details></div>';
   }
   function loadSettings() {
     api("GET", "/api/outreach/config").then(function (r) {
@@ -599,20 +783,33 @@
       $("s_name").value = g.name; $("s_title").value = g.title; $("s_company").value = g.company; $("s_website").value = g.website; $("s_postal").value = g.postal_address; $("s_accent").value = g.accent_color; $("s_logo").checked = g.logo !== false;
       $("x_notify").value = s.notify_email; $("x_days").value = s.send_days.join(","); $("x_tz").value = s.timezone; $("x_countries").value = s.countries.join(",");
       $("x_ramp").value = s.ramp.join(","); $("x_limit").value = s.daily_limit; $("x_gaps").value = s.followup_gaps_days.join(","); $("x_bounce").value = s.bounce_pause_percent;
-      $("x_win").checked = s.window_enabled; $("x_wstart").value = s.window_start; $("x_wend").value = s.window_end; $("x_min").value = s.min_delay_seconds; $("x_max").value = s.max_delay_seconds; $("x_html").checked = s.html_emails; $("x_mx").checked = s.check_mx; $("x_live").checked = !s.dry_run; $("x_auto").checked = s.auto_run !== false; $("x_track").checked = s.track_clicks !== false;
+      $("x_win").checked = s.window_enabled; $("x_wstart").value = s.window_start; $("x_wend").value = s.window_end; $("x_min").value = s.min_delay_seconds; $("x_max").value = s.max_delay_seconds; $("x_html").checked = s.html_emails; $("x_mx").checked = s.check_mx; $("x_auto").checked = s.auto_run !== false; $("x_track").checked = s.track_clicks !== false;
       $("mbList").innerHTML = c.mailboxes.map(mbBlock).join("");
       var a = c.ai || {}, w = c.warmup || {};
       $("a_icp").value = a.icp || ""; $("a_book").value = a.booking_link || ""; $("a_offer").value = a.offer || ""; $("a_min").value = a.min_score || 0; $("a_hook").value = a.webhook_url || "";
       $("a_classify").checked = a.classify_replies !== false; $("a_draft").checked = a.draft_replies !== false; $("a_prio").checked = a.prioritise_by_score !== false;
       $("w_on").checked = !!w.enabled; $("w_per").value = w.per_day || 4; $("w_reply").value = w.reply_percent == null ? 60 : w.reply_percent;
+      state.dirty = false; $("saveBar").hidden = true; markPreset(); updateEstimate(); updateAiChip();
     }).catch(fail);
   }
-  $("addMb").addEventListener("click", function () { var n = $("mbList").children.length; if (n >= 10) return; $("mbList").insertAdjacentHTML("beforeend", mbBlock(null, n)); });
-  $("mbList").addEventListener("click", function (e) { if (e.target.getAttribute("data-rm")) e.target.closest(".mb").remove(); }); // ids are permanent: never renumber
+  function updateAiChip() { var a = state.status && state.status.ai, on = a && a.configured; $("aiChip").textContent = on ? "Connected" : "Not connected"; $("aiChip").className = "chip " + (on ? "okc" : "warnc"); }
+
+  // ---- settings tabs, unsaved changes
+  function showSettingsTab(name) {
+    state.stab = name;
+    document.querySelectorAll("[data-spane]").forEach(function (el) { el.hidden = el.dataset.spane !== name; });
+    document.querySelectorAll("#setTabs button").forEach(function (b) { b.classList.toggle("on", b.dataset.stab === name); });
+    $("saveBar").hidden = !state.dirty || name === "checks";
+  }
+  $("setTabs").addEventListener("click", function (e) { var b = e.target.closest("button[data-stab]"); if (b) showSettingsTab(b.dataset.stab); });
+  function markDirty() { state.dirty = true; $("saveBar").hidden = state.stab === "checks"; markPreset(); updateEstimate(); }
+  $("settingsForm").addEventListener("input", markDirty);
+  $("settingsForm").addEventListener("change", markDirty);
+  $("discardBtn").addEventListener("click", function () { loadSettings(); toast("Changes discarded"); });
+  $("addMb").addEventListener("click", function () { var n = $("mbList").children.length; if (n >= 10) return; $("mbList").insertAdjacentHTML("beforeend", mbBlock(null)); markDirty(); });
+  $("mbList").addEventListener("click", function (e) { if (e.target.getAttribute("data-rm")) { e.target.closest(".mb").remove(); markDirty(); } }); // ids are permanent: never renumber
   $("settingsForm").addEventListener("submit", function (e) {
     e.preventDefault();
-    var wasDry = state.config ? state.config.sending.dry_run : true, live = $("x_live").checked;
-    if (live && wasDry && !confirm("Turn on LIVE sending? Runs will send real emails to your leads.")) return;
     var boxes = [].map.call($("mbList").children, function (el) {
       var m = { id: el.dataset.id ? Number(el.dataset.id) : undefined }; el.querySelectorAll("[data-k]").forEach(function (i) { m[i.dataset.k] = i.type === "checkbox" ? i.checked : i.value; }); return m;
     }).filter(function (m) { return m.email.trim(); });
@@ -620,12 +817,12 @@
       signature: { name: $("s_name").value, title: $("s_title").value, company: $("s_company").value, website: $("s_website").value, postal_address: $("s_postal").value, accent_color: $("s_accent").value, logo: $("s_logo").checked },
       sending: { notify_email: $("x_notify").value, send_days: $("x_days").value, timezone: $("x_tz").value, countries: $("x_countries").value, ramp: $("x_ramp").value, daily_limit: $("x_limit").value,
         followup_gaps_days: $("x_gaps").value, bounce_pause_percent: $("x_bounce").value, min_delay_seconds: $("x_min").value, max_delay_seconds: $("x_max").value,
-        window_enabled: $("x_win").checked, window_start: $("x_wstart").value, window_end: $("x_wend").value, html_emails: $("x_html").checked, check_mx: $("x_mx").checked, dry_run: !live, auto_run: $("x_auto").checked, track_clicks: $("x_track").checked, check_inbox_in_dry_run: state.config ? state.config.sending.check_inbox_in_dry_run : false },
+        window_enabled: $("x_win").checked, window_start: $("x_wstart").value, window_end: $("x_wend").value, html_emails: $("x_html").checked, check_mx: $("x_mx").checked, dry_run: state.config ? state.config.sending.dry_run : true, auto_run: $("x_auto").checked, track_clicks: $("x_track").checked, check_inbox_in_dry_run: state.config ? state.config.sending.check_inbox_in_dry_run : false },
       mailboxes: boxes,
       ai: { icp: $("a_icp").value, booking_link: $("a_book").value, offer: $("a_offer").value, min_score: $("a_min").value, webhook_url: $("a_hook").value, classify_replies: $("a_classify").checked, draft_replies: $("a_draft").checked, prioritise_by_score: $("a_prio").checked },
       warmup: { enabled: $("w_on").checked, per_day: $("w_per").value, reply_percent: $("w_reply").value }
     };
-    api("PUT", "/api/outreach/config", body).then(function (r) { state.config = r.config; toast("Settings saved"); loadSettings(); refresh(); }).catch(fail);
+    api("PUT", "/api/outreach/config", body).then(function (r) { state.config = r.config; toast("Settings saved"); state.dirty = false; loadSettings(); refresh(); }).catch(fail);
   });
 
   // ---------------------------------------------------------------- campaigns
@@ -639,13 +836,8 @@
     tc.innerHTML = '<option value="">Everyone (default)</option>' + opts; tc.value = tcur;
     $("tplCampBar").hidden = !camps().length;
   }
-  function renderInsights() {
-    var ins = (state.status && state.status.insights) || [];
-    $("insightBox").hidden = !ins.length;
-    $("insightList").innerHTML = ins.map(function (i) { return '<li class="' + (i.level === "bad" ? "bad" : i.level === "warn" ? "warn" : "") + '">' + esc(i.text) + "</li>"; }).join("");
-  }
   function renderCampaignCards() {
-    var cs = camps(); $("campBox").hidden = !cs.length;
+    var cs = camps(); $("campEmpty").hidden = !!cs.length; $("campTable").parentNode.hidden = !cs.length;
     $("campTable").innerHTML = cs.length ? "<tr><th>Campaign</th><th>Waiting</th><th>In sequence</th><th>Today</th><th>Replies</th><th>Positive</th><th>Bounces</th><th>Finishes in</th></tr>" + cs.map(function (c) {
       var where = [].concat(c.countries, c.states, c.cities).join(", ") || "anywhere", what = c.types.join(", ") || "any business";
       return "<tr><td>" + esc(c.name) + (c.enabled ? "" : ' <span class="chip">paused</span>') + '<div class="hint">' + esc(where + " · " + what) + "</div></td><td>" + c.waiting + "</td><td>" + c.active + "</td><td>" + c.sentToday + (c.daily_limit ? " of " + c.daily_limit : "") + "</td><td>" + c.replied + " <span class='hint'>(" + c.replyRate + "%)</span></td><td>" + c.positive + "</td><td>" + c.bounceRate + "%</td><td>" + (c.daysLeft ? c.daysLeft + " day" + (c.daysLeft === 1 ? "" : "s") : "–") + "</td></tr>";
@@ -654,6 +846,10 @@
   $("campBox").addEventListener("click", function (e) { var b = e.target.closest("[data-view-go]"); if (b) go(b.dataset.viewGo); });
   var campOpts = null, campMbs = [];
   var FILTERS = [["countries", "Countries", "US, UK"], ["states", "States / regions", "TX, Florida"], ["cities", "Cities", "Austin, Dallas"], ["types", "Business types", "roofing, hvac, dentist"]];
+  function emailsRow(c) {
+    var st = camps().filter(function (x) { return x.id === c.id; })[0], own = st && st.ownEmails;
+    return '<div class="toolbar" style="margin:0"><span class="chip ' + (own ? "okc" : "warnc") + '">' + (own ? "Has its own emails" : "Sends the default emails") + '</span><button type="button" class="btn sm" data-emails="' + esc(c.id) + '">' + (own ? "Edit emails" : "Edit emails") + '</button><button type="button" class="btn sm" data-aiwrite="' + esc(c.id) + '">✨ Write with AI</button></div>';
+  }
   function campBlock(c) {
     c = c || {};
     var f = FILTERS.map(function (k) {
@@ -666,7 +862,7 @@
       '<button type="button" class="btn sm" data-mv="-1" title="Earlier: fits leads first">↑</button><button type="button" class="btn sm" data-mv="1" title="Later">↓</button><button type="button" class="btn sm danger" data-rmc="1">Remove</button></div>' +
       '<div class="row">' + f.slice(0, 2).join("") + '</div><div class="row">' + f.slice(2).join("") + "</div>" +
       '<div class="row"><div class="field"><label>Send from <span class="hint">(none ticked = every mailbox)</span></label><div>' + (mbs || '<span class="hint">Add mailboxes in Settings first.</span>') + '</div></div><div class="field"><label>Daily limit for this campaign <span class="hint">(0 = only the mailboxes\' limits)</span></label><input type="number" data-n="daily_limit" min="0" max="1000" value="' + esc(c.daily_limit || 0) + '"></div></div>' +
-      '<p class="hint cp" style="margin:6px 0">Checking…</p>' + (c.id ? '<button type="button" class="btn sm" data-emails="' + esc(c.id) + '">Edit emails for this campaign</button>' : '<span class="hint">Save to give it its own emails.</span>') + "</div>";
+      '<p class="hint cp" style="margin:6px 0">Checking…</p>' + (c.id ? emailsRow(c) : '<span class="hint">Save the campaign to give it its own emails.</span>') + "</div>";
   }
   function collectCamps() {
     return [].map.call($("campList").querySelectorAll(".camp"), function (el) {
@@ -682,13 +878,14 @@
     [].forEach.call($("campList").querySelectorAll(".camp"), previewCamp);
   }
   function loadCampaigns() {
+    aiCampState();
     api("GET", "/api/outreach/campaigns").then(function (r) { campOpts = r.options; campMbs = r.mailboxes; renderCamps(r.campaigns); }).catch(fail);
   }
   var cpT = {};
   function previewCamp(el) {
     var c = collectCamps()[[].indexOf.call($("campList").querySelectorAll(".camp"), el)], out = el.querySelector(".cp");
     api("POST", "/api/outreach/campaigns/preview", { filters: c, id: c.id }).then(function (r) {
-      out.innerHTML = "<b>" + r.total + "</b> lead" + (r.total === 1 ? "" : "s") + " match, <b>" + r.waiting + "</b> still waiting to be emailed" + (r.claimed ? ' <span class="warn">(' + r.claimed + " already belong to a campaign above)</span>" : "") +
+      out.innerHTML = "<b>" + r.total + "</b> lead" + (r.total === 1 ? "" : "s") + " match, <b>" + r.waiting + "</b> still waiting to be emailed" + (r.claimed ? ' <span class="warn">(' + r.claimed + " already belong to a campaign above)</span>" : "") + (r.blocked ? ' <span class="warn">(' + r.blocked + " are in countries your Settings do not allow)</span>" : "") +
         (r.sample.length ? '<br><span class="hint">e.g. ' + r.sample.map(function (s) { return esc(s.store + (s.place ? " (" + s.place + ")" : "")); }).join(" · ") + "</span>" : "");
     }).catch(function () { out.textContent = ""; });
   }
@@ -704,6 +901,18 @@
     if (mv) { var list = collectCamps(), i = [].indexOf.call($("campList").querySelectorAll(".camp"), el), j = i + Number(mv.dataset.mv); if (j >= 0 && j < list.length) { var t = list[i]; list[i] = list[j]; list[j] = t; renderCamps(list); } }
     if (rm && confirm("Remove this campaign? Its leads that are still waiting stop being emailed unless another campaign fits them.")) { var l2 = collectCamps(); l2.splice([].indexOf.call($("campList").querySelectorAll(".camp"), el), 1); renderCamps(l2); }
     if (em) { state.tplCampaign = em.dataset.emails; state.tpl = null; go("templates"); }
+    var aw = e.target.closest("[data-aiwrite]"); if (aw) { state.tplCampaign = aw.dataset.aiwrite; state.tpl = null; state.openWriter = true; go("templates"); }
+  });
+  function aiCampState() { var on = aiOn(); $("aiCampBtn").disabled = !on; $("aiCampChip").textContent = on ? "Gemini connected" : "Gemini not connected"; $("aiCampChip").className = "chip " + (on ? "okc" : "warnc"); }
+  $("aiCampBtn").addEventListener("click", function () {
+    var text = $("aiCampText").value.trim(); if (text.length < 5) return fail(new Error("Describe who you want to email, for example: roofing companies in Texas."));
+    var b = this; b.disabled = true; b.textContent = "Building…";
+    api("POST", "/api/outreach/ai/campaign", { description: text }).then(function (r) {
+      var list = collectCamps(); if (list.length >= 20) throw new Error("You already have 20 campaigns.");
+      var c = r.campaign; delete c.id; list.push(c); renderCamps(list);
+      $("aiCampNote").textContent = (r.note ? r.note + " " : "") + "Matches " + r.preview.total + " of your leads. Check it below, then Save campaigns.";
+      var last = $("campList").lastElementChild; if (last) last.scrollIntoView({ behavior: "smooth", block: "center" });
+    }).catch(fail).then(function () { b.textContent = "Build with AI"; aiCampState(); });
   });
   $("addCamp").addEventListener("click", function () { var l = collectCamps(); if (l.length >= 20) return; l.push({ name: "", enabled: true }); renderCamps(l); });
   $("saveCamps").addEventListener("click", function () {
@@ -714,12 +923,12 @@
   function renderResults() {
     var an = state.status.analytics || {}, labs = an.labels || {}, steps = an.byStep || {};
     var cards = [["Positive replies", an.positive || 0], ["Meetings booked", an.meetings || 0], ["Won", an.won || 0], ["Referrals added", an.referrals || 0], ["Paused (out of office)", an.snoozed || 0], ["Leads scored", an.scored || 0]]
-      .map(function (x) { return '<div class="card"><div class="n">' + x[1] + '</div><div class="l">' + esc(x[0]) + "</div></div>"; }).join("");
+      .map(function (x) { return '<div class="kpi"><div class="n">' + x[1] + '</div><div class="l">' + esc(x[0]) + "</div></div>"; }).join("");
     var lt = Object.keys(labs).length ? "<table><tr><th>What they said</th><th>Replies</th></tr>" + Object.keys(labs).sort(function (a, b) { return labs[b] - labs[a]; }).map(function (k) { return '<tr><td><span class="chip lab-' + esc(k) + '">' + esc(LABEL[k] || k) + "</span></td><td>" + labs[k] + "</td></tr>"; }).join("") + "</table>" : '<p class="empty">Replies are labelled once Gemini is set up and someone answers.</p>';
     var st = Object.keys(steps).some(function (k) { return steps[k].reached; }) ? "<table><tr><th>Email</th><th>Reached</th><th>Replies</th><th>Positive</th><th>Reply rate</th></tr>" + Object.keys(steps).map(function (k) { var x = steps[k]; return "<tr><td>Email " + k + "</td><td>" + x.reached + "</td><td>" + x.replied + "</td><td>" + x.positive + "</td><td>" + (x.reached ? (100 * x.replied / x.reached).toFixed(1) : "0.0") + "%</td></tr>"; }).join("") + "</table>" : "";
     var mb = Object.keys(state.status.byMailbox || {}).filter(function (k) { return k !== "?"; });
     var mt = mb.length ? "<table><tr><th>Mailbox</th><th>Started</th><th>Replies</th><th>Positive</th><th>Bounced</th></tr>" + mb.map(function (k) { var x = state.status.byMailbox[k]; return "<tr><td>" + esc(k) + "</td><td>" + x.started + "</td><td>" + x.replied + "</td><td>" + (x.positive || 0) + "</td><td>" + x.bounced + "</td></tr>"; }).join("") + "</table>" : "";
-    $("resultsBody").innerHTML = '<div class="cards" style="margin-bottom:14px">' + cards + '</div><div class="grid2"><div>' + lt + "</div><div>" + st + "</div></div>" + (mt ? '<div style="margin-top:14px">' + mt + "</div>" : "");
+    $("resultsBody").innerHTML = '<div class="kpis" style="margin-bottom:14px">' + cards + '</div><div class="grid2"><div>' + lt + "</div><div>" + st + "</div></div>" + (mt ? '<div style="margin-top:14px">' + mt + "</div>" : "");
   }
   function renderObjections() {
     var o = state.status.ai && state.status.ai.objections;
@@ -738,6 +947,7 @@
       if (j.running) scoreTimer = setTimeout(pollScore, 2000); else loadLeads();
     }).catch(function () {});
   }
+  $("leadTools").addEventListener("click", function (e) { if (e.target.closest("button, a")) $("leadTools").parentNode.open = false; });
   $("scoreBtn").addEventListener("click", function () {
     api("POST", "/api/outreach/ai/score/start", { limit: 50 }).then(function () { toast("Scoring started"); pollScore(); }).catch(function (e) { if (/already/i.test(e.message)) pollScore(); else fail(e); });
   });
@@ -787,7 +997,7 @@
     api("POST", "/api/outreach/test-email", { to: to }).then(function (r) {
       $("goLive").innerHTML = r.problems ? '<ul class="bad" style="margin-left:18px">' + r.problems.map(function (p) { return "<li>" + esc(p) + "</li>"; }).join("") + "</ul>" :
         "<table>" + r.results.map(function (x) { return "<tr><td>" + esc(x.mailbox) + "</td><td>" + (x.ok ? '<span class="ok">sent: check inbox and spam</span>' : '<span class="bad">' + esc(x.error) + "</span>") + "</td></tr>"; }).join("") + "</table>";
-    }).catch(fail).finally(function () { $("testSend").disabled = false; });
+    refresh(); }).catch(fail).finally(function () { $("testSend").disabled = false; });
   });
   $("dnsBtn").addEventListener("click", function () {
     $("dnsBtn").disabled = true; $("goLive").innerHTML = '<p class="hint">Checking…</p>';
@@ -797,6 +1007,7 @@
           return "<tr><td style='width:70px'>" + esc(c.name) + '</td><td class="' + (c.status === "ok" ? "ok" : c.status === "bad" ? "bad" : "warn") + '" style="width:60px">' + (c.status === "ok" ? "OK" : c.status === "bad" ? "Fix" : "Check") + "</td><td class='hint'>" + esc(c.detail) + "</td></tr>";
         }).join("") + "</table>";
       }).join("") : '<p class="hint">Add a mailbox and save first.</p>';
+      refresh();
     }).catch(fail).finally(function () { $("dnsBtn").disabled = false; });
   });
 
@@ -804,7 +1015,7 @@
   api("GET", "/api/outreach/session").then(function (r) {
     state.needUser = Boolean(r.usernameRequired);
     if (!r.authed) return showLogin();
-    var v = location.hash.slice(1); if (TITLES[v]) state.view = v;
+    var v = location.hash.slice(1); if (v === "dashboard") v = "overview"; if (VIEWS[v]) state.view = v;
     showApp(); go(state.view);
   }).catch(function (e) {
     document.body.innerHTML = '<div class="login"><form><h1>Outreach is off</h1><p style="margin-top:10px">' + esc(e.message) + "</p></form></div>";

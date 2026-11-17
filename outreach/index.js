@@ -220,7 +220,11 @@ async function route(req, res, url, method) {
     if (testSends.length >= 5) return send(res, 429, { ok: false, error: "Five test emails in 10 minutes is the limit. Try again shortly." });
     const body = await readJson(req);
     testSends.push(Date.now());
-    try { return send(res, 200, { ok: true, ...(await eng.sendTest(String(body.to || "").trim())) }); } catch (e) { return send(res, 400, { ok: false, error: e.message }); }
+    try {
+      const r = await eng.sendTest(String(body.to || "").trim());
+      if (r.results && r.results.some((x) => x.ok)) eng.markSetup("test_sent");
+      return send(res, 200, { ok: true, ...r });
+    } catch (e) { return send(res, 400, { ok: false, error: e.message }); }
   }
   // --- Gemini: scoring, drafts, objections ---
   if (p === "/ai/status" && method === "GET") return send(res, 200, { ok: true, ...ai.status() });
@@ -241,6 +245,47 @@ async function route(req, res, url, method) {
       return send(res, 200, { ok: true, draft });
     } catch (e) { return send(res, 400, { ok: false, error: String(e.message).slice(0, 200) }); }
   }
+  if (p === "/ai/campaign" && method === "POST") {
+    const body = await readJson(req);
+    try {
+      const cfg = eng.loadConfig(), track = store.loadTracking();
+      const draft = await ai.buildCampaign(String(body.description || ""), eng.campaignOptions(track));
+      const clean = eng.sanitizeConfig({ ...cfg, campaigns: [draft] }).campaigns[0];
+      return send(res, 200, { ok: true, campaign: clean, note: draft.note, preview: eng.campaignPreview(clean, cfg) });
+    } catch (e) { return send(res, 400, { ok: false, error: String(e.message).slice(0, 200) }); }
+  }
+  if (p === "/ai/templates" && method === "POST") {
+    const body = await readJson(req);
+    try {
+      const cfg = eng.loadConfig(), camp = (cfg.campaigns || []).find((c) => String(c.id) === String(body.campaign));
+      const r = await ai.writeSequence({ brief: String(body.brief || ""), tone: String(body.tone || ""), campaign: camp ? camp.name : "", sender: String(cfg.signature.name || "").split(/\s+/)[0], company: cfg.signature.company });
+      const checked = r.emails.map((e) => { const rendered = tpl.render(e.step, { ...tpl.SAMPLE_LEAD, campaign: "" }, cfg, "a", e.text); return { ...e, check: tpl.copyCheck(rendered.subject, rendered.text.split("\n\n--\n")[0], { first: e.step === 1 }), preview: rendered.text.split("\n\n--\n")[0] }; });
+      return send(res, 200, { ok: true, emails: checked, errors: r.errors });
+    } catch (e) { return send(res, 400, { ok: false, error: String(e.message).slice(0, 200) }); }
+  }
+  if (p === "/ai/rewrite" && method === "POST") {
+    const body = await readJson(req);
+    try { return send(res, 200, { ok: true, ...(await ai.rewriteEmail({ text: String(body.text || ""), instruction: String(body.instruction || "shorter"), step: Number(body.step) || 1 })) }); }
+    catch (e) { return send(res, 400, { ok: false, error: String(e.message).slice(0, 200) }); }
+  }
+  if (p === "/ai/filter" && method === "POST") {
+    const body = await readJson(req);
+    try {
+      const facets = eng.leadFacets(store.loadTracking(), eng.loadConfig(), new Date(), clicks.allLeads());
+      return send(res, 200, { ok: true, filter: await ai.parseLeadFilter(String(body.query || ""), facets, eng.STAGE_NAMES) });
+    } catch (e) { return send(res, 400, { ok: false, error: String(e.message).slice(0, 200) }); }
+  }
+  if (p === "/ai/brief" && method === "GET") return send(res, 200, { ok: true, brief: ai.cachedBrief(), configured: ai.configured() });
+  if (p === "/ai/brief" && method === "POST") {
+    const body = await readJson(req);
+    try {
+      const st = eng.status();
+      const { series, ...today } = st.overview;
+      const snapshot = { today, sentPerDay: series.map((d) => d.sent).join(","), leadsWaiting: st.remaining, daysToFinish: st.daysLeft, mode: st.dryRun ? "test mode (nothing sent)" : "live", replyLabels: st.analytics.labels, positiveReplies: st.analytics.positive, meetings: st.analytics.meetings,
+        campaigns: st.campaigns.map((c) => ({ name: c.name, on: c.enabled, waiting: c.waiting, started: c.started, replyRate: c.replyRate, positive: c.positive, bounceRate: c.bounceRate })), mailboxes: st.mailboxes.map((m) => ({ email: m.email, health: m.health, paused: m.paused, passwordSet: m.passwordSet })), attention: st.insights.map((i) => i.text).slice(0, 6) };
+      return send(res, 200, { ok: true, brief: await ai.brief(snapshot, { force: body.force === true }) });
+    } catch (e) { return send(res, 400, { ok: false, error: String(e.message).slice(0, 200) }); }
+  }
   if (p === "/ai/objections" && method === "POST") {
     try { const r = await ai.mineObjections(); return send(res, r.ok ? 200 : 400, r); } catch (e) { return send(res, 400, { ok: false, error: String(e.message).slice(0, 200) }); }
   }
@@ -248,7 +293,11 @@ async function route(req, res, url, method) {
     if (eng.run.running) return send(res, 409, { ok: false, error: "A run is in progress. Try again when it finishes." });
     try { return send(res, 200, { ok: true, ...(await runWarmup({ force: true })) }); } catch (e) { return send(res, 400, { ok: false, error: String(e.message).slice(0, 200) }); }
   }
-  if (p === "/dns" && method === "GET") return send(res, 200, { ok: true, domains: await eng.dnsHealth() });
+  if (p === "/dns" && method === "GET") {
+    const domains = await eng.dnsHealth();
+    if (domains.length && domains.every((d) => d.checks.every((c) => c.status !== "bad"))) eng.markSetup("dns_ok");
+    return send(res, 200, { ok: true, domains });
+  }
 
   if (p === "/preview" && method === "GET") {
     const n = Math.min(20, Math.max(1, parseInt(url.searchParams.get("n"), 10) || 5));
@@ -256,16 +305,16 @@ async function route(req, res, url, method) {
   }
 
   if (p === "/leads" && method === "GET") {
-    const q = (url.searchParams.get("q") || "").toLowerCase();
-    const st = url.searchParams.get("status") || "";
+    const sp = url.searchParams;
     const limit = Math.min(500, Math.max(1, parseInt(url.searchParams.get("limit"), 10) || 100));
     const offset = Math.max(0, parseInt(url.searchParams.get("offset"), 10) || 0);
     const cl = clicks.allLeads();
-    const camp = url.searchParams.get("campaign") || "";
-    const all = store.loadTracking().filter((t) => (!camp || (camp === "none" ? !t.campaign : t.campaign === camp)) && (!st || (st === "clicked" ? ((cl[t.email.toLowerCase()] || {}).clicks || 0) > 0 : t.status === st)) && (!q || `${t.email} ${t.store} ${t.domain}`.toLowerCase().includes(q)));
     const cfg = eng.loadConfig();
+    const all = eng.leadQuery(store.loadTracking(), { text: sp.get("q"), status: sp.get("status"), stage: sp.get("stage"), campaign: sp.get("campaign"), country: sp.get("country"), state: sp.get("state"),
+      city: sp.get("city"), type: sp.get("type"), minScore: sp.get("minScore"), sort: sp.get("sort") }, cfg, new Date(), cl);
     return send(res, 200, { ok: true, total: all.length, rows: all.slice(offset, offset + limit).map((t) => ({ ...Object.fromEntries(LEAD_VIEW.map((f) => [f, t[f]])), next: eng.nextEmail(t, cfg), clicks: (cl[t.email.toLowerCase()] || {}).clicks || 0 })) });
   }
+  if (p === "/leads/facets" && method === "GET") return send(res, 200, { ok: true, ...eng.leadFacets(store.loadTracking(), eng.loadConfig(), new Date(), clicks.allLeads()) });
   if (p === "/leads/import" && method === "POST") {
     const body = await readJson(req, 8 * 1024 * 1024);
     if (!Array.isArray(body.rows) || body.rows.length > 20000) return send(res, 400, { ok: false, error: "Send up to 20,000 rows." });
@@ -347,7 +396,7 @@ async function route(req, res, url, method) {
     const camp = url.searchParams.get("campaign") || "", cdir = tpl.campaignDir(camp);
     const dir = cdir || tpl.OVERRIDE; // "edited" means edited for the campaign being viewed, or for everyone when none is chosen
     const edited = new Set(fs.existsSync(dir) ? fs.readdirSync(dir) : []);
-    return send(res, 200, { ok: true, templates: tpl.listTemplateFiles(camp).map((t) => ({ name: t.name, step: t.step, variant: t.variant, text: fs.readFileSync(t.file, "utf8"), edited: edited.has(t.name), bundled: bundled.has(t.name) })),
+    return send(res, 200, { ok: true, gaps: eng.loadConfig().sending.followup_gaps_days, templates: tpl.listTemplateFiles(camp).map((t) => ({ name: t.name, step: t.step, variant: t.variant, text: fs.readFileSync(t.file, "utf8"), edited: edited.has(t.name), bundled: bundled.has(t.name) })),
       fields: Object.keys(tpl.fieldsFor(tpl.SAMPLE_LEAD, eng.loadConfig())) });
   }
   if (p === "/templates/check" && method === "POST") {

@@ -15,93 +15,159 @@
 <style>
 :root{
   color-scheme:dark;
-  --bg:#0a0a0a; --panel:#141414; --panel-2:#1b1b1b; --line:rgba(255,255,255,.09); --line-2:rgba(255,255,255,.16);
-  --text:#f4f4f2; --dim:#a8a8a8; --mute:#777; --accent:#8b6cff; --accent-2:#5B2EE5;
-  --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; --radius:14px;
+  --bg:#0b0b0c; --side:#0f0f10; --panel:#141416; --panel-2:#1b1b1e; --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.15);
+  --text:#f5f5f4; --dim:#a3a3a8; --mute:#707077; --accent:#ef3340; --accent-2:#d91f2d; --accent-soft:rgba(239,51,64,.13);
+  --ok:#34d399; --warn:#fbbf24; --bad:#f87171; --radius:14px;
   --sans:'Inter',system-ui,-apple-system,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%}
-body{overflow-x:hidden}
-body{font-family:var(--sans);background:var(--bg);color:var(--text);line-height:1.5;min-height:100vh;-webkit-font-smoothing:antialiased}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);line-height:1.5;min-height:100vh;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 a{color:var(--accent)}
+code{font-family:var(--mono);font-size:12px;background:var(--panel-2);padding:1px 6px;border-radius:6px}
 [hidden]{display:none!important}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* login */
 .login{min-height:100vh;display:grid;place-items:center;padding:24px}
 .login form{width:100%;max-width:360px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:32px 28px}
 .login h1{font-size:20px;margin:14px 0 4px}
 .login p{color:var(--dim);font-size:14px;margin-bottom:20px}
-.mark{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:grid;place-items:center;font-weight:700}
+.mark{width:40px;height:40px;border-radius:11px;background:var(--accent);display:grid;place-items:center;font-weight:700}
 
 /* shell */
-.app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
-.side{position:sticky;top:0;height:100vh;border-right:1px solid var(--line);padding:20px 14px;display:flex;flex-direction:column;gap:6px;background:#0d0d0d}
-.brand{display:flex;align-items:center;gap:10px;padding:4px 8px 18px;font-weight:600;letter-spacing:-.01em}
-.nav-btn{display:flex;align-items:center;gap:12px;width:100%;padding:11px 12px;border:0;border-radius:10px;background:none;color:var(--dim);font-size:14px;font-weight:500;text-align:left}
+.app{display:grid;grid-template-columns:224px 1fr;min-height:100vh}
+.side{position:sticky;top:0;height:100vh;border-right:1px solid var(--line);padding:18px 12px;display:flex;flex-direction:column;gap:4px;background:var(--side)}
+.brand{display:flex;align-items:center;gap:10px;padding:2px 8px 18px;font-weight:600;letter-spacing:-.01em}
+.nav-btn{display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;border:0;border-radius:10px;background:none;color:var(--dim);font-size:14px;font-weight:500;text-align:left}
 .nav-btn:hover{background:var(--panel);color:var(--text)}
-.nav-btn.on{background:var(--panel-2);color:var(--text)}
+.nav-btn.on{background:var(--accent-soft);color:var(--text)}
+.nav-btn.on svg{color:var(--accent)}
 .nav-btn svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.badge{margin-left:auto;background:var(--accent-2);color:#fff;border-radius:99px;font-size:11px;padding:1px 8px;font-weight:600}
+.badge{margin-left:auto;background:var(--accent);color:#fff;border-radius:99px;font-size:11px;padding:1px 8px;font-weight:600}
 .side .grow{flex:1}
-.main{padding:28px clamp(16px,3vw,40px) 60px;max-width:1180px;width:100%;min-width:0}
-.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:24px}
-.top h2{font-size:24px;letter-spacing:-.02em;margin-right:auto}
-.pill{display:inline-flex;align-items:center;gap:7px;border-radius:99px;padding:5px 12px;font-size:12px;font-weight:600;border:1px solid var(--line-2)}
-.pill i{width:7px;height:7px;border-radius:50%;background:currentColor}
-.pill.dry{color:var(--warn)} .pill.live{color:var(--ok)} .pill.busy{color:var(--accent)}
-.pill.busy i{animation:pulse 1s infinite} @keyframes pulse{50%{opacity:.25}}
+.main{min-width:0}
+.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px clamp(16px,3vw,40px);background:rgba(11,11,12,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.topbar .ttl{margin-right:auto;min-width:0}
+.topbar h2{font-size:20px;letter-spacing:-.02em;line-height:1.2}
+.topbar .sub{color:var(--dim);font-size:13px}
+.page{padding:24px clamp(16px,3vw,40px) 70px;max-width:1160px}
+.seg{display:inline-flex;border:1px solid var(--line-2);border-radius:99px;padding:3px;background:var(--panel)}
+.seg button{border:0;background:none;border-radius:99px;padding:6px 14px;font-size:13px;font-weight:600;color:var(--dim)}
+.seg button.on{background:var(--panel-2);color:var(--text)}
+.seg button.on.test{background:rgba(251,191,36,.16);color:var(--warn)}
+.seg button.on.live{background:rgba(52,211,153,.16);color:var(--ok)}
+.runstate{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--accent);font-weight:600}
+.runstate i{width:8px;height:8px;border-radius:50%;background:currentColor;animation:pulse 1s infinite} @keyframes pulse{50%{opacity:.25}}
 
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:9px 16px;border-radius:99px;border:1px solid var(--line-2);background:transparent;font-size:14px;font-weight:500;transition:background .15s,border-color .15s}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:9px 16px;border-radius:10px;border:1px solid var(--line-2);background:transparent;font-size:14px;font-weight:500;transition:background .15s,border-color .15s}
 .btn:hover{border-color:var(--text)}
 a.btn{color:var(--text);text-decoration:none}
-.btn.primary{background:var(--text);color:#000;border-color:var(--text)}
-.btn.primary:hover{background:#dcdcdc}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{background:var(--accent-2);border-color:var(--accent-2)}
 .btn.danger{color:var(--bad);border-color:rgba(248,113,113,.4)}
-.btn.sm{padding:5px 12px;font-size:13px}
+.btn.sm{padding:6px 12px;font-size:13px}
+.btn.ghost{border-color:transparent;color:var(--dim)} .btn.ghost:hover{color:var(--text);border-color:var(--line-2)}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
-.card .n{font-size:28px;font-weight:600;letter-spacing:-.02em}
-.card .l{color:var(--dim);font-size:13px}
+h3.sec{font-size:13px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin:28px 0 12px}
+h3.sec:first-child{margin-top:0}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;margin-bottom:16px}
-.panel h3{font-size:15px;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.panel h3{font-size:15px;margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .panel h3 small{color:var(--mute);font-weight:400;font-size:12px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .hint{color:var(--dim);font-size:13px}
 .ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--bad)}
 
+/* overview */
+.setup{border:1px solid rgba(239,51,64,.35);background:linear-gradient(135deg,rgba(239,51,64,.10),rgba(239,51,64,.02));border-radius:var(--radius);padding:20px 22px;margin-bottom:20px}
+.setup h3{font-size:17px;margin-bottom:2px} .setup .prog{height:6px;border-radius:9px;background:rgba(255,255,255,.1);margin:12px 0 14px;overflow:hidden} .setup .prog b{display:block;height:100%;background:var(--accent);transition:width .4s}
+.step{display:flex;align-items:center;gap:12px;padding:10px 4px;border-top:1px solid var(--line)}
+.step:first-of-type{border-top:0}
+.step .tick{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line-2);display:grid;place-items:center;flex:none;font-size:12px;color:transparent}
+.step.done .tick{background:var(--ok);border-color:var(--ok);color:#04130c}
+.step.done .lbl{color:var(--mute);text-decoration:line-through}
+.step .lbl{font-weight:600;font-size:14px}.step .hint{font-size:12px}
+.step>div{flex:1;min-width:0}
+.step .go{margin-left:auto;flex:none}
+.attn{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:20px;overflow:hidden}
+.attn-item{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-top:1px solid var(--line);font-size:14px}
+.attn-item:first-child{border-top:0}
+.attn-item .dot{width:8px;height:8px;border-radius:50%;margin-top:7px;flex:none;background:var(--mute)}
+.attn-item.bad .dot{background:var(--bad)}.attn-item.warn .dot{background:var(--warn)}.attn-item.info .dot{background:#60a5fa}
+.attn-item .go{margin-left:auto;flex:none}
+.attn-ok{padding:14px 18px;color:var(--ok);font-size:14px;display:flex;gap:10px;align-items:center}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+.kpi .l{color:var(--dim);font-size:13px}.kpi .n{font-size:30px;font-weight:650;letter-spacing:-.03em;line-height:1.15;margin:2px 0}.kpi .s{color:var(--mute);font-size:12px}
+.chart{display:flex;align-items:flex-end;gap:6px;height:132px;padding-top:8px}
+.chart .col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:3px;height:100%;min-width:0}
+.chart .bars{display:flex;gap:2px;align-items:flex-end;height:100px;width:100%;justify-content:center}
+.chart .b{width:44%;max-width:14px;border-radius:4px 4px 1px 1px;background:var(--accent);min-height:2px}
+.chart .r{width:44%;max-width:14px;border-radius:4px 4px 1px 1px;background:var(--ok)}
+.chart .d{font-size:10px;color:var(--mute);margin-top:4px}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--dim);margin-top:6px}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.mbgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.mbcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
+.mbcard .e{font-weight:600;font-size:14px;overflow-wrap:anywhere}
+.mbcard .row2{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--dim)}
+.bar{height:6px;border-radius:9px;background:var(--panel-2);overflow:hidden;min-width:60px;margin-top:10px}
+.bar b{display:block;height:100%;background:var(--accent)}
+.empty-cta{text-align:center;padding:26px 16px}.empty-cta p{color:var(--dim);margin:6px 0 14px;font-size:14px}
+
 table{width:100%;border-collapse:collapse;font-size:14px}
 th{color:var(--mute);font-weight:500;font-size:12px;text-align:left;padding:6px 10px 8px 0;white-space:nowrap}
-td{padding:9px 10px 9px 0;border-top:1px solid var(--line);vertical-align:middle}
+td{padding:10px 10px 10px 0;border-top:1px solid var(--line);vertical-align:middle}
 .scroll{overflow-x:auto}
-.bar{height:6px;border-radius:9px;background:var(--panel-2);overflow:hidden;min-width:90px}
-.bar b{display:block;height:100%;background:var(--accent)}
-
-.problems{border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.06)}
-.problems li{margin:4px 0 0 18px;font-size:14px}
 pre.log{font:12px/1.55 var(--mono);background:#0b0b0b;border:1px solid var(--line);border-radius:10px;padding:14px;max-height:340px;overflow:auto;white-space:pre-wrap;word-break:break-word;color:#cfcfcf}
-.log .sent{color:var(--ok)} .log .rep{color:var(--accent)} .log .err{color:var(--bad)} .log .wrn{color:var(--warn)}
+.log .sent{color:var(--ok)} .log .rep{color:#93c5fd} .log .err{color:var(--bad)} .log .wrn{color:var(--warn)}
+details.fold{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:12px}
+details.fold>summary{cursor:pointer;padding:12px 16px;font-weight:600;font-size:14px;list-style:none;display:flex;align-items:center;gap:10px}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary::after{content:"+";margin-left:auto;color:var(--mute);font-size:18px;line-height:1}
+details.fold[open]>summary::after{content:"–"}
+details.fold>.in{padding:2px 16px 16px}
+details.menu{position:relative}
+details.menu>summary{list-style:none;cursor:pointer}details.menu>summary::-webkit-details-marker{display:none}
+details.menu .pop{position:absolute;right:0;top:calc(100% + 6px);z-index:15;min-width:230px;background:var(--panel-2);border:1px solid var(--line-2);border-radius:12px;padding:6px;box-shadow:0 14px 40px rgba(0,0,0,.5)}
+details.menu .pop button,details.menu .pop a{display:flex;align-items:center;width:100%;text-align:left;padding:9px 12px;border:0;background:none;border-radius:8px;font-size:14px;color:var(--text);text-decoration:none}
+details.menu .pop button:hover,details.menu .pop a:hover{background:var(--panel)}
+details.menu .pop .sep{height:1px;background:var(--line);margin:4px 6px}
 
 label{display:block;font-size:13px;color:var(--dim);margin-bottom:5px}
-input[type=text],input[type=email],input[type=password],input[type=number],input[type=search],input[type=datetime-local],input[type=time],input[type=date],select,textarea{width:100%;background:var(--panel-2);border:1px solid var(--line-2);border-radius:10px;padding:9px 12px;outline:none}
+input[type=text],input[type=email],input[type=url],input[type=password],input[type=number],input[type=search],input[type=datetime-local],input[type=time],input[type=date],select,textarea{width:100%;background:var(--panel-2);border:1px solid var(--line-2);border-radius:10px;padding:9px 12px;outline:none}
 input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 input[type=color]{width:44px;height:36px;padding:2px;background:var(--panel-2);border:1px solid var(--line-2);border-radius:8px}
 .field{margin-bottom:14px}
-.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
-.check{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text);margin:0}
-.check input{width:18px;height:18px;accent-color:var(--accent-2)}
+.field .hint{display:block;margin-top:4px;font-size:12px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.check{display:flex;align-items:flex-start;gap:10px;font-size:14px;color:var(--text);margin:0;line-height:1.45}
+.check input{width:18px;height:18px;accent-color:var(--accent);margin-top:2px;flex:none}
+.check .hint{display:block}
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
 .toolbar input[type=search]{max-width:280px}
 .toolbar select{width:auto}
-.chip{display:inline-block;padding:2px 10px;border-radius:99px;font-size:12px;background:var(--panel-2);color:var(--dim);border:1px solid var(--line)}
-textarea.ai-line{width:100%;min-width:300px;resize:vertical;line-height:1.4}.chip.high{color:var(--ok)} .chip.medium{color:var(--warn)} .chip.skipped-bad-address{color:var(--warn)} .chip.replied{color:var(--accent);border-color:rgba(139,108,255,.4)} .chip.active{color:var(--ok)} .chip.bounced,.chip.unsubscribed,.chip.do-not-contact{color:var(--bad)}
-.chip.lab-interested,.chip.lab-question{color:var(--ok);border-color:rgba(74,222,128,.4)} .chip.lab-not_now,.chip.lab-out_of_office,.chip.lab-wrong_person{color:var(--warn)} .chip.lab-not_interested,.chip.lab-unsubscribe{color:var(--bad)}
-.draft{margin-top:8px;padding:10px 12px;border:1px dashed var(--line);border-radius:10px;font-size:13px;color:var(--dim);white-space:pre-wrap}
+.chip{display:inline-block;padding:2px 10px;border-radius:99px;font-size:12px;background:var(--panel-2);color:var(--dim);border:1px solid var(--line);white-space:nowrap}
+textarea.ai-line{width:100%;min-width:300px;resize:vertical;line-height:1.4}.chip.high{color:var(--ok)} .chip.medium{color:var(--warn)} .chip.skipped-bad-address{color:var(--warn)} .chip.replied{color:#93c5fd;border-color:rgba(147,197,253,.4)} .chip.active{color:var(--ok)} .chip.bounced,.chip.unsubscribed,.chip.do-not-contact{color:var(--bad)}
+.chip.lab-interested,.chip.lab-question{color:var(--ok);border-color:rgba(52,211,153,.4)} .chip.lab-not_now,.chip.lab-out_of_office,.chip.lab-wrong_person{color:var(--warn)} .chip.lab-not_interested,.chip.lab-unsubscribe{color:var(--bad)}
+.chip.okc{color:var(--ok);border-color:rgba(52,211,153,.4)} .chip.warnc{color:var(--warn);border-color:rgba(251,191,36,.4)} .chip.badc{color:var(--bad);border-color:rgba(248,113,113,.4)}
+.draft{margin-top:8px;padding:10px 12px;border:1px dashed var(--line-2);border-radius:10px;font-size:13px;color:var(--dim);white-space:pre-wrap}
 .chip.field-chip{cursor:pointer;font-family:var(--mono)} .chip.field-chip:hover{color:var(--text);border-color:var(--text)}
+
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:20px;overflow-x:auto}
+.tabs button,.tabs a{border:0;background:none;padding:10px 14px;font-size:14px;font-weight:500;color:var(--dim);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;text-decoration:none}
+.tabs button:hover,.tabs a:hover{color:var(--text)}
+.tabs .on{color:var(--text);border-bottom-color:var(--accent)}
+.presets{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:14px}
+.preset{text-align:left;border:1px solid var(--line-2);border-radius:var(--radius);background:var(--panel);padding:16px;display:block;width:100%}
+.preset:hover{border-color:var(--text)}
+.preset.on{border-color:var(--accent);background:var(--accent-soft)}
+.preset b{display:block;font-size:15px;margin-bottom:4px}.preset span{display:block;color:var(--dim);font-size:13px}
+.estimate{background:var(--panel-2);border-radius:10px;padding:10px 14px;font-size:14px;margin-bottom:18px}
+.savebar{position:sticky;bottom:0;z-index:18;display:flex;align-items:center;gap:12px;padding:12px 16px;margin-top:18px;background:rgba(27,27,30,.96);backdrop-filter:blur(8px);border:1px solid var(--line-2);border-radius:14px;box-shadow:0 -8px 30px rgba(0,0,0,.4)}
+.savebar span{margin-right:auto;font-size:14px}
 
 .reply{display:grid;grid-template-columns:1fr auto;gap:8px 16px;padding:14px 0;border-top:1px solid var(--line)}
 .reply:first-child{border-top:0}
@@ -140,8 +206,9 @@ textarea.ai-line{width:100%;min-width:300px;resize:vertical;line-height:1.4}.chi
 textarea.editor{min-height:300px;font:13px/1.6 var(--mono);resize:vertical}
 iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radius:10px;background:#fff}
 .mb{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;background:var(--panel-2)}
-.mb-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-weight:600;font-size:14px}
-.mb-head .btn{margin-left:auto}
+.mb-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;font-weight:600;font-size:14px;flex-wrap:wrap}
+.mb-head>span:first-child{margin-right:auto}
+.mb .adv{margin-top:6px}.mb .adv summary{cursor:pointer;color:var(--dim);font-size:13px}
 
 .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--text);color:#000;padding:10px 18px;border-radius:99px;font-size:14px;font-weight:500;z-index:50;box-shadow:0 8px 30px rgba(0,0,0,.5)}
 .toast.err{background:var(--bad);color:#000}
@@ -151,12 +218,13 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
   .app{grid-template-columns:minmax(0,1fr)}
   .side{position:fixed;inset:auto 0 0 0;height:auto;flex-direction:row;padding:6px 6px calc(6px + env(safe-area-inset-bottom));border-right:0;border-top:1px solid var(--line);z-index:30;gap:2px;justify-content:space-around}
   .side .brand,.side .grow,.side .logout{display:none}
-  .nav-btn{flex-direction:column;gap:3px;padding:7px 4px;font-size:11px;text-align:center;justify-content:center;width:auto;flex:1;position:relative}
-  .nav-btn .badge{position:absolute;top:2px;right:18%;margin:0;padding:0 6px}
-  .main{padding-bottom:110px}
+  .nav-btn{flex-direction:column;gap:3px;padding:7px 2px;font-size:10.5px;text-align:center;justify-content:center;width:auto;flex:1;position:relative}
+  .nav-btn .badge{position:absolute;top:2px;right:14%;margin:0;padding:0 6px}
+  .page{padding-bottom:110px}
+  .topbar{position:static}
   .grid2,.tpl{grid-template-columns:1fr}
   .tpl-list{display:flex;gap:6px;overflow-x:auto}.tpl-list button{white-space:nowrap;width:auto}
-  .top h2{font-size:21px}
+  .savebar{bottom:76px}
 }
 </style>
 </head>
@@ -166,7 +234,7 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
   <form id="loginForm">
     <div class="mark">W</div>
     <h1>Outreach</h1>
-    <p>Sign in to manage your cold-email campaign.</p>
+    <p>Sign in to manage your cold-email campaigns.</p>
     <div class="field" id="userField" hidden><label for="un">Username</label><input id="un" type="text" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
     <div class="field"><label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password" required autofocus></div>
     <p class="bad" id="loginErr" hidden></p>
@@ -177,57 +245,70 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
 <div class="app" id="app" hidden>
   <nav class="side" aria-label="Sections">
     <div class="brand"><img src="/assets/logo-icon.png" alt="" width="30" height="30" style="border-radius:8px">Outreach</div>
-    <button class="nav-btn on" data-view="dashboard"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Dashboard</button>
-    <button class="nav-btn" data-view="replies"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Replies<span class="badge" id="replyBadge" hidden></span></button>
-    <button class="nav-btn" data-view="campaigns"><svg viewBox="0 0 24 24"><path d="M12 21s-7-5.6-7-11a7 7 0 0 1 14 0c0 5.4-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>Campaigns</button>
-    <button class="nav-btn" data-view="leads"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/></svg>Leads</button>
-    <button class="nav-btn" data-view="templates"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 9l8 5 8-5"/></svg>Emails</button>
-    <button class="nav-btn" data-view="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button>
+    <button class="nav-btn on" data-view="overview"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Overview</span></button><button class="nav-btn" data-view="replies"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg><span>Inbox</span><span class="badge" id="replyBadge" hidden></span></button><button class="nav-btn" data-view="campaigns"><svg viewBox="0 0 24 24"><path d="M3 11l18-7-7 18-2.5-7.5z"/></svg><span>Campaigns</span></button><button class="nav-btn" data-view="leads"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/></svg><span>Leads</span></button><button class="nav-btn" data-view="reports"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Reports</span></button><button class="nav-btn" data-view="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg><span>Settings</span></button>
     <div class="grow"></div>
-    <button class="nav-btn logout" id="logout"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>Sign out</button>
+    <button class="nav-btn logout" id="logout"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg><span>Sign out</span></button>
   </nav>
 
   <main class="main">
-    <div class="top">
-      <h2 id="title">Dashboard</h2>
-      <span class="pill" id="modePill"></span>
+    <header class="topbar">
+      <div class="ttl"><h2 id="title">Overview</h2><div class="sub" id="subtitle"></div></div>
+      <span class="runstate" id="runState" hidden><i></i><span id="runText">Running</span></span>
+      <div class="seg" id="modeSwitch" role="group" aria-label="Sending mode"><button type="button" data-mode="test">Test mode</button><button type="button" data-mode="live">Live</button></div>
       <button class="btn danger sm" id="stopBtn" hidden>Stop</button>
-      <button class="btn sm" id="testBtn">Test run</button>
+      <button class="btn sm" id="testBtn" hidden>Test run</button>
       <button class="btn primary sm" id="runBtn">Run now</button>
-    </div>
+    </header>
+    <div class="page">
 
-    <section id="v-dashboard">
-      <div class="panel problems" id="problems" hidden><h3>Fix these before live sending</h3><ul id="problemList"></ul></div>
-      <div class="panel problems" id="dataWarn" hidden><h3>Protect your data</h3><ul id="dataWarnList"></ul></div>
-      <div class="panel problems" id="heldBox" hidden><h3>Needs your check <small>a send was interrupted: look in your Sent folder, then choose</small></h3><div id="heldList"></div></div>
-      <div class="panel" id="insightBox" hidden><h3>Worth your attention</h3><ul id="insightList" style="margin:0;padding-left:18px;line-height:1.7"></ul></div>
-      <div class="panel" id="lastRunBox" hidden><p id="lastRunText" style="margin:0"></p></div>
-      <div class="panel" id="windowBox" hidden><p id="windowInfo" style="margin:0"></p></div>
-      <div class="cards" id="cards"></div>
-      <div class="panel" id="clickBox"><h3>Link clicks <small>people who clicked a link in your emails; mail scanners are filtered out</small></h3><div id="clickList"></div></div>
-      <div class="panel" id="campBox" hidden><h3>Campaigns <small>leads grouped by place and business type</small><button class="btn sm" style="margin-left:auto" data-view-go="campaigns">Manage</button></h3><div class="scroll"><table id="campTable"></table></div></div>
-      <div class="panel"><h3>Mailboxes <small>each one warms up automatically</small></h3><div class="scroll"><table id="mbTable"></table></div></div>
+    <section id="v-overview">
+      <div class="setup" id="setupBox" hidden>
+        <h3>Get ready to send</h3><div class="hint" id="setupSub"></div>
+        <div class="prog"><b id="setupBar"></b></div>
+        <div id="setupSteps"></div>
+      </div>
+      <div class="panel" id="heldBox" hidden style="border-color:rgba(251,191,36,.4)"><h3>Needs your check <small>a send was interrupted: look in your Sent folder, then choose</small></h3><div id="heldList"></div></div>
+      <div class="attn" id="attnBox"><div id="attnList"></div></div>
+      <div class="kpis" id="kpis"></div>
+      <div class="panel" id="briefBox"><h3>✨ AI brief <small id="briefAt"></small><button class="btn sm" id="briefBtn" type="button" style="margin-left:auto">Write today's brief</button></h3><div id="briefBody" class="hint"></div></div>
+      <div class="panel"><h3>Last 14 days <small id="lastRun"></small></h3><div class="chart" id="chart"></div><div class="legend"><span><i style="background:var(--accent)"></i>Emails sent</span><span><i style="background:var(--ok)"></i>Replies</span></div><p class="hint" id="lastRunText" style="margin-top:10px"></p></div>
+      <h3 class="sec">Campaigns</h3>
+      <div class="panel" id="campBox"><div class="scroll"><table id="campTable"></table></div><div id="campEmpty" class="empty-cta" hidden><b>No campaigns yet</b><p>Campaigns let you email a place or business type with its own mailboxes, daily limit and wording. Until you make one, every lead is emailed.</p><button class="btn primary sm" data-view-go="campaigns">Create a campaign</button></div></div>
+      <h3 class="sec">Mailboxes</h3>
+      <div class="mbgrid" id="mbCards"></div>
+    </section>
+
+    <section id="v-reports" hidden>
+      <h3 class="sec">Results</h3>
+      <div class="panel"><div id="resultsBody"></div></div>
+      <h3 class="sec">Email performance</h3>
       <div class="grid2">
         <div class="panel"><h3>Subject line test <small>change one thing at a time</small></h3><div id="abBox"></div></div>
-        <div class="panel"><h3>Sequence progress</h3><div id="funnel"></div></div>
+        <div class="panel"><h3>How far leads get</h3><div id="funnel"></div></div>
       </div>
-      <div class="panel"><h3>Results <small>replies by what people said, and which email got the answer</small></h3><div id="resultsBody"></div></div>
-      <div class="panel"><h3>Why people say no <small>Gemini groups the “not interested” and “not now” replies so you can fix the copy</small></h3><div id="objBody"></div><div class="toolbar" style="margin:10px 0 0"><button class="btn sm" id="objBtn">Summarise objections</button></div></div>
-      <div class="panel"><h3>Run log <small id="lastRun"></small></h3><pre class="log" id="log">No activity yet.</pre></div>
+      <h3 class="sec">Link clicks</h3>
+      <div class="panel" id="clickBox"><div id="clickList"></div></div>
+      <h3 class="sec">Why people say no</h3>
+      <div class="panel"><div id="objBody"></div><div class="toolbar" style="margin:10px 0 0"><button class="btn sm" id="objBtn">Summarise with Gemini</button></div></div>
+      <h3 class="sec">Activity log</h3>
+      <details class="fold"><summary>Show the run log</summary><div class="in"><pre class="log" id="log">No activity yet.</pre></div></details>
     </section>
 
     <section id="v-campaigns" hidden>
-      <div class="panel"><h3>Campaigns <small>each group of leads gets its own mailboxes, daily limit and, if you like, its own emails. A lead goes to the first campaign (top to bottom) that fits it.</small></h3>
-        <p class="hint" id="campIntro" style="margin:0 0 12px"></p>
-        <div id="campList"></div>
-        <div class="toolbar" style="margin:12px 0 0"><button class="btn sm" id="addCamp" type="button">Add campaign</button><button class="btn primary sm" id="saveCamps" type="button">Save campaigns</button><span class="hint" id="campMsg"></span></div>
-        <p class="hint" style="margin-top:12px">Leave a box empty to mean "any". Places come from your spreadsheet's <b>country</b>, <b>state</b> and <b>city</b> columns (state and city are also read from a US street address). Business types match as words inside the lead's category, niche, store name or website, so "roof" catches "Roofing contractor". Until you create a campaign, every lead is emailed; after that, only leads in a campaign that is switched on.</p>
+      <div class="tabs"><button class="on" data-goview="campaigns">Campaigns</button><button data-goview="templates">Emails</button></div>
+      <div class="panel" id="aiCampBox"><h3>✨ Describe a campaign <span class="chip" id="aiCampChip"></span></h3>
+        <div class="toolbar" style="margin-bottom:6px"><input type="text" id="aiCampText" placeholder="e.g. roofing companies in Texas and Florida" style="flex:1;min-width:240px" maxlength="400"><button class="btn primary sm" id="aiCampBtn" type="button">Build with AI</button></div>
+        <p class="hint" id="aiCampNote">Gemini sets the places and business types from your leads. You check the live count, then save.</p>
       </div>
+      <p class="hint" id="campIntro" style="margin:0 0 14px"></p>
+      <div id="campList"></div>
+      <div class="toolbar" style="margin:12px 0 0"><button class="btn sm" id="addCamp" type="button">Add campaign</button><button class="btn primary sm" id="saveCamps" type="button">Save campaigns</button><span class="hint" id="campMsg"></span></div>
+      <p class="hint" style="margin-top:14px">A lead goes to the first campaign (top to bottom) that fits it. Leave a box empty to mean "any". Places come from your spreadsheet's <b>country</b>, <b>state</b> and <b>city</b> columns (state and city are also read from a US street address). Business types match as words inside the lead's category, niche, store name or website, so "roof" catches "Roofing contractor". Until you create a campaign every lead is emailed; after that, only leads in a campaign that is switched on.</p>
     </section>
 
     <section id="v-replies" hidden>
       <div class="toolbar"><select id="replyFilter"><option value="">All replies</option><option value="positive">Interested or question</option><option value="not_now">Not now</option><option value="not_interested">Not interested</option><option value="wrong_person">Wrong person</option><option value="unlabelled">Not labelled</option></select><span class="hint" id="replyCount"></span></div>
-      <div class="panel"><h3>People who replied <small>send each the free video audit within 24 hours</small></h3><div id="replyList"></div></div>
+      <div class="panel"><div id="replyList"></div></div>
       <div class="panel" id="schedPanel" hidden><h3>Scheduled messages <small>sent automatically at the time you pick</small></h3><div id="schedList"></div></div>
     </section>
 
@@ -262,21 +343,36 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
       </form>
     </div>
 
+
     <section id="v-leads" hidden>
       <div class="toolbar">
-        <input type="search" id="leadQ" placeholder="Search store, email or domain">
-        <select id="leadStatus"><option value="">All statuses</option></select>
-        <select id="leadCampaign"><option value="">All campaigns</option></select>
+        <input type="search" id="leadQ" placeholder="Search by name, email or city, or describe who you want" style="max-width:420px;flex:1">
+        <button class="btn sm" id="aiFilter" type="button" title="Describe who you want in plain English and let Gemini set the filters">✨ Ask AI</button>
         <span style="flex:1"></span>
-        <button class="btn sm" id="aiBtn">Personalise (Gemini)</button>
-        <button class="btn sm" id="scoreBtn">Score leads (Gemini)</button><span class="hint" id="scoreInfo"></span>
-        <button class="btn sm" id="cleanBtn">Clean list</button><label class="check" style="margin:0" title="Asks each store's mail server whether the mailbox exists. Needs outgoing port 25, which many hosts block (then it just says unknown)."><input type="checkbox" id="smtpChk"> SMTP check</label>
-        <button class="btn sm" id="dncBtn">Never contact…</button>
-        <button class="btn sm" id="rmBouncedBtn">Remove bounced</button>
-        <a class="btn sm" href="/api/outreach/export?file=tracking" download>Export CSV</a>
-        <a class="btn sm" href="/api/outreach/export?file=sent" download>Sent log</a>
+        <details class="menu"><summary class="btn sm">Tools ▾</summary><div class="pop" id="leadTools">
+          <button id="aiBtn" type="button">Personalise first lines (Gemini)</button>
+          <button id="scoreBtn" type="button">Score leads (Gemini)</button>
+          <button id="cleanBtn" type="button">Clean the list</button>
+          <label class="check" style="padding:6px 12px" title="Asks each store's mail server whether the mailbox exists. Needs outgoing port 25, which many hosts block (then it just says unknown)."><input type="checkbox" id="smtpChk"> Also check mailboxes exist (SMTP)</label>
+          <div class="sep"></div>
+          <button id="dncBtn" type="button">Never contact…</button>
+          <button id="rmBouncedBtn" type="button">Remove bounced leads</button>
+          <div class="sep"></div>
+          <a href="/api/outreach/export?file=tracking" download>Export leads (CSV)</a>
+          <a href="/api/outreach/export?file=sent" download>Export sent log</a>
+        </div></details>
         <label class="btn primary sm" style="margin:0;cursor:pointer">Import leads<input type="file" id="importFile" accept=".xlsx,.xls,.csv" hidden></label>
       </div>
+      <div class="toolbar" id="leadFilters">
+        <select id="leadStage" aria-label="Stage"></select>
+        <select id="leadPlace" aria-label="Place"></select>
+        <select id="leadType" aria-label="Business type"></select>
+        <select id="leadCampaign" aria-label="Campaign"><option value="">All campaigns</option></select>
+        <select id="leadSort" aria-label="Sort"><option value="">Original order</option><option value="score">Best fit first</option><option value="recent">Latest activity first</option></select>
+        <button class="btn ghost sm" id="clearFilters" type="button" hidden>Clear filters</button>
+        <span class="hint" id="leadCount"></span>
+      </div>
+      <p class="hint" id="scoreInfo" style="margin:-6px 0 12px"></p>
       <div class="panel" id="aiBox" hidden><h3>Personalise with Gemini <small>one factual opening line per store, from its own website. You approve every line.</small></h3><div id="aiBody"></div></div>
       <div class="panel" id="cleanBox" hidden><h3>List cleaner <small>finds addresses that would bounce or hurt your sender reputation</small></h3><div id="cleanBody"></div></div>
       <div class="panel"><div class="scroll"><table id="leadTable"></table></div><div class="toolbar" style="margin:14px 0 0"><button class="btn sm" id="prevPg">Previous</button><span class="hint" id="pgInfo"></span><button class="btn sm" id="nextPg">Next</button></div></div>
@@ -284,7 +380,14 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
     </section>
 
     <section id="v-templates" hidden>
+      <div class="tabs"><button data-goview="campaigns">Campaigns</button><button class="on" data-goview="templates">Emails</button></div>
       <div class="toolbar" id="tplCampBar"><label class="hint" for="tplCampaign">Emails for</label><select id="tplCampaign"><option value="">Everyone (default)</option></select><span class="hint">A campaign can have its own wording; anything you don't change there uses the default emails.</span></div>
+      <details class="fold" id="writerBox"><summary>✨ Write the emails with Gemini</summary><div class="in">
+        <div class="field"><label>Who are you writing to, and what do you offer?</label><textarea id="wBrief" rows="3" maxlength="600" placeholder="e.g. Roofing companies in Texas. We build AI call answering that picks up every call and books the estimate."></textarea></div>
+        <div class="row"><div class="field"><label>Tone</label><select id="wTone"><option value="friendly">Friendly</option><option value="direct">Direct</option><option value="professional">Professional</option></select></div></div>
+        <div class="toolbar"><button class="btn primary sm" id="wGo" type="button">Write 4 emails</button><span class="hint" id="wMsg"></span></div>
+        <div id="wOut"></div>
+      </div></details>
       <div class="tpl">
         <div class="tpl-list" id="tplList"></div>
         <div>
@@ -292,102 +395,136 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
             <div class="field"><label>Email text <span class="hint">(first line is the subject)</span></label><textarea class="editor" id="tplText" spellcheck="true"></textarea></div>
             <div class="toolbar" id="fieldChips"></div>
             <div class="toolbar"><button class="btn primary sm" id="tplSave">Save</button><button class="btn sm" id="tplReset" hidden>Reset to default</button><span class="hint" id="tplStats"></span></div>
+            <div class="toolbar"><select id="tplImprove" style="max-width:190px"><option value="shorter">Make it shorter</option><option value="friendlier">Friendlier</option><option value="direct">More direct</option><option value="spam">Less spammy</option></select><button class="btn sm" id="tplImproveBtn" type="button">✨ Improve with AI</button><button class="btn ghost sm" id="tplUndo" type="button" hidden>Undo</button></div>
             <div class="toolbar"><button class="btn sm" id="tplCheck">Check copy</button><label class="check" style="margin:0"><input type="checkbox" id="tplCheckAi"> also ask Gemini</label></div>
             <div id="copyCheckOut"></div>
           </div>
-          <div class="panel"><h3>Preview <small>sample store; the real email is personalised per lead</small></h3><p style="font-weight:600;margin-bottom:10px" id="pvSubject"></p><iframe class="preview" id="pvFrame" sandbox="" title="Email preview"></iframe></div>
+          <div class="panel"><h3>Preview <small>sample store; the real email is personalised per lead</small><span class="seg" style="margin-left:auto"><button type="button" class="on" id="pvDesk">Desktop</button><button type="button" id="pvPhone">Phone</button></span></h3><p style="font-weight:600;margin-bottom:10px" id="pvSubject"></p><iframe class="preview" id="pvFrame" sandbox="" title="Email preview"></iframe></div>
           <div class="panel"><h3>Preview real leads <small>next emails in the queue, nothing is sent</small></h3><div id="queuePv"><button class="btn sm" id="queueBtn">Show next 3</button></div></div>
         </div>
       </div>
+
     </section>
 
     <section id="v-settings" hidden>
+      <div class="tabs" id="setTabs"><button class="on" data-stab="sender">Sender</button><button data-stab="mailboxes">Mailboxes</button><button data-stab="sending">Sending</button><button data-stab="ai">AI &amp; automation</button><button data-stab="checks">Checks &amp; backup</button></div>
       <form id="settingsForm">
-        <div class="panel"><h3>Your signature <small>shown at the bottom of every email</small></h3>
-          <div class="row">
-            <div class="field"><label>Your name</label><input type="text" id="s_name" maxlength="100"></div>
-            <div class="field"><label>Job title</label><input type="text" id="s_title" maxlength="100"></div>
-            <div class="field"><label>Company</label><input type="text" id="s_company" maxlength="100"></div>
-            <div class="field"><label>Website</label><input type="text" id="s_website" maxlength="200"></div>
+        <div data-spane="sender">
+          <div class="panel"><h3>Who the emails come from <small>shown at the bottom of every email</small></h3>
+            <div class="row">
+              <div class="field"><label>Your name</label><input type="text" id="s_name" maxlength="100"></div>
+              <div class="field"><label>Job title</label><input type="text" id="s_title" maxlength="100"></div>
+              <div class="field"><label>Company</label><input type="text" id="s_company" maxlength="100"></div>
+              <div class="field"><label>Website</label><input type="text" id="s_website" maxlength="200"></div>
+            </div>
+            <div class="field"><label>Postal address <span class="warn">(required by US law)</span></label><input type="text" id="s_postal" maxlength="300"></div>
+            <div class="row">
+              <div class="field"><label>Accent colour</label><input type="color" id="s_accent"></div>
+              <div class="field"><label class="check"><input type="checkbox" id="s_logo"> <span>Show the logo in the signature<span class="hint">A small picture loaded from your website.</span></span></label></div>
+            </div>
           </div>
-          <div class="row">
-            <div class="field" style="grid-column:span 2"><label>Postal address <span class="warn">(required by US law)</span></label><input type="text" id="s_postal" maxlength="300"></div>
-            <div class="field"><label>Accent colour</label><input type="color" id="s_accent"></div>
+          <div class="panel"><h3>Reply alerts</h3>
+            <div class="field"><label>Email me when someone replies or opts out</label><input type="email" id="x_notify" placeholder="you@weberslink.org"></div>
           </div>
-          <div class="field"><label class="check"><input type="checkbox" id="s_logo"> Show the logo in the email signature (a small picture loaded from your website)</label></div>
         </div>
 
-        <div class="panel"><h3>Sending mailboxes <small>use lookalike domains, not weberslink.org</small></h3>
-          <div id="mbList"></div>
-          <button type="button" class="btn sm" id="addMb">Add mailbox</button>
-          <p class="hint" style="margin-top:12px">Passwords are never entered here. On the server, set one environment variable per mailbox, named as shown under each mailbox (for example <code>OUTREACH_PASSWORD_1</code>). Mail servers other than Hostinger must be listed in <code>OUTREACH_ALLOWED_HOSTS</code>.</p>
+        <div data-spane="mailboxes" hidden>
+          <div class="panel"><h3>Sending mailboxes <small>use lookalike domains, not your main domain</small></h3>
+            <div id="mbList"></div>
+            <button type="button" class="btn sm" id="addMb">Add a mailbox</button>
+            <p class="hint" style="margin-top:12px">Passwords are never typed here. Each mailbox shows the server variable to set in Hostinger (for example <code>OUTREACH_PASSWORD_1</code>). Mail servers other than Hostinger must be listed in <code>OUTREACH_ALLOWED_HOSTS</code>.</p>
+          </div>
+          <div class="panel"><h3>Warm-up between your mailboxes</h3>
+            <div class="field"><label class="check"><input type="checkbox" id="w_on"> <span>Mailboxes email each other a few times a day<span class="hint">They open the messages, rescue them from spam and answer some. Daytime only; never counts toward the cold-email limit.</span></span></label></div>
+            <div class="row">
+              <div class="field"><label>Messages per mailbox per day</label><input type="number" id="w_per" min="1" max="20"></div>
+              <div class="field"><label>Answer this % of them</label><input type="number" id="w_reply" min="0" max="100"></div>
+            </div>
+            <div class="toolbar"><button type="button" class="btn sm" id="wuRun">Run warm-up now</button><span class="hint" id="wuInfo"></span></div>
+          </div>
         </div>
 
-        <div class="panel"><h3>Gemini and warm-up <small>Gemini needs <code>GEMINI_OUTREACH_KEY</code> on the server. It labels replies and suggests answers; it never sends anything.</small></h3>
-          <div class="field"><label>Your ideal customer <span class="hint">(used to score leads 1–10 and order the queue)</span></label><textarea id="a_icp" rows="3" maxlength="1200" placeholder="e.g. Online stores in the US/UK selling apparel or cosmetics, with a slow mobile site, a small team and no live chat."></textarea></div>
-          <div class="row">
-            <div class="field"><label>Booking link <span class="hint">(https, offered in AI reply drafts)</span></label><input type="url" id="a_book" placeholder="https://cal.com/you/15min"></div>
-            <div class="field"><label>What you offer <span class="hint">(one line, for drafts)</span></label><input type="text" id="a_offer" maxlength="200"></div>
+        <div data-spane="sending" hidden>
+          <h3 class="sec">How fast should it send?</h3>
+          <div class="presets" id="presets">
+            <button type="button" class="preset" data-preset="careful"><b>Careful</b><span>New domain or mailbox. Starts at 5 a day and grows to 20, weekdays only.</span></button>
+            <button type="button" class="preset" data-preset="standard"><b>Standard</b><span>Warmed-up mailboxes. Starts at 10 a day and grows to 40, weekdays only.</span></button>
+            <button type="button" class="preset" data-preset="nonstop"><b>Around the clock</b><span>One email every 15–20 minutes, every day, up to 100 a day per mailbox. Highest risk.</span></button>
           </div>
-          <div class="row">
-            <div class="field"><label>Skip leads scoring below <span class="hint">(0 = never skip)</span></label><input type="number" id="a_min" min="0" max="10"></div>
-            <div class="field"><label>Tell this address about positive replies <span class="hint">(webhook, https; optional)</span></label><input type="url" id="a_hook" placeholder="https://hooks.zapier.com/..."></div>
+          <div class="estimate" id="estimate"></div>
+          <h3 class="sec">Delivery options</h3>
+          <div class="panel">
+            <div class="field"><label class="check"><input type="checkbox" id="x_auto"> <span><b>Run automatically</b><span class="hint">While Live, the app starts runs by itself and keeps sending. No cron job needed.</span></span></label></div>
+            <div class="field"><label class="check"><input type="checkbox" id="x_html"> <span>Designed HTML emails<span class="hint">Sent with a plain-text copy.</span></span></label></div>
+            <div class="field"><label class="check"><input type="checkbox" id="x_track"> <span>Track link clicks<span class="hint">Links go through your site so you see who clicked. Needs HTML emails.</span></span></label></div>
+            <div class="field" style="margin:0"><label class="check"><input type="checkbox" id="x_mx"> <span>Check each address's domain can receive mail first<span class="hint">Cuts bounces.</span></span></label></div>
           </div>
-          <div class="field"><label class="check"><input type="checkbox" id="a_classify"> Label every reply with Gemini (interested, not now, out of office, wrong person …) and read return dates and referrals</label></div>
-          <div class="field"><label class="check"><input type="checkbox" id="a_draft"> Write a suggested answer for interested replies (you review and send it)</label></div>
-          <div class="field"><label class="check"><input type="checkbox" id="a_prio"> Email the best-scoring leads first</label></div>
-          <h3 style="margin-top:18px;font-size:14px">Warm-up between your mailboxes</h3>
-          <div class="field"><label class="check"><input type="checkbox" id="w_on"> Mailboxes email each other a few times a day, open the messages, rescue them from spam and answer some (daytime only, never counts toward the cold-email limit)</label></div>
-          <div class="row">
-            <div class="field"><label>Messages per mailbox per day</label><input type="number" id="w_per" min="1" max="20"></div>
-            <div class="field"><label>Answer this % of them</label><input type="number" id="w_reply" min="0" max="100"></div>
-          </div>
-          <div class="toolbar"><button type="button" class="btn sm" id="wuRun">Run warm-up now</button><span class="hint" id="wuInfo"></span></div>
+          <details class="fold"><summary>Customize the details</summary><div class="in">
+            <div class="row">
+              <div class="field"><label>Send days</label><input type="text" id="x_days" placeholder="Mon,Tue,Wed,Thu,Fri"></div>
+              <div class="field"><label>Time zone</label><input type="text" id="x_tz" placeholder="America/New_York"></div>
+              <div class="field"><label>Countries to email</label><input type="text" id="x_countries" placeholder="US,UK"></div>
+            </div>
+            <div class="row">
+              <div class="field"><label>Emails per day, by week of warm-up</label><input type="text" id="x_ramp" placeholder="10,20,30,40"><span class="hint">Each mailbox, week by week.</span></div>
+              <div class="field"><label>Hard limit per mailbox per day</label><input type="number" id="x_limit" min="1" max="100"></div>
+              <div class="field"><label>Days between emails 1→2, 2→3, 3→4</label><input type="text" id="x_gaps" placeholder="3,4,7"></div>
+              <div class="field"><label>Pause a mailbox above this bounce %</label><input type="number" id="x_bounce" min="1" max="50"></div>
+            </div>
+            <div class="row">
+              <div class="field"><label>Wait between emails: at least (seconds)</label><input type="number" id="x_min" min="0"><span class="hint">600 = 10 minutes</span></div>
+              <div class="field"><label>Wait between emails: at most (seconds)</label><input type="number" id="x_max" min="0"><span class="hint">1200 = 20 minutes</span></div>
+            </div>
+            <div class="field"><label class="check"><input type="checkbox" id="x_win"> <span><b>Only send during a daily window</b><span class="hint">Uses the time zone above. A window can run past midnight; 7pm to 7am counts as one day.</span></span></label></div>
+            <div class="row">
+              <div class="field"><label>Window opens</label><input type="time" id="x_wstart"></div>
+              <div class="field"><label>Window closes</label><input type="time" id="x_wend"></div>
+            </div>
+            <button type="button" class="btn sm" id="overnightPk">Use 7pm–7am Pakistan time</button>
+          </div></details>
         </div>
 
-        <div class="panel"><h3>Sending rules <button type="button" class="btn sm" id="roundclock" style="margin-left:auto">Use 24/7 settings</button> <button type="button" class="btn sm" id="cautious" style="margin-left:6px">Use cautious settings</button></h3>
-          <p class="hint" style="margin:-4px 0 14px">Cautious = 5, 10, 15, 20 emails a day by week, at most 20 per mailbox, pause at 3% bounces. Best when you send from a single mailbox on your main domain. <b>24/7</b> = no sending window, every day of the week, one email every 15 to 20 minutes, warming up 25, 50, 75 then 100 a day (the most one mailbox is allowed). Sending that much from one address raises the risk of spam filtering, so watch the bounce rate.</p>
-          <div class="row">
-            <div class="field"><label>Notify me about replies at</label><input type="email" id="x_notify" placeholder="you@weberslink.org"></div>
-            <div class="field"><label>Send days</label><input type="text" id="x_days" placeholder="Mon,Tue,Wed,Thu,Fri"></div>
-            <div class="field"><label>Time zone</label><input type="text" id="x_tz" placeholder="America/New_York"></div>
-            <div class="field"><label>Countries to email</label><input type="text" id="x_countries" placeholder="US,UK"></div>
+        <div data-spane="ai" hidden>
+          <div class="panel"><h3>Gemini <span class="chip" id="aiChip"></span></h3>
+            <p class="hint" style="margin-bottom:14px">Gemini reads replies and leads to save you time. It never sends anything by itself. It needs <code>GEMINI_OUTREACH_KEY</code> on the server.</p>
+            <div class="field"><label class="check"><input type="checkbox" id="a_classify"> <span>Label every reply<span class="hint">Interested, not now, out of office, wrong person… It also reads return dates and referrals.</span></span></label></div>
+            <div class="field"><label class="check"><input type="checkbox" id="a_draft"> <span>Write a suggested answer for interested replies<span class="hint">You review and send it.</span></span></label></div>
+            <div class="field" style="margin:0"><label class="check"><input type="checkbox" id="a_prio"> <span>Email the best-scoring leads first</span></label></div>
           </div>
-          <div class="row">
-            <div class="field"><label>Warm-up per week (emails/day)</label><input type="text" id="x_ramp" placeholder="25,50,75,100"></div>
-            <div class="field"><label>Max per mailbox per day</label><input type="number" id="x_limit" min="1" max="100"></div>
-            <div class="field"><label>Days between emails 1→2, 2→3, 3→4</label><input type="text" id="x_gaps" placeholder="3,4,7"></div>
-            <div class="field"><label>Pause a mailbox above this bounce %</label><input type="number" id="x_bounce" min="1" max="50"></div>
+          <div class="panel"><h3>Your ideal customer</h3>
+            <div class="field"><label>Describe who you want to reach <span class="hint" style="display:inline">(used to score leads 1–10)</span></label><textarea id="a_icp" rows="3" maxlength="1200" placeholder="e.g. Online stores in the US/UK selling apparel or cosmetics, with a slow mobile site, a small team and no live chat."></textarea></div>
+            <div class="row">
+              <div class="field"><label>Skip leads scoring below</label><input type="number" id="a_min" min="0" max="10"><span class="hint">0 = never skip</span></div>
+              <div class="field"><label>What you offer (one line)</label><input type="text" id="a_offer" maxlength="200"></div>
+            </div>
           </div>
-          <div class="row">
-            <div class="field"><label>Wait between emails, minimum (seconds; 600 = 10 min)</label><input type="number" id="x_min" min="0"></div>
-            <div class="field"><label>Wait between emails, maximum (seconds; 1200 = 20 min)</label><input type="number" id="x_max" min="0"></div>
+          <div class="panel"><h3>Links</h3>
+            <div class="row">
+              <div class="field"><label>Booking link</label><input type="url" id="a_book" placeholder="https://cal.com/you/15min"><span class="hint">Offered in suggested replies (https only).</span></div>
+              <div class="field"><label>Tell another app about positive replies</label><input type="url" id="a_hook" placeholder="https://hooks.zapier.com/..."><span class="hint">Webhook for a CRM, Zapier or Slack (https only).</span></div>
+            </div>
           </div>
-          <div class="field"><label class="check"><input type="checkbox" id="x_win"> <b>Only send during a daily window</b> (uses the time zone above)</label></div>
-          <div class="row">
-            <div class="field"><label>Window opens</label><input type="time" id="x_wstart"></div>
-            <div class="field"><label>Window closes</label><input type="time" id="x_wend"></div>
-          </div>
-          <p class="hint" style="margin:-4px 0 14px">Emails are spread evenly across the window, one every so often, so a day's batch never goes out in a burst. A window can run past midnight (7pm to 7am counts as one day). Outside it the dashboard still reads your inbox but sends nothing. <button type="button" class="btn sm" id="overnightPk" style="margin-left:6px">Use 7pm–7am Pakistan time</button></p>
-          <div class="field"><label class="check"><input type="checkbox" id="x_html"> Send designed HTML emails (with a plain-text copy)</label></div>
-          <div class="field"><label class="check"><input type="checkbox" id="x_track"> Track link clicks <span class="hint">(links in the HTML part go through your site, so you see who clicked; needs HTML emails)</span></label></div>
-          <div class="field"><label class="check"><input type="checkbox" id="x_mx"> Check each store's email domain can receive mail first</label></div>
-          <div class="field"><label class="check"><input type="checkbox" id="x_auto"> <b>Run automatically</b> — while Live sending is on, the app starts runs by itself (checks every 10 minutes) and keeps sending, with no cron job needed. Untick to start runs only by hand or from a cron job.</label></div>
-          <div class="field"><label class="check" style="color:var(--warn)"><input type="checkbox" id="x_live"> <b>Live sending</b> — off means every run is a safe dry run that sends nothing</label></div>
         </div>
-        <button class="btn primary" type="submit">Save settings</button>
+        <div class="savebar" id="saveBar" hidden><span>You have unsaved changes.</span><button type="button" class="btn ghost sm" id="discardBtn">Discard</button><button type="submit" class="btn primary sm">Save changes</button></div>
       </form>
-      <div class="panel" style="margin-top:20px"><h3>Your data and backup <small>settings, leads, history and email edits</small></h3>
-        <p class="hint" id="dataInfo"></p>
-        <div class="toolbar"><a class="btn sm" id="bkDownload" href="/api/outreach/backup" download>Download backup</a><label class="btn sm" style="cursor:pointer;margin:0">Restore from backup<input type="file" id="bkRestore" accept=".json,application/json" hidden></label></div>
-        <p class="hint">The backup file contains your leads, so keep it private. Passwords are never included (they live only in Hostinger). Restoring replaces your current settings and leads; a safety copy of what was there is saved first.</p>
-      </div>
-      <div class="panel" style="margin-top:20px"><h3>Before you go live <small>save settings first</small></h3>
-        <div class="toolbar"><input type="email" id="testTo" placeholder="Your own email, e.g. you@gmail.com" style="max-width:320px"><button class="btn sm" id="testSend" type="button">Send test email</button><button class="btn sm" id="dnsBtn" type="button">Check domain DNS</button></div>
-        <p class="hint">The test sends one sample email from each mailbox. Check it lands in your inbox, not spam.</p>
-        <div id="goLive"></div>
+
+      <div data-spane="checks" hidden>
+        <div class="panel"><h3>Send a test email <small>one sample from each mailbox</small></h3>
+          <div class="toolbar"><input type="email" id="testTo" placeholder="Your own email, e.g. you@gmail.com" style="max-width:320px"><button class="btn sm" id="testSend" type="button">Send test email</button></div>
+          <p class="hint">Check it lands in your inbox, not spam. Save any settings changes first.</p>
+        </div>
+        <div class="panel"><h3>Check your domain's email setup <small>SPF, DKIM, DMARC</small></h3>
+          <div class="toolbar"><button class="btn sm" id="dnsBtn" type="button">Check now</button></div>
+          <div id="goLive"></div>
+        </div>
+        <div class="panel"><h3>Your data and backup <small>settings, leads, history and email edits</small></h3>
+          <p class="hint" id="dataInfo"></p>
+          <div class="toolbar" style="margin-top:12px"><a class="btn sm" id="bkDownload" href="/api/outreach/backup" download>Download backup</a><label class="btn sm" style="cursor:pointer;margin:0">Restore from backup<input type="file" id="bkRestore" accept=".json,application/json" hidden></label></div>
+          <p class="hint">The backup contains your leads, so keep it private. Passwords are never included. Restoring replaces your current settings and leads; a safety copy of what was there is saved first.</p>
+        </div>
       </div>
     </section>
+    </div>
   </main>
 </div>
 

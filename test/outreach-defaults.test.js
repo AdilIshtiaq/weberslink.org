@@ -16,7 +16,7 @@ const wipe = () => { for (const f of fs.readdirSync(DIR)) fs.rmSync(path.join(DI
 test("a fresh install (or wiped data folder) starts with the owner's own settings", () => {
   wipe();
   const c = eng.loadConfig();
-  assert.deepStrictEqual(c.signature, { name: "Hassan Ali", title: "Founder", company: "WebersLink", website: "weberslink.org", postal_address: "2315 Chestnut Street, Montgomery, Alabama 36107, United States", accent_color: "#5b2ee5", logo: true });
+  assert.deepStrictEqual(c.signature, { name: "Hassan Ali", title: "Founder", company: "WebersLink", website: "weberslink.org", postal_address: "2315 Chestnut Street, Montgomery, Alabama 36107, United States", accent_color: "#ef1421", logo: true });
   const hostinger = { enabled: true, smtp_host: "smtp.hostinger.com", smtp_port: 465, imap_host: "imap.hostinger.com", imap_port: 993 };
   assert.deepStrictEqual(c.mailboxes, [
     { id: 1, email: "hassan@weberslink.org", from_name: "Hassan Ali", ...hostinger },
