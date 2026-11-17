@@ -153,7 +153,7 @@ function renderHtml(main, cfg) {
   const href = /^https?:/i.test(site) ? site : "https://" + site;
   let logoUrl = "";
   if (sig.logo !== false) { try { logoUrl = new URL(href).origin + "/assets/email-logo.png"; } catch (e) { /* no valid website: no logo */ } }
-  const logoRow = logoUrl ? `<tr><td style="padding:0 0 10px 0;"><a href="${esc(href)}"><img src="${esc(logoUrl)}" width="168" height="37" class="wl-logo" alt="${esc(sig.company)}" style="display:block;border:0;width:168px;max-width:100%;height:auto;"></a></td></tr>\n` : "";
+  const logoRow = logoUrl ? `<tr><td style="padding:0 0 10px 0;"><a href="${esc(href)}"><img src="${esc(logoUrl)}" width="168" height="28" class="wl-logo" alt="${esc(sig.company)}" style="display:block;border:0;width:168px;max-width:100%;height:auto;"></a></td></tr>\n` : "";
   const role = sig.title ? `${esc(sig.title)}, ${esc(sig.company)}` : esc(sig.company);
   // Responsive: fluid 100% width capped at 600px, viewport meta, and a small-screen media query (clients that
   // strip <style> still get the fluid inline layout). Table-based shell for Outlook.

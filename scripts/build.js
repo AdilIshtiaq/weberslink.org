@@ -109,7 +109,7 @@ ${list.map((pj) => projectCard(pj, loc)).join("\n")}
 function nav(cls = "nav scrolled", logoHref = "/") {
   return `<header class="${cls}" id="nav">
   <div class="wrap">
-    <a href="${logoHref}" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="187" height="33"></a>
+    <a href="${logoHref}" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="196" height="32"></a>
     <nav class="nav-links" id="navLinks" aria-label="Main">
       <div class="nav-dd"><a href="/#services" class="dd-t">Services <i aria-hidden="true"></i></a><div class="dd-menu dd-svc">${MAIN_SERVICES.map((m, i) => `<a href="${m.href}"><b>0${i + 1}</b><span>${esc(m.name)}<small>${esc(m.line)}</small></span></a>`).join("")}<a href="/services/" class="dd-all">All services →</a></div></div>
       <a href="/work/">Work</a>
@@ -130,7 +130,7 @@ function footer() {
   <div class="wrap">
     <div class="foot-cols">
       <div class="fcol fcol-brand">
-        <a href="/" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="187" height="33"></a>
+        <a href="/" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="196" height="32"></a>
         <p>Your in-house tech team: automation, AI voice and chat agents, websites, software and CMS. For businesses in the US, UK &amp; Europe.</p>
         <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="footer">Book a free call</a>
       </div>
