@@ -211,6 +211,24 @@ the dashboard shows where each mailbox's warm-up mail landed (inbox vs spam), wh
 **Not built:** LinkedIn/WhatsApp steps, built-in email finding (use Apollo to find addresses, then import), team roles and per-client workspaces, recipient-timezone sending, external seed-inbox placement tests.
 
 
+## Campaigns (by place and business type)
+Dashboard -> **Campaigns**. A campaign is a group of leads defined by **countries, states, cities and business types** (leave a box empty
+for "any"), with its own **mailboxes**, **daily limit** and, optionally, its own **email copy**. Examples: "Texas roofers", "UK dentists", "Florida HVAC".
+- **Where the data comes from:** your spreadsheet's `country`, `state` and `city` columns; state and city are also read from a US street address
+  ("12 Main St, Dallas, TX 75201"). "Texas", "texas" and "TX" are treated as the same. Business types match as words inside the lead's category,
+  niche, store name or website, so "roof" catches "Roofing contractor". The page suggests the most common values in your leads; click one to add it.
+- **Which campaign a lead joins:** the first campaign in your list (top to bottom) that fits it. Leads still waiting are re-sorted every time you save, so
+  editing a campaign takes effect at once; leads already in a sequence keep theirs. A live count under each campaign shows how many leads match and how many
+  another campaign above already claims.
+- **Sending rules:** with no campaigns, every lead is emailed as before. Once any campaign exists, only leads in a campaign that is **On** are emailed
+  (a paused campaign sends nothing, including follow-ups). Campaigns take turns in the queue so a big one never starves the others. A campaign's daily limit is shared across its mailboxes
+  and counts across runs; the mailboxes' own limits and warm-up still apply. Follow-ups always come from the mailbox that sent the first email.
+- **Own emails:** Emails tab -> "Emails for" -> pick the campaign, edit and save. Anything you don't change there uses your default emails. "Reset to default" removes the campaign's edit.
+- **Dashboard:** a Campaigns table (waiting, in sequence, sent today, replies, positives, bounces, days to finish) and **Worth your attention**, which spells out problems
+  and opportunities from your data: leads matching no campaign, a campaign with no mailbox or no leads, a paused mailbox or campaign, bounces, a campaign replying at twice the rate of another, replies waiting over 24 hours.
+- Leads can be filtered by campaign; the table shows each lead's place and campaign. Campaigns and their email copy are included in backups.
+
+
 ## First-time checklist
 1. Set the env variables above, restart the app, sign in.
 2. Settings: your name, company, **postal address**, notify email, mailboxes (lookalike domains, not weberslink.org). Save.
@@ -236,7 +254,7 @@ Every email carries the postal address and an opt-out line. A mailbox pauses its
 A/B versions share one body and differ only in subject; judge after about 100 leads each.
 
 ## Tests
-`npm test` (about 147 tests: engine, API, auth, regression tests for an independent code review; no network or real
+`npm test` (about 156 tests: engine, API, auth, regression tests for an independent code review; no network or real
 mailboxes needed).
 
 ## Not covered by tests

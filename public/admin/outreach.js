@@ -39,13 +39,14 @@
   $("logout").addEventListener("click", function () { try { localStorage.removeItem("wl_owner"); } catch (e) {} api("POST", "/api/outreach/logout", {}).finally(showLogin); });
 
   // ---------------------------------------------------------------- navigation
-  var TITLES = { dashboard: "Dashboard", replies: "Replies", leads: "Leads", templates: "Emails", settings: "Settings" };
+  var TITLES = { dashboard: "Dashboard", replies: "Replies", campaigns: "Campaigns", leads: "Leads", templates: "Emails", settings: "Settings" };
   function go(view) {
     state.view = view;
-    ["dashboard", "replies", "leads", "templates", "settings"].forEach(function (v) { $("v-" + v).hidden = v !== view; });
+    ["dashboard", "replies", "campaigns", "leads", "templates", "settings"].forEach(function (v) { $("v-" + v).hidden = v !== view; });
     document.querySelectorAll(".nav-btn[data-view]").forEach(function (b) { b.classList.toggle("on", b.dataset.view === view); });
     $("title").textContent = TITLES[view];
     if (history.replaceState) history.replaceState(null, "", "#" + view);
+    if (view === "campaigns") loadCampaigns();
     if (view === "leads") loadLeads();
     if (view === "templates") loadTemplates();
     if (view === "settings") { loadSettings(); showDataInfo(); }
@@ -102,7 +103,7 @@
         esc(m.firstLiveSend || "not started") + "</td><td>" + m.bounceRate + "%</td><td>" + healthChip(m.health) + "</td><td class='hint'>" + (m.placement ? m.placement.inbox + " inbox · " + m.placement.spam + " spam" : "–") + "</td><td>" + (m.passwordSet ? '<span class="ok">set</span>' : '<span class="warn">not set</span>') + "</td></tr>";
     }).join("") : '<tr><td class="empty">No mailbox yet. Add one in Settings.</td></tr>';
 
-    renderResults(); renderObjections();
+    renderResults(); renderObjections(); renderInsights(); renderCampaignCards(); fillCampaignSelects();
     var vs = Object.keys(s.byVariant || {}).sort();
     $("abBox").innerHTML = vs.length ? "<table><tr><th>Version</th><th>Started</th><th>Replied</th><th>Rate</th></tr>" + vs.map(function (v) {
       var x = s.byVariant[v]; return "<tr><td>Email 1 · " + esc(v.toUpperCase()) + "</td><td>" + x.started + "</td><td>" + x.replied + "</td><td>" + (x.started ? (100 * x.replied / x.started).toFixed(1) : "0.0") + "%</td></tr>";
@@ -373,11 +374,11 @@
   var STATUSES = ["new", "active", "finished", "replied", "unsubscribed", "bounced", "do-not-contact", "skipped-bad-address", "skipped-country", "skipped-no-mailserver"];
   $("leadStatus").innerHTML += STATUSES.map(function (s) { return '<option value="' + s + '">' + s + "</option>"; }).join("") + '<option value="clicked">clicked a link</option>';
   function loadLeads() {
-    var q = new URLSearchParams({ q: $("leadQ").value, status: $("leadStatus").value, limit: PAGE, offset: state.leadPage * PAGE });
+    var q = new URLSearchParams({ q: $("leadQ").value, status: $("leadStatus").value, campaign: $("leadCampaign").value, limit: PAGE, offset: state.leadPage * PAGE });
     api("GET", "/api/outreach/leads?" + q).then(function (r) {
-      $("leadTable").innerHTML = r.rows.length ? "<tr><th>Store</th><th>Email</th><th>Country</th><th>Score</th><th>Status</th><th>Emails sent</th><th>Last sent</th><th>Next</th><th>Clicks</th><th>Mailbox</th><th>Ver.</th></tr>" + r.rows.map(function (t) {
+      $("leadTable").innerHTML = r.rows.length ? "<tr><th>Store</th><th>Email</th><th>Place</th><th>Campaign</th><th>Score</th><th>Status</th><th>Emails sent</th><th>Last sent</th><th>Next</th><th>Clicks</th><th>Mailbox</th><th>Ver.</th></tr>" + r.rows.map(function (t) {
         var sent = Number(t.step) || 0;
-        return "<tr><td>" + esc(t.store || t.domain) + "</td><td>" + esc(t.email) + "</td><td>" + esc(t.country) + '</td><td title="' + esc(t.ai_score_reason || "") + '">' + esc(t.ai_score || "–") + '</td><td><span class="chip ' + esc(t.status) + '">' + esc(t.status === "skipped-bad-address" ? "set aside" : t.status) + "</span>" + (t.reply_label ? ' <span class="chip lab-' + esc(t.reply_label) + '">' + esc(LABEL[t.reply_label] || t.reply_label) + "</span>" : "") + (t.smtp === "catch-all" ? ' <span class="chip medium" title="This domain accepts any address, so the mailbox could not be verified">catch-all</span>' : "") + "</td><td>" + (sent ? sent + " of 4" : "–") + "</td><td>" + esc((t.last_sent || "").slice(0, 10) || "–") + "</td><td class='hint'>" + esc(t.next || "") + (t.snooze_until && t.status === "active" ? ' <button class="btn sm" data-unsnooze="' + esc(t.email) + '">Resume now</button>' : "") + (t.status === "skipped-bad-address" ? ' <button class="btn sm" data-restore="' + esc(t.email) + '">Restore</button>' : "") + "</td><td>" + (t.clicks ? '<span class="clicked">' + t.clicks + "</span>" : "–") + "</td><td>" + esc(t.mailbox) + "</td><td>" + esc((t.variant || "").toUpperCase()) + "</td></tr>";
+        return "<tr><td>" + esc(t.store || t.domain) + "</td><td>" + esc(t.email) + "</td><td>" + esc([t.city, t.state, t.country].filter(Boolean).join(", ")) + "</td><td>" + esc(campName(t.campaign)) + '</td><td title="' + esc(t.ai_score_reason || "") + '">' + esc(t.ai_score || "–") + '</td><td><span class="chip ' + esc(t.status) + '">' + esc(t.status === "skipped-bad-address" ? "set aside" : t.status) + "</span>" + (t.reply_label ? ' <span class="chip lab-' + esc(t.reply_label) + '">' + esc(LABEL[t.reply_label] || t.reply_label) + "</span>" : "") + (t.smtp === "catch-all" ? ' <span class="chip medium" title="This domain accepts any address, so the mailbox could not be verified">catch-all</span>' : "") + "</td><td>" + (sent ? sent + " of 4" : "–") + "</td><td>" + esc((t.last_sent || "").slice(0, 10) || "–") + "</td><td class='hint'>" + esc(t.next || "") + (t.snooze_until && t.status === "active" ? ' <button class="btn sm" data-unsnooze="' + esc(t.email) + '">Resume now</button>' : "") + (t.status === "skipped-bad-address" ? ' <button class="btn sm" data-restore="' + esc(t.email) + '">Restore</button>' : "") + "</td><td>" + (t.clicks ? '<span class="clicked">' + t.clicks + "</span>" : "–") + "</td><td>" + esc(t.mailbox) + "</td><td>" + esc((t.variant || "").toUpperCase()) + "</td></tr>";
       }).join("") : '<tr><td class="empty">No leads match.</td></tr>';
       var from = r.total ? state.leadPage * PAGE + 1 : 0;
       $("pgInfo").textContent = from + "–" + Math.min(r.total, (state.leadPage + 1) * PAGE) + " of " + r.total;
@@ -385,6 +386,7 @@
     }).catch(fail);
   }
   var qT; $("leadQ").addEventListener("input", function () { clearTimeout(qT); qT = setTimeout(function () { state.leadPage = 0; loadLeads(); }, 250); });
+  $("leadCampaign").addEventListener("change", function () { state.leadPage = 0; loadLeads(); });
   $("leadStatus").addEventListener("change", function () { state.leadPage = 0; loadLeads(); });
   $("prevPg").addEventListener("click", function () { state.leadPage--; loadLeads(); });
   $("nextPg").addEventListener("click", function () { state.leadPage++; loadLeads(); });
@@ -532,7 +534,8 @@
   // ---------------------------------------------------------------- templates
   function tplLabel(t) { return "Email " + t.step + (t.step === 1 ? " · version " + t.variant.toUpperCase() : ""); }
   function loadTemplates() {
-    return api("GET", "/api/outreach/templates").then(function (r) {
+    $("tplCampaign").value = state.tplCampaign || "";
+    return api("GET", "/api/outreach/templates" + (state.tplCampaign ? "?campaign=" + encodeURIComponent(state.tplCampaign) : "")).then(function (r) {
       state.templates = r.templates; state.fields = r.fields;
       if (!state.tpl || !r.templates.some(function (t) { return t.name === state.tpl; })) state.tpl = r.templates[0] && r.templates[0].name;
       $("fieldChips").innerHTML = '<span class="hint">Insert:</span>' + r.fields.filter(function (f) { return ["psi", "lcp", "speed_line", "sender_name", "niche", "country", "first_name"].indexOf(f) < 0; }).map(function (f) { return '<span class="chip field-chip" data-f="' + f + '">{' + f + "}</span>"; }).join("");
@@ -549,6 +552,7 @@
     state.tpl = name; var t = state.templates.filter(function (x) { return x.name === name; })[0]; if (!t) return;
     $("tplText").value = t.text; $("tplReset").hidden = !t.edited; renderTplList(); previewTpl();
   }
+  $("tplCampaign").addEventListener("change", function () { state.tplCampaign = this.value; state.tpl = null; loadTemplates(); });
   $("tplList").addEventListener("click", function (e) { var b = e.target.closest("button[data-t]"); if (b) selectTpl(b.dataset.t); });
   $("fieldChips").addEventListener("click", function (e) {
     var f = e.target.getAttribute("data-f"); if (!f) return; var ta = $("tplText"), s = ta.selectionStart, en = ta.selectionEnd;
@@ -564,11 +568,11 @@
     }).catch(function (e) { $("pvSubject").textContent = ""; $("pvFrame").srcdoc = ""; $("tplStats").innerHTML = '<span class="bad">' + esc(e.message) + "</span>"; });
   }
   $("tplSave").addEventListener("click", function () {
-    api("PUT", "/api/outreach/templates", { name: state.tpl, text: $("tplText").value }).then(function () { toast("Saved"); return loadTemplates(); }).catch(fail);
+    api("PUT", "/api/outreach/templates", { name: state.tpl, text: $("tplText").value, campaign: state.tplCampaign || undefined }).then(function () { toast("Saved"); return loadTemplates(); }).catch(fail);
   });
   $("tplReset").addEventListener("click", function () {
     if (!confirm("Discard your edits and go back to the default text?")) return;
-    api("DELETE", "/api/outreach/templates?name=" + encodeURIComponent(state.tpl), {}).then(function () { toast("Reset"); return loadTemplates(); }).catch(fail);
+    api("DELETE", "/api/outreach/templates?name=" + encodeURIComponent(state.tpl) + (state.tplCampaign ? "&campaign=" + encodeURIComponent(state.tplCampaign) : ""), {}).then(function () { toast("Reset"); return loadTemplates(); }).catch(fail);
   });
   $("queueBtn").addEventListener("click", function () {
     api("GET", "/api/outreach/preview?n=3").then(function (r) {
@@ -622,6 +626,88 @@
       warmup: { enabled: $("w_on").checked, per_day: $("w_per").value, reply_percent: $("w_reply").value }
     };
     api("PUT", "/api/outreach/config", body).then(function (r) { state.config = r.config; toast("Settings saved"); loadSettings(); refresh(); }).catch(fail);
+  });
+
+  // ---------------------------------------------------------------- campaigns
+  var camps = function () { return (state.status && state.status.campaigns) || []; };
+  function campName(id) { if (!id) return camps().length ? "none" : "–"; var c = camps().filter(function (x) { return String(x.id) === String(id); })[0]; return c ? c.name : "(removed)"; }
+  function fillCampaignSelects() {
+    var opts = camps().map(function (c) { return '<option value="' + c.id + '">' + esc(c.name) + "</option>"; }).join("");
+    var lc = $("leadCampaign"), cur = lc.value;
+    lc.innerHTML = '<option value="">All campaigns</option>' + opts + (camps().length ? '<option value="none">No campaign</option>' : ""); lc.value = cur;
+    var tc = $("tplCampaign"), tcur = state.tplCampaign || "";
+    tc.innerHTML = '<option value="">Everyone (default)</option>' + opts; tc.value = tcur;
+    $("tplCampBar").hidden = !camps().length;
+  }
+  function renderInsights() {
+    var ins = (state.status && state.status.insights) || [];
+    $("insightBox").hidden = !ins.length;
+    $("insightList").innerHTML = ins.map(function (i) { return '<li class="' + (i.level === "bad" ? "bad" : i.level === "warn" ? "warn" : "") + '">' + esc(i.text) + "</li>"; }).join("");
+  }
+  function renderCampaignCards() {
+    var cs = camps(); $("campBox").hidden = !cs.length;
+    $("campTable").innerHTML = cs.length ? "<tr><th>Campaign</th><th>Waiting</th><th>In sequence</th><th>Today</th><th>Replies</th><th>Positive</th><th>Bounces</th><th>Finishes in</th></tr>" + cs.map(function (c) {
+      var where = [].concat(c.countries, c.states, c.cities).join(", ") || "anywhere", what = c.types.join(", ") || "any business";
+      return "<tr><td>" + esc(c.name) + (c.enabled ? "" : ' <span class="chip">paused</span>') + '<div class="hint">' + esc(where + " · " + what) + "</div></td><td>" + c.waiting + "</td><td>" + c.active + "</td><td>" + c.sentToday + (c.daily_limit ? " of " + c.daily_limit : "") + "</td><td>" + c.replied + " <span class='hint'>(" + c.replyRate + "%)</span></td><td>" + c.positive + "</td><td>" + c.bounceRate + "%</td><td>" + (c.daysLeft ? c.daysLeft + " day" + (c.daysLeft === 1 ? "" : "s") : "–") + "</td></tr>";
+    }).join("") : "";
+  }
+  $("campBox").addEventListener("click", function (e) { var b = e.target.closest("[data-view-go]"); if (b) go(b.dataset.viewGo); });
+  var campOpts = null, campMbs = [];
+  var FILTERS = [["countries", "Countries", "US, UK"], ["states", "States / regions", "TX, Florida"], ["cities", "Cities", "Austin, Dallas"], ["types", "Business types", "roofing, hvac, dentist"]];
+  function campBlock(c) {
+    c = c || {};
+    var f = FILTERS.map(function (k) {
+      var sug = ((campOpts || {})[k[0]] || []).slice(0, 8).map(function (o) { return '<span class="chip field-chip" data-add="' + k[0] + '" data-v="' + esc(o.value) + '">' + esc(o.value) + " · " + o.count + "</span>"; }).join(" ");
+      return '<div class="field"><label>' + k[1] + '</label><input type="text" data-f="' + k[0] + '" value="' + esc(Array.isArray(c[k[0]]) ? c[k[0]].join(", ") : c[k[0]] || "") + '" placeholder="' + k[2] + '"><div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">' + sug + "</div></div>";
+    });
+    var mbs = campMbs.map(function (m) { return '<label class="check" style="margin-right:14px"><input type="checkbox" data-mb="' + m.id + '"' + ((c.mailboxes || []).indexOf(m.id) >= 0 ? " checked" : "") + "> " + esc(m.email) + "</label>"; }).join("");
+    return '<div class="mb camp" data-id="' + esc(c.id || "") + '"><div class="mb-head"><input type="text" data-n="name" value="' + esc(c.name || "") + '" placeholder="Campaign name, e.g. Texas roofers" maxlength="60" style="max-width:340px;font-weight:600">' +
+      '<span style="flex:1"></span><label class="check"><input type="checkbox" data-n="enabled"' + (c.enabled === false ? "" : " checked") + '> On</label>' +
+      '<button type="button" class="btn sm" data-mv="-1" title="Earlier: fits leads first">↑</button><button type="button" class="btn sm" data-mv="1" title="Later">↓</button><button type="button" class="btn sm danger" data-rmc="1">Remove</button></div>' +
+      '<div class="row">' + f.slice(0, 2).join("") + '</div><div class="row">' + f.slice(2).join("") + "</div>" +
+      '<div class="row"><div class="field"><label>Send from <span class="hint">(none ticked = every mailbox)</span></label><div>' + (mbs || '<span class="hint">Add mailboxes in Settings first.</span>') + '</div></div><div class="field"><label>Daily limit for this campaign <span class="hint">(0 = only the mailboxes\' limits)</span></label><input type="number" data-n="daily_limit" min="0" max="1000" value="' + esc(c.daily_limit || 0) + '"></div></div>' +
+      '<p class="hint cp" style="margin:6px 0">Checking…</p>' + (c.id ? '<button type="button" class="btn sm" data-emails="' + esc(c.id) + '">Edit emails for this campaign</button>' : '<span class="hint">Save to give it its own emails.</span>') + "</div>";
+  }
+  function collectCamps() {
+    return [].map.call($("campList").querySelectorAll(".camp"), function (el) {
+      var c = { id: el.dataset.id ? Number(el.dataset.id) : undefined, name: el.querySelector('[data-n="name"]').value, enabled: el.querySelector('[data-n="enabled"]').checked, daily_limit: el.querySelector('[data-n="daily_limit"]').value,
+        mailboxes: [].map.call(el.querySelectorAll("[data-mb]:checked"), function (i) { return Number(i.dataset.mb); }) };
+      el.querySelectorAll("[data-f]").forEach(function (i) { c[i.dataset.f] = i.value; });
+      return c;
+    });
+  }
+  function renderCamps(list) {
+    $("campList").innerHTML = list.length ? list.map(campBlock).join("") : '<p class="empty">No campaigns yet. Add one to email a place or business type on its own.</p>';
+    $("campIntro").textContent = campOpts && campOpts.total ? "Your " + campOpts.total + " leads: click a suggestion under a box to add it." : "Import leads first, then build campaigns from the places and business types in them.";
+    [].forEach.call($("campList").querySelectorAll(".camp"), previewCamp);
+  }
+  function loadCampaigns() {
+    api("GET", "/api/outreach/campaigns").then(function (r) { campOpts = r.options; campMbs = r.mailboxes; renderCamps(r.campaigns); }).catch(fail);
+  }
+  var cpT = {};
+  function previewCamp(el) {
+    var c = collectCamps()[[].indexOf.call($("campList").querySelectorAll(".camp"), el)], out = el.querySelector(".cp");
+    api("POST", "/api/outreach/campaigns/preview", { filters: c, id: c.id }).then(function (r) {
+      out.innerHTML = "<b>" + r.total + "</b> lead" + (r.total === 1 ? "" : "s") + " match, <b>" + r.waiting + "</b> still waiting to be emailed" + (r.claimed ? ' <span class="warn">(' + r.claimed + " already belong to a campaign above)</span>" : "") +
+        (r.sample.length ? '<br><span class="hint">e.g. ' + r.sample.map(function (s) { return esc(s.store + (s.place ? " (" + s.place + ")" : "")); }).join(" · ") + "</span>" : "");
+    }).catch(function () { out.textContent = ""; });
+  }
+  $("campList").addEventListener("input", function (e) {
+    var el = e.target.closest(".camp"); if (!el || !e.target.dataset.f) return;
+    clearTimeout(cpT[el.dataset.id || "new"]); cpT[el.dataset.id || "new"] = setTimeout(function () { previewCamp(el); }, 350);
+  });
+  $("campList").addEventListener("change", function (e) { var el = e.target.closest(".camp"); if (el && (e.target.dataset.mb || e.target.dataset.n)) previewCamp(el); });
+  $("campList").addEventListener("click", function (e) {
+    var el = e.target.closest(".camp"); if (!el) return;
+    var add = e.target.closest("[data-add]"), mv = e.target.closest("[data-mv]"), rm = e.target.closest("[data-rmc]"), em = e.target.closest("[data-emails]");
+    if (add) { var inp = el.querySelector('[data-f="' + add.dataset.add + '"]'), have = inp.value.split(",").map(function (x) { return x.trim().toLowerCase(); }); if (have.indexOf(add.dataset.v.toLowerCase()) < 0) inp.value = (inp.value.trim() ? inp.value.trim().replace(/,$/, "") + ", " : "") + add.dataset.v; previewCamp(el); }
+    if (mv) { var list = collectCamps(), i = [].indexOf.call($("campList").querySelectorAll(".camp"), el), j = i + Number(mv.dataset.mv); if (j >= 0 && j < list.length) { var t = list[i]; list[i] = list[j]; list[j] = t; renderCamps(list); } }
+    if (rm && confirm("Remove this campaign? Its leads that are still waiting stop being emailed unless another campaign fits them.")) { var l2 = collectCamps(); l2.splice([].indexOf.call($("campList").querySelectorAll(".camp"), el), 1); renderCamps(l2); }
+    if (em) { state.tplCampaign = em.dataset.emails; state.tpl = null; go("templates"); }
+  });
+  $("addCamp").addEventListener("click", function () { var l = collectCamps(); if (l.length >= 20) return; l.push({ name: "", enabled: true }); renderCamps(l); });
+  $("saveCamps").addEventListener("click", function () {
+    api("PUT", "/api/outreach/campaigns", { campaigns: collectCamps() }).then(function (r) { toast("Campaigns saved"); $("campMsg").textContent = ""; renderCamps(r.campaigns); refresh(); }).catch(fail);
   });
 
   // ---------------------------------------------------------------- results, objections, scoring, warm-up, copy check
