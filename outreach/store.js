@@ -32,7 +32,7 @@ const P = (...a) => path.join(DATA_DIR, ...a);
 const TRACK_FIELDS = ["email", "first_name", "store", "domain", "country", "category", "niche", "step", "status", "mailbox", "variant",
   "last_sent", "subject", "first_message_id", "last_message_id", "psi", "lcp", "mx", "note", "replied_at", "loom_sent", "sending",
   "custom_line", "research_status", "research_source", "research_conf",
-  "replied_step", "referred_by", "smtp", "reply_label", "reply_snippet", "reply_summary", "snooze_until", "ai_score", "ai_score_reason", "draft_reply", "outcome"];
+  "replied_step", "referred_by", "smtp", "reply_label", "reply_snippet", "reply_summary", "snooze_until", "ai_score", "ai_score_reason", "draft_reply", "outcome", "state", "city", "campaign"];
 // Fields the dashboard owns (a run never overwrites them): the "video sent" tick and the personalised first line.
 const DASHBOARD_FIELDS = ["loom_sent", "custom_line", "research_status", "research_source", "research_conf",
   "reply_label", "reply_snippet", "reply_summary", "snooze_until", "ai_score", "ai_score_reason", "draft_reply", "outcome", "smtp"]; // AI results + manual outcomes: a run never overwrites these

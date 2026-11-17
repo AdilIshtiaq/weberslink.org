@@ -115,7 +115,7 @@ const clientIp = (req) => {
   return xff.length ? xff[xff.length - 1] : String(req.socket.remoteAddress || "");
 };
 
-const LEAD_VIEW = ["email", "first_name", "store", "domain", "country", "category", "step", "status", "mailbox", "variant", "last_sent", "psi", "note", "loom_sent", "ai_score", "ai_score_reason", "reply_label", "snooze_until", "outcome", "smtp"];
+const LEAD_VIEW = ["email", "first_name", "store", "domain", "country", "category", "step", "status", "mailbox", "variant", "last_sent", "psi", "note", "loom_sent", "ai_score", "ai_score_reason", "reply_label", "snooze_until", "outcome", "smtp", "state", "city", "campaign"];
 
 async function route(req, res, url, method) {
   const p = url.pathname.replace(/^\/api\/outreach/, "") || "/";
@@ -176,12 +176,28 @@ async function route(req, res, url, method) {
     if (eng.run.running) return send(res, 409, { ok: false, error: "A run is in progress. Stop it before changing settings." });
     const body = await readJson(req);
     try {
+      if (body.campaigns === undefined) body.campaigns = eng.loadConfig().campaigns; // the Settings form doesn't edit campaigns: keep them
       const cfg = eng.sanitizeConfig(body);
       eng.saveConfig(cfg);
       return send(res, 200, { ok: true, config: cfg });
     } catch (e) { return send(res, 400, { ok: false, error: e.message }); }
   }
 
+  // --- campaigns (groups of leads by place and business type) ---
+  if (p === "/campaigns" && method === "GET") return send(res, 200, { ok: true, campaigns: eng.loadConfig().campaigns, options: eng.campaignOptions(), mailboxes: eng.loadConfig().mailboxes.filter((m) => m.email).map((m) => ({ id: m.id, email: m.email })) });
+  if (p === "/campaigns" && method === "PUT") {
+    const body = await readJson(req);
+    try {
+      const cfg = eng.sanitizeConfig({ ...eng.loadConfig(), campaigns: body.campaigns });
+      eng.saveConfig(cfg);
+      eng.loadState(cfg); // waiting leads move into their new campaigns straight away
+      return send(res, 200, { ok: true, campaigns: cfg.campaigns });
+    } catch (e) { return send(res, 400, { ok: false, error: e.message }); }
+  }
+  if (p === "/campaigns/preview" && method === "POST") {
+    const body = await readJson(req);
+    return send(res, 200, { ok: true, ...eng.campaignPreview(body.filters || {}, eng.loadConfig(), body.id) });
+  }
   if (p === "/run" && method === "POST") {
     const body = await readJson(req);
     const r = eng.startRun({ source: "dashboard", forceDry: body.dry === true });
@@ -245,7 +261,8 @@ async function route(req, res, url, method) {
     const limit = Math.min(500, Math.max(1, parseInt(url.searchParams.get("limit"), 10) || 100));
     const offset = Math.max(0, parseInt(url.searchParams.get("offset"), 10) || 0);
     const cl = clicks.allLeads();
-    const all = store.loadTracking().filter((t) => (!st || (st === "clicked" ? ((cl[t.email.toLowerCase()] || {}).clicks || 0) > 0 : t.status === st)) && (!q || `${t.email} ${t.store} ${t.domain}`.toLowerCase().includes(q)));
+    const camp = url.searchParams.get("campaign") || "";
+    const all = store.loadTracking().filter((t) => (!camp || (camp === "none" ? !t.campaign : t.campaign === camp)) && (!st || (st === "clicked" ? ((cl[t.email.toLowerCase()] || {}).clicks || 0) > 0 : t.status === st)) && (!q || `${t.email} ${t.store} ${t.domain}`.toLowerCase().includes(q)));
     const cfg = eng.loadConfig();
     return send(res, 200, { ok: true, total: all.length, rows: all.slice(offset, offset + limit).map((t) => ({ ...Object.fromEntries(LEAD_VIEW.map((f) => [f, t[f]])), next: eng.nextEmail(t, cfg), clicks: (cl[t.email.toLowerCase()] || {}).clicks || 0 })) });
   }
@@ -327,8 +344,10 @@ async function route(req, res, url, method) {
 
   if (p === "/templates" && method === "GET") {
     const bundled = new Set(fs.existsSync(path.join(__dirname, "templates")) ? fs.readdirSync(path.join(__dirname, "templates")) : []);
-    const edited = new Set(fs.existsSync(tpl.OVERRIDE) ? fs.readdirSync(tpl.OVERRIDE) : []);
-    return send(res, 200, { ok: true, templates: tpl.listTemplateFiles().map((t) => ({ name: t.name, step: t.step, variant: t.variant, text: fs.readFileSync(t.file, "utf8"), edited: edited.has(t.name), bundled: bundled.has(t.name) })),
+    const camp = url.searchParams.get("campaign") || "", cdir = tpl.campaignDir(camp);
+    const dir = cdir || tpl.OVERRIDE; // "edited" means edited for the campaign being viewed, or for everyone when none is chosen
+    const edited = new Set(fs.existsSync(dir) ? fs.readdirSync(dir) : []);
+    return send(res, 200, { ok: true, templates: tpl.listTemplateFiles(camp).map((t) => ({ name: t.name, step: t.step, variant: t.variant, text: fs.readFileSync(t.file, "utf8"), edited: edited.has(t.name), bundled: bundled.has(t.name) })),
       fields: Object.keys(tpl.fieldsFor(tpl.SAMPLE_LEAD, eng.loadConfig())) });
   }
   if (p === "/templates/check" && method === "POST") {
@@ -356,6 +375,7 @@ async function route(req, res, url, method) {
     const body = await readJson(req);
     const name = String(body.name || "");
     if (!tpl.FILE_RE.test(name)) return send(res, 400, { ok: false, error: "Template names look like email1.txt, email1b.txt ... email4.txt" });
+    const saveDir = tpl.campaignDir(body.campaign) || tpl.OVERRIDE;
     const text = String(body.text || "").replace(/\r\n/g, "\n");
     try {
       const { subject, body: b } = tpl.parseTemplate(text, name);
@@ -364,14 +384,14 @@ async function route(req, res, url, method) {
       if (left) throw new Error(`Still contains the placeholder ${left[0]}`);
       tpl.render(Number(name[5]), tpl.SAMPLE_LEAD, eng.loadConfig(), "a", text);
     } catch (e) { return send(res, 400, { ok: false, error: e.message }); }
-    fs.mkdirSync(tpl.OVERRIDE, { recursive: true });
-    store.atomicWrite(path.join(tpl.OVERRIDE, name), text.endsWith("\n") ? text : text + "\n");
+    fs.mkdirSync(saveDir, { recursive: true });
+    store.atomicWrite(path.join(saveDir, name), text.endsWith("\n") ? text : text + "\n");
     return send(res, 200, { ok: true });
   }
   if (p === "/templates" && method === "DELETE") {
     const name = String(url.searchParams.get("name") || "");
     if (!tpl.FILE_RE.test(name)) return send(res, 400, { ok: false, error: "Bad template name." });
-    try { fs.unlinkSync(path.join(tpl.OVERRIDE, name)); } catch (e) { return send(res, 404, { ok: false, error: "No edited copy to reset." }); }
+    try { fs.unlinkSync(path.join(tpl.campaignDir(url.searchParams.get("campaign")) || tpl.OVERRIDE, name)); } catch (e) { return send(res, 404, { ok: false, error: "No edited copy to reset." }); }
     return send(res, 200, { ok: true });
   }
 

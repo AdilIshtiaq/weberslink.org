@@ -17,9 +17,13 @@ const OPT_OUT_TEXT = 'Prefer not to hear from me? Reply "unsubscribe" and I\'ll 
 
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-function listTemplateFiles() {
+/** Folder holding one campaign's own email copy (campaign ids are small whole numbers), or null. */
+const campaignDir = (id) => (/^\d{1,2}$/.test(String(id == null ? "" : id)) ? path.join(OVERRIDE, "campaign-" + id) : null);
+
+/** Bundled emails, overridden by your edits, overridden by the campaign's own edits (when a campaign id is given). */
+function listTemplateFiles(campaign) {
   const files = new Map();
-  for (const dir of [BUNDLED, OVERRIDE]) {
+  for (const dir of [BUNDLED, OVERRIDE, campaignDir(campaign)].filter(Boolean)) {
     let names = [];
     try { names = fs.readdirSync(dir); } catch (e) { continue; }
     for (const n of names) if (FILE_RE.test(n)) files.set(n, path.join(dir, n));
@@ -38,15 +42,15 @@ function parseTemplate(raw, name = "template") {
   return { subject: first.slice(8).trim(), body: (nl < 0 ? "" : text.slice(nl + 1)).replace(/^\n+/, "") };
 }
 
-function loadTemplate(step, variant = "a") {
-  const list = listTemplateFiles().filter((t) => t.step === step);
+function loadTemplate(step, variant = "a", campaign) {
+  const list = listTemplateFiles(campaign).filter((t) => t.step === step);
   const t = list.find((x) => x.variant === variant) || list.find((x) => x.variant === "a");
   if (!t) throw new Error(`templates/email${step}.txt is missing`);
   return parseTemplate(fs.readFileSync(t.file, "utf8"), t.name);
 }
 
-function variantsFor(step) {
-  return listTemplateFiles().filter((t) => t.step === step).map((t) => t.variant);
+function variantsFor(step, campaign) {
+  return listTemplateFiles(campaign).filter((t) => t.step === step).map((t) => t.variant);
 }
 
 /**
@@ -192,7 +196,7 @@ ${esc(sig.postal_address)}<br>${esc(OPT_OUT_TEXT)}
 
 /** Returns { subject, text, html } for email `step` to `lead`. */
 function render(step, lead, cfg, variant = "a", rawTemplate = null) {
-  const { subject, body } = rawTemplate ? parseTemplate(rawTemplate) : loadTemplate(step, variant);
+  const { subject, body } = rawTemplate ? parseTemplate(rawTemplate) : loadTemplate(step, variant, lead.campaign);
   const fields = fieldsFor(lead, cfg);
   const sig = cfg.signature;
   const seed = `${String(lead.email || "").toLowerCase()}|${step}`;
@@ -230,7 +234,7 @@ function copyCheck(subject, body, { first = true } = {}) {
 
 /** Email 1 variants are shared out evenly, stably per address. */
 function pickVariant(lead, step) {
-  const vs = variantsFor(step).sort();
+  const vs = variantsFor(step, lead.campaign).sort();
   if (step > 1) return vs.includes(lead.variant) ? lead.variant : "a";
   const h = crypto.createHash("sha1").update(String(lead.email).toLowerCase()).digest().readUInt32BE(0);
   return vs[h % vs.length];
@@ -251,4 +255,4 @@ function templateProblems(cfg) {
   return problems;
 }
 
-module.exports = { OPT_OUT_TEXT, OVERRIDE, listTemplateFiles, parseTemplate, loadTemplate, variantsFor, fill, prettyDomain, fieldsFor, render, renderHtml, pickVariant, spin, copyCheck, templateProblems, SAMPLE_LEAD, FILE_RE };
+module.exports = { OPT_OUT_TEXT, OVERRIDE, campaignDir, listTemplateFiles, parseTemplate, loadTemplate, variantsFor, fill, prettyDomain, fieldsFor, render, renderHtml, pickVariant, spin, copyCheck, templateProblems, SAMPLE_LEAD, FILE_RE };
