@@ -171,6 +171,47 @@ line; only **approved** lines go into emails.
 - Only the store's name, website and category are sent to Google, never personal details. Free-tier limits and
   grounding quotas change; check your quota in Google AI Studio.
 
+## Three mailboxes, AI replies, warm-up (v2.5)
+**Mailboxes.** A fresh install starts with `hassan@`, `adil_ishtiaq@` and `sienna_carter@weberslink.org`. If you already saved
+settings, add the two new ones in Settings -> Sending mailboxes (they get numbers 2 and 3) and set `OUTREACH_PASSWORD_2` and
+`OUTREACH_PASSWORD_3` on the server. A mailbox whose sender name differs from the Signature name signs emails as that
+person, with no job title unless you fill one in. New leads rotate across the mailboxes; follow-ups stay with the mailbox that started the thread.
+
+**Gemini on replies** (needs `GEMINI_OUTREACH_KEY`; `GEMINI_OUTREACH_AI_DAILY_MAX` caps calls, default 300). Every reply is
+labelled: interested, question, not now, not interested, out of office, wrong person, unsubscribe, other. The word-list rules
+still run first and decide who is stopped; Gemini can only make things safer (a high/medium-confidence "unsubscribe" the word
+list missed stops the lead and adds the address to the never-contact list).
+- **Out of office:** the return date snoozes follow-ups until the day after (Leads shows "Paused until...", with a **Resume now** button).
+- **Wrong person with a named colleague:** that person is added as a new lead, marked "referred by", and is not blocked by the "a colleague replied" rule.
+- **Suggested reply** for interested/question replies (Replies tab, **Use suggested reply**): plain text, no links except your booking link
+  (Settings -> Gemini). A person always reviews and sends it; nothing is auto-sent.
+- **Webhook:** set an https address in Settings and positive replies on live runs are posted there as JSON (CRM, Zapier, Slack).
+- Mark each reply's **Outcome** (meeting booked / won / lost). The Dashboard's Results panel shows replies by label, by email step, by mailbox, and meetings.
+- **Why people say no:** Dashboard -> Summarise objections groups the last 60 days of "no" and "not now" replies into themes with copy advice.
+
+**Lead scoring.** Describe your ideal customer in Settings -> Gemini, then Leads -> **Score leads (Gemini)**. Waiting leads are then emailed
+best-score first; "Skip leads scoring below" sets a floor. Scores come only from the lead's own fields (category, niche, country, PageSpeed).
+
+**Copy tools.** Templates -> **Check copy** flags spam-filter words, pushy calls to action, long emails, too many links and ALL CAPS (add
+"also ask Gemini" for a second opinion). Spintax works in subject and body: `{Hi|Hey|Hello} {first_name}`; the same lead always gets the same wording.
+
+**One-click unsubscribe.** Every cold email carries `List-Unsubscribe` (https and mailto) and `List-Unsubscribe-Post: List-Unsubscribe=One-Click`
+(Gmail/Yahoo bulk-sender requirement). The https link lives at `/u/<token>` on your site (same address setting as click tracking). A GET only shows a
+confirm button; a POST unsubscribes, suppresses the address and stops its sequence.
+
+**SMTP check** (Leads -> tick "SMTP check", then Clean list). Asks each recipient's mail server whether the mailbox exists (never sends
+mail) and spots catch-all domains. Only a clear "no such user" answer sets a lead aside. Many hosts, shared hosting included, block outgoing port 25; then
+every answer is "unknown" and nothing changes. Free-mail addresses are not probed.
+
+**Warm-up between your mailboxes** (Settings -> Gemini and warm-up, off by default). Every 30 minutes in daytime, each mailbox sends a few short
+messages to the others; the receiver opens them, moves any from spam back to the inbox, and answers a share. It never counts toward the cold-email limit and
+the dashboard shows where each mailbox's warm-up mail landed (inbox vs spam), which doubles as a free placement test and feeds the **Health** score
+(bounces, pauses, spam placement). With only three inboxes the effect is modest: keep ramp-up slow and lists clean. The IMAP part
+(finding, opening and rescuing warm-up mail) is tested with fakes only, so run **Run warm-up now** once and check the result before relying on it.
+
+**Not built:** LinkedIn/WhatsApp steps, built-in email finding (use Apollo to find addresses, then import), team roles and per-client workspaces, recipient-timezone sending, external seed-inbox placement tests.
+
+
 ## First-time checklist
 1. Set the env variables above, restart the app, sign in.
 2. Settings: your name, company, **postal address**, notify email, mailboxes (lookalike domains, not weberslink.org). Save.
@@ -196,7 +237,7 @@ Every email carries the postal address and an opt-out line. A mailbox pauses its
 A/B versions share one body and differ only in subject; judge after about 100 leads each.
 
 ## Tests
-`npm test` (about 98 tests: engine, API, auth, regression tests for an independent code review; no network or real
+`npm test` (about 147 tests: engine, API, auth, regression tests for an independent code review; no network or real
 mailboxes needed).
 
 ## Not covered by tests

@@ -80,7 +80,7 @@ function jobStatus() {
  * Looks at every lead still waiting to be emailed. `mx(domain)` -> "yes" | "no" | "unknown" (injectable for tests).
  * Runs in the background; poll jobStatus(). Does not change any lead.
  */
-function startScan({ mx, concurrency = 10 } = {}) {
+function startScan({ mx, smtp, smtpMax = 500, concurrency = 10 } = {}) {
   if (job.running) return { started: false, reason: "A scan is already running." };
   Object.assign(job, { running: true, phase: "Checking addresses", done: 0, total: 0, startedAt: new Date().toISOString(), result: null, error: "" });
   const done = (async () => {
@@ -105,13 +105,27 @@ function startScan({ mx, concurrency = 10 } = {}) {
       }
     };
     await Promise.all(Array.from({ length: Math.min(concurrency, queue.length || 1) }, worker));
+    // Optional: ask each recipient's mail server whether the mailbox exists (see verify.js). Never changes a lead by itself.
+    const smtpResult = new Map();
+    if (smtp) {
+      const todo = waiting.filter((t) => !t.smtp && decisions.get(t.email.toLowerCase()).action !== "remove" && domains.get(t.email.split("@")[1].toLowerCase()) !== "no" && !FREE_MAIL.test(t.email.split("@")[1])).slice(0, smtpMax);
+      job.phase = "Checking mailboxes exist (SMTP)"; job.total = todo.length; job.done = 0;
+      const q = [...todo];
+      const w2 = async () => { while (q.length) { const t = q.shift(); try { smtpResult.set(t.email.toLowerCase(), await smtp(t.email)); } catch (e) { smtpResult.set(t.email.toLowerCase(), "unknown"); } job.done++; } };
+      await Promise.all(Array.from({ length: Math.min(3, q.length || 1) }, w2));
+    }
     const counts = { total: waiting.length, ok: 0, remove: 0, role: 0, noMailServer: 0, byKind: {} };
+    if (smtp) { counts.smtpInvalid = 0; counts.catchAll = 0; }
     const items = [];
     for (const t of waiting) {
       const key = t.email.toLowerCase();
       const dec = decisions.get(key);
       const dom = domains.get(t.email.split("@")[1].toLowerCase());
       if (dec.action !== "remove" && dom === "no") { dec.action = "remove"; dec.kind = "no-mail-server"; dec.reason = "its domain has no mail server (mail would bounce)"; }
+      const sv = smtpResult.get(key);
+      if (sv && sv !== "unknown") dec.smtp = sv;
+      if (sv === "invalid" && dec.action !== "remove") { dec.action = "remove"; dec.kind = "smtp-invalid"; dec.reason = "its mail server says this mailbox does not exist"; counts.smtpInvalid++; }
+      if (sv === "catch-all") counts.catchAll++;
       if (dec.action === "remove") { counts.remove++; if (dec.kind === "no-mail-server") counts.noMailServer++; counts.byKind[dec.kind] = (counts.byKind[dec.kind] || 0) + 1; }
       else if (dec.action === "flag") counts.role++;
       else counts.ok++;
@@ -139,6 +153,7 @@ function applyScan({ skipRoles = false } = {}) {
       t.status = SKIPPED; t.note = dec.reason;
       if (dec.action === "flag") out.roleSkipped++; else out.skipped++;
     } else if (dec.domainMx === "yes" && !t.mx) { t.mx = "yes"; out.domainsConfirmed++; }
+    if (dec.smtp && dec.smtp !== "invalid") t.smtp = dec.smtp; // "valid" or "catch-all", kept for your information
   }
   store.saveTracking(rows);
   return { ok: true, ...out };

@@ -15,8 +15,12 @@ const { Mailbox, passwordFor } = require("./mail");
 const { stripOurFooter } = require("./inbound");
 const richtext = require("./richtext");
 const clicks = require("./clicks");
+const ai = require("./ai");
+const unsub = require("./unsub");
+const webhook = require("./webhook");
+const warmup = require("./warmup");
 
-const VERSION = "2.4";
+const VERSION = "2.5";
 const MAX_PER_MAILBOX_PER_DAY = 100; // hard cap per mailbox (raised from 40 so one mailbox can send every 15-20 minutes around the clock)
 const RESCAN_MS = 10 * 60 * 1000;    // during a long run, re-read the inboxes at least this often so replies and opt-outs stop the sequence promptly
 const DONE_STATUSES = ["replied", "unsubscribed", "bounced", "do-not-contact"];
@@ -45,7 +49,15 @@ const DEFAULT_CONFIG = {
     notify_email: "", html_emails: true, check_mx: true, bounce_pause_percent: 3, check_inbox_in_dry_run: false, auto_run: true, track_clicks: true,
     window_enabled: true, window_start: "19:00", window_end: "07:00",
   },
-  mailboxes: [{ id: 1, email: "hassan@weberslink.org", from_name: "Hassan Ali", enabled: true, smtp_host: "smtp.hostinger.com", smtp_port: 465, imap_host: "imap.hostinger.com", imap_port: 993 }],
+  mailboxes: [
+    { id: 1, email: "hassan@weberslink.org", from_name: "Hassan Ali", enabled: true, smtp_host: "smtp.hostinger.com", smtp_port: 465, imap_host: "imap.hostinger.com", imap_port: 993 },
+    { id: 2, email: "adil_ishtiaq@weberslink.org", from_name: "Adil Ishtiaq", enabled: true, smtp_host: "smtp.hostinger.com", smtp_port: 465, imap_host: "imap.hostinger.com", imap_port: 993 },
+    { id: 3, email: "sienna_carter@weberslink.org", from_name: "Sienna Carter", enabled: true, smtp_host: "smtp.hostinger.com", smtp_port: 465, imap_host: "imap.hostinger.com", imap_port: 993 },
+  ],
+  // Gemini features (need GEMINI_OUTREACH_KEY on the server). They only ever make sending MORE careful; nothing is sent by the AI.
+  ai: { classify_replies: true, draft_replies: true, icp: "", min_score: 0, prioritise_by_score: true, booking_link: "", offer: "a free 3-minute video audit of their store's website", webhook_url: "" },
+  // Mailboxes warm each other up: a few short messages a day between your own inboxes, opened, rescued from spam and answered.
+  warmup: { enabled: false, per_day: 4, reply_percent: 60 },
 };
 
 function loadConfig() {
@@ -55,6 +67,8 @@ function loadConfig() {
     sending: { ...DEFAULT_CONFIG.sending, ...(saved.sending || {}) },
     // Defaults only apply when nothing was ever saved; a saved empty list means "no mailboxes" on purpose.
     mailboxes: Array.isArray(saved.mailboxes) ? saved.mailboxes : DEFAULT_CONFIG.mailboxes.map((m) => ({ ...m })),
+    ai: { ...DEFAULT_CONFIG.ai, ...(saved.ai || {}) },
+    warmup: { ...DEFAULT_CONFIG.warmup, ...(saved.warmup || {}) },
   };
   if (!cfg.sending.notify_email) cfg.sending.notify_email = String(process.env.OUTREACH_NOTIFY_EMAIL || "").trim();
   return cfg;
@@ -91,6 +105,8 @@ function sanitizeConfig(input) {
       window_enabled: s.window_enabled === true, window_start: hhmm(s.window_start, d.sending.window_start), window_end: hhmm(s.window_end, d.sending.window_end),
     },
     mailboxes: sanitizeMailboxes(input.mailboxes),
+    ai: sanitizeAi(input.ai),
+    warmup: sanitizeWarmup(input.warmup),
   };
   if (out.sending.notify_email && !store.isEmail(out.sending.notify_email)) throw new Error("Notification email is not a valid address");
   for (const m of out.mailboxes) if (m.email && !store.isEmail(m.email)) throw new Error(`Mailbox "${m.email}" is not a valid address`);
@@ -98,6 +114,18 @@ function sanitizeConfig(input) {
   if (out.sending.window_enabled && out.sending.window_start === out.sending.window_end) throw new Error("The sending window's start and end times must be different");
   return out;
 }
+function sanitizeAi(a = {}) {
+  const d = DEFAULT_CONFIG.ai;
+  const https = (v) => { const x = str(v, 500); if (!x) return ""; try { const u = new URL(x); if (u.protocol !== "https:") throw 0; return u.toString(); } catch (e) { throw new Error(`"${x.slice(0, 60)}" must be a full https:// address`); } };
+  return {
+    classify_replies: a.classify_replies !== false, draft_replies: a.draft_replies !== false, prioritise_by_score: a.prioritise_by_score !== false,
+    icp: str(a.icp, 1200), min_score: intIn(a.min_score, 0, 10, 0), booking_link: https(a.booking_link), offer: str(a.offer, 200) || d.offer, webhook_url: https(a.webhook_url),
+  };
+}
+function sanitizeWarmup(w = {}) {
+  return { enabled: w.enabled === true, per_day: intIn(w.per_day, 1, 20, 4), reply_percent: intIn(w.reply_percent, 0, 100, 60) };
+}
+
 // Mail servers the dashboard may send passwords to. Without this, a hijacked admin session could point a mailbox at
 // a server it controls and capture the real password. Add others with OUTREACH_ALLOWED_HOSTS (comma separated).
 function hostAllowed(host) {
@@ -120,7 +148,7 @@ function sanitizeMailboxes(list) {
     let id = ids[i];
     if (!id) { id = 1; while (used.has(id)) id++; used.add(id); }
     const box = {
-      id, email: str(m.email, 200), from_name: str(m.from_name, 100), enabled: m.enabled !== false,
+      id, email: str(m.email, 200), from_name: str(m.from_name, 100), title: str(m.title, 100), enabled: m.enabled !== false,
       smtp_host: str(m.smtp_host, 200) || "smtp.hostinger.com", smtp_port: intIn(m.smtp_port, 1, 65535, 465),
       imap_host: str(m.imap_host, 200) || "imap.hostinger.com", imap_port: intIn(m.imap_port, 1, 65535, 993),
     };
@@ -215,6 +243,7 @@ function nextEmail(t, cfg, now = new Date()) {
   if (t.status === "finished") return "Sequence complete";
   if (t.status === cleaner.SKIPPED) return t.note ? `Skipped: ${t.note}` : "Skipped by the list cleaner";
   if (t.status !== "active" || step < 1 || step > 3) return "";
+  if (snoozed(t, cfg, now)) return `Paused until ${t.snooze_until} (out of office)`;
   const lastDay = campaignDate(cfg, new Date(t.last_sent));
   const gap = cfg.sending.followup_gaps_days[step - 1] || cfg.sending.followup_gaps_days[cfg.sending.followup_gaps_days.length - 1];
   const due = nextSendDay(addDays(lastDay, gap));
@@ -303,7 +332,7 @@ function applyRules(track, cfg) {
   }
   const doneDomains = new Set(track.filter((t) => ["replied", "unsubscribed"].includes(t.status) && !FREE_MAIL.test(emailDomain(t.email))).map((t) => emailDomain(t.email)));
   for (const t of track) {
-    if (["new", "active"].includes(t.status) && doneDomains.has(emailDomain(t.email))) set(t, "do-not-contact", "colleague already replied / opted out");
+    if (["new", "active"].includes(t.status) && !t.referred_by && doneDomains.has(emailDomain(t.email))) set(t, "do-not-contact", "colleague already replied / opted out"); // a colleague named in a reply ("contact Sara") is allowed
   }
   return changed;
 }
@@ -408,14 +437,19 @@ function classify(messages, track, myAddrs) {
       continue;
     }
     if (DONE_STATUSES.includes(lead.status) || lead.status === "new") continue;
-    if (AUTO_REPLY.test(msg.subject) && !STOP_WORDS.test(fresh)) { lead.note = `auto-reply ${stamp}`; continue; }
     const snippet = fresh.replace(/\s+/g, " ").trim().slice(0, 300);
+    const prevStatus = lead.status;
+    if (AUTO_REPLY.test(msg.subject) && !STOP_WORDS.test(fresh)) {
+      lead.note = `auto-reply ${stamp}`;
+      changes.push({ kind: "AUTO-REPLY", lead, snippet, text: fresh || msg.body, subject: msg.subject, prevStatus }); // the sequence goes on; Gemini may read a return date
+      continue;
+    }
     if (wantsStop) {
       lead.status = "unsubscribed"; lead.note = `asked to stop ${stamp}`;
       changes.push({ kind: "OPT-OUT", lead, snippet });
     } else {
-      lead.status = "replied"; lead.note = `replied ${stamp} from ${frm}`; lead.replied_at = new Date().toISOString();
-      changes.push({ kind: "REPLIED", lead, snippet });
+      lead.status = "replied"; lead.note = `replied ${stamp} from ${frm}`; lead.replied_at = new Date().toISOString(); lead.replied_step = String(lead.step || "");
+      changes.push({ kind: "REPLIED", lead, snippet, text: fresh, subject: msg.subject, prevStatus });
     }
   }
   return changes;
@@ -438,10 +472,27 @@ function bounceCheck(track, box, cfg) {
   return { paused: mine.length >= 20 && rate >= cfg.sending.bounce_pause_percent, rate, sent: mine.length };
 }
 
+/** An out-of-office reply with a return date pauses the follow-ups until then. */
+const snoozed = (t, cfg, now = new Date()) => Boolean(t.snooze_until) && String(t.snooze_until) > today(cfg, now);
+
+/** New leads in the order they should start: best ICP score first (unscored last), skipping scores below the minimum you set. */
+function queueOrder(track, cfg) {
+  const a = cfg.ai || {}, min = Number(a.min_score) || 0;
+  const list = track.filter((x) => x.status === "new" && !x.sending && !(min && x.ai_score && Number(x.ai_score) < min));
+  return a.prioritise_by_score === false ? list : list.sort((x, y) => (Number(y.ai_score) || 0) - (Number(x.ai_score) || 0));
+}
+/** Settings for one mailbox's emails: a mailbox with its own name signs as that person (no borrowed job title). */
+function cfgFor(cfg, box) {
+  const m = box && (box.conf || box);
+  const name = String((m && (m.from_name || m.name)) || "").trim();
+  if (!name || name === cfg.signature.name) return cfg;
+  return { ...cfg, signature: { ...cfg.signature, name, title: String((m && m.title) || "").trim() } };
+}
+
 function dueFollowups(track, cfg, now = new Date()) {
   const gaps = cfg.sending.followup_gaps_days;
   return track.filter((t) => {
-    if (t.status !== "active" || t.sending) return false;
+    if (t.status !== "active" || t.sending || snoozed(t, cfg, now)) return false;
     const step = Number(t.step || 0);
     return step >= 1 && step <= 3 && daysSince(t.last_sent, cfg, now) >= (gaps[step - 1] || gaps[gaps.length - 1]);
   });
@@ -515,7 +566,7 @@ async function runOnce(opts = {}, deps = {}) {
     // 1. inboxes. Every change is saved lead-by-lead (never the whole list), so edits made in the dashboard
     //    while this scan is running can't be overwritten. The same scan is repeated during a long run
     //    (see rescanIfDue) so a reply or "stop" is honoured within minutes, not at the next run.
-    let lastScan = 0;
+    let lastScan = 0, aiOff = false;
     const scanInboxes = async () => {
       const all = [];
       const sendKeys = new Set(boxes.map((b) => b.addr.toLowerCase()));
@@ -538,12 +589,25 @@ async function runOnce(opts = {}, deps = {}) {
         for (const c of changes) {
           if (c.kind === "UNMATCHED-STOP") { if (!dry) store.addSuppression(c.lead.email); } else store.saveRow(c.lead);
         }
+        for (const c of changes) {
+          if (aiOff || !["REPLIED", "AUTO-REPLY"].includes(c.kind)) continue;
+          const r = await ai.enrichReply(c, { cfg, dry, now: clock(), log });
+          if (r && r.quota) { aiOff = true; continue; }
+          if (!r) continue;
+          c.ai = r;
+          if (c.kind === "REPLIED" && c.lead.status === "unsubscribed") c.kind = "OPT-OUT"; // Gemini caught a stop request the word list missed
+          else if (c.kind === "REPLIED" && c.lead.status !== "replied") c.kind = "AUTO-REPLY"; // an out-of-office the sequence now continues past
+          if (!dry && c.kind === "REPLIED" && cfg.ai.webhook_url && ai.POSITIVE.includes(r.label)) {
+            webhook.post(cfg.ai.webhook_url, { event: "positive_reply", label: r.label, summary: r.summary, email: c.lead.email, store: c.lead.store, domain: c.lead.domain, mailbox: c.lead.mailbox, replied_at: c.lead.replied_at, reply: c.snippet })
+              .then((w) => { if (!w.ok) log(`  (webhook not delivered: ${w.error || w.status})`); });
+          }
+        }
         all.push(...changes);
         if (!Array.isArray(res) && res.maxUid) { mb.lastUid = res.maxUid; mb.uidValidity = res.uidValidity; store.writeJson("mailboxes.json", state); }
       }
       for (const c of all) {
         log(`  ${c.kind.padEnd(8)} ${c.lead.email}  (${c.lead.store})${c.snippet ? `  "${c.snippet.slice(0, 80)}"` : ""}${c.kind === "UNMATCHED-STOP" && !dry ? "  -> added to do-not-contact" : ""}`);
-        if (c.kind === "REPLIED") summary.replies++; else if (c.kind === "OPT-OUT" || c.kind === "UNMATCHED-STOP") summary.optOuts++; else summary.bounces++;
+        if (c.kind === "REPLIED") summary.replies++; else if (c.kind === "OPT-OUT" || c.kind === "UNMATCHED-STOP") summary.optOuts++; else if (c.kind === "BOUNCED") summary.bounces++;
       }
       if (all.length) await notify(cfg, boxes, all, dry);
       lastScan = clock().getTime();
@@ -601,7 +665,7 @@ async function runOnce(opts = {}, deps = {}) {
       plan.get(key).push({ t, step: Number(t.step) + 1 }); left[key]--;
     }
     let rr = 0;
-    for (const t of track.filter((x) => x.status === "new" && !x.sending)) {
+    for (const t of queueOrder(track, cfg)) {
       if (run.stop) break;
       const open = boxes.filter((b) => (left[b.addr.toLowerCase()] || 0) > 0);
       if (!open.length) break;
@@ -628,6 +692,7 @@ async function runOnce(opts = {}, deps = {}) {
         : current.sending ? "on hold"
         : DONE_STATUSES.includes(current.status) ? `now ${current.status}`
         : suppressed(current.email, store.loadSuppression()) ? "on the do-not-contact list"
+        : snoozed(current, cfg, clock()) ? `snoozed until ${current.snooze_until} (out of office)`
         : step === 1 ? (current.status !== "new" ? `status is ${current.status}` : "")
         : (current.status !== "active" || Number(current.step) !== step - 1 ? `status changed (${current.status}, step ${current.step})` : "");
       if (why) { log(`  skipped ${t.email}: ${why}`); return "skipped"; }
@@ -637,7 +702,7 @@ async function runOnce(opts = {}, deps = {}) {
       t.mailbox = t.mailbox || mailboxHint;
 
       const variant = tpl.pickVariant(t, step);
-      const r = tpl.render(step, t, cfg, variant);
+      const r = tpl.render(step, t, cfgFor(cfg, box), variant);
       let html = cfg.sending.html_emails ? r.html : undefined;
       const subject = step > 1 ? (/^re:/i.test(t.subject) ? t.subject : "Re: " + t.subject) : r.subject;
       const refs = [...new Set([t.first_message_id, t.last_message_id].filter(Boolean))];
@@ -658,7 +723,7 @@ async function runOnce(opts = {}, deps = {}) {
       }
       let sent;
       try {
-        sent = await box.send({ to: t.email, subject, text: r.text, html, inReplyTo: step > 1 ? refs[refs.length - 1] : undefined, references: step > 1 ? refs : undefined });
+        sent = await box.send({ to: t.email, subject, text: r.text, html, unsubscribeUrl: unsub.urlFor(t.email, cfg), inReplyTo: step > 1 ? refs[refs.length - 1] : undefined, references: step > 1 ? refs : undefined });
       } catch (e) {
         if (e.code === "EENVELOPE" || (/recipient/i.test(e.message || "") && e.responseCode >= 500)) {
           const rc = Number(e.responseCode || (e.rejectedErrors && e.rejectedErrors[0] && e.rejectedErrors[0].responseCode) || 0);
@@ -767,7 +832,7 @@ async function notify(cfg, boxes, changes, dry) {
   const replied = hits.filter((c) => c.kind === "REPLIED").length;
   const text = "New activity from your outreach:\n\n" + hits.map((c) => c.kind === "UNMATCHED-STOP"
     ? `STOP REQUEST from ${c.lead.email} (not matched to a lead; added to your do-not-contact list)\n    "${c.snippet}"\n`
-    : `${c.kind}: ${c.lead.store} <${c.lead.email}>  (via ${c.lead.mailbox || "?"})\n    "${c.snippet}"\n`).join("\n") +
+    : `${c.kind}: ${c.lead.store} <${c.lead.email}>  (via ${c.lead.mailbox || "?"})${c.ai ? `  [${c.ai.label.replace(/_/g, " ")}]` : ""}\n    "${c.snippet}"\n${c.ai && c.ai.summary ? `    AI: ${c.ai.summary}\n` : ""}${c.lead.draft_reply ? "    A suggested reply is waiting in the dashboard (Replies tab).\n" : ""}`).join("\n") +
     (replied ? "\nSend the free video audit to people who replied within 24 hours - from the mailbox they wrote to.\n" : "");
   try {
     await boxes[0].send({ to, subject: replied ? `Outreach: ${replied} new repl${replied === 1 ? "y" : "ies"}` : "Outreach: opt-outs recorded", text, listUnsubscribe: false }, { saveCopy: false });
@@ -822,7 +887,7 @@ function previewNext(n, cfg = loadConfig(), boxes) {
       subject: step > 1 ? (/^re:/i.test(t.subject) ? t.subject : "Re: " + t.subject) : r.subject, text: r.text, html: r.html });
   };
   for (const t of dueFollowups(track, cfg)) { if (out.length >= n) break; add(t, Number(t.step) + 1); }
-  for (const t of track.filter((x) => x.status === "new" && !x.sending)) { if (out.length >= n) break; add(t, 1); }
+  for (const t of queueOrder(track, cfg)) { if (out.length >= n) break; add(t, 1); }
   return out;
 }
 
@@ -833,15 +898,22 @@ function status(cfg = loadConfig(), now = new Date()) {
   const started = track.filter((t) => Number(t.step || 0) >= 1 || ["replied", "unsubscribed"].includes(t.status));
   const group = (keyFn) => {
     const g = {};
-    for (const t of started) { const k = keyFn(t); (g[k] ||= { started: 0, replied: 0, bounced: 0 }); g[k].started++; if (t.status === "replied") g[k].replied++; if (t.status === "bounced") g[k].bounced++; }
+    for (const t of started) {
+      const k = keyFn(t); (g[k] ||= { started: 0, replied: 0, bounced: 0, positive: 0, meetings: 0 }); g[k].started++;
+      if (t.status === "replied") g[k].replied++; if (t.status === "bounced") g[k].bounced++;
+      if (ai.POSITIVE.includes(t.reply_label)) g[k].positive++; if (["meeting_booked", "won"].includes(t.outcome)) g[k].meetings++;
+    }
     return g;
   };
   const doneToday = sentTodayByBox(cfg, now);
+  const warmupState = warmup.status(now);
   const mailboxes = cfg.mailboxes.filter((m) => m.email).map((m) => {
     const key = m.email.toLowerCase(), box = { addr: m.email };
     const b = bounceCheck(track, box, cfg);
+    const spam = warmup.spamRate(m.email);
     return { id: m.id, email: m.email, enabled: m.enabled, passwordSet: Boolean(passwordFor(m)), firstLiveSend: (state.mailboxes[key] || {}).first_live_send || "",
-      todayLimit: dailyLimitFor(box, cfg, state, now), sentToday: doneToday[key] || 0, bounceRate: Math.round(b.rate * 10) / 10, paused: b.paused };
+      todayLimit: dailyLimitFor(box, cfg, state, now), sentToday: doneToday[key] || 0, bounceRate: Math.round(b.rate * 10) / 10, paused: b.paused,
+      health: healthScore({ bounceRate: b.rate, paused: b.paused, spamRate: spam }), spamRate: Math.round(spam * 1000) / 10, placement: (warmupState.placement || {})[key] || null };
   });
   const daily = mailboxes.filter((m) => m.enabled && !m.paused).reduce((a, m) => a + m.todayLimit, 0);
   const remaining = track.filter((t) => t.status === "new").length;
@@ -851,7 +923,10 @@ function status(cfg = loadConfig(), now = new Date()) {
     furthestStep: count(started.filter((t) => Number(t.step)), (t) => `email ${t.step}`), mailboxes, remaining,
     daysLeft: remaining && daily ? Math.ceil(remaining / daily) : 0,
     replied: track.filter((t) => t.status === "replied").sort((a, b) => String(b.replied_at).localeCompare(String(a.replied_at))).map((t) => ({
-      email: t.email, store: t.store, mailbox: t.mailbox, note: t.note, repliedAt: t.replied_at, loomSent: t.loom_sent === "1", domain: t.domain, firstName: t.first_name, subject: t.subject, clicks: clicks.forLead(t.email) })),
+      email: t.email, store: t.store, mailbox: t.mailbox, note: t.note, repliedAt: t.replied_at, loomSent: t.loom_sent === "1", domain: t.domain, firstName: t.first_name, subject: t.subject, clicks: clicks.forLead(t.email),
+      label: t.reply_label, summary: t.reply_summary, snippet: t.reply_snippet, draft: t.draft_reply, outcome: t.outcome })),
+    analytics: analytics(track, started),
+    ai: ai.status(), aiConfig: { icp: Boolean(cfg.ai.icp), booking: Boolean(cfg.ai.booking_link) }, warmup: { ...warmupState, enabled: cfg.warmup.enabled },
     clicks: (() => { const ls = Object.fromEntries(track.map((t) => [t.email.toLowerCase(), t])); return clicks.recent(40).map((c) => ({ ...c, store: (ls[c.email] || {}).store || "", status: (ls[c.email] || {}).status || "" })); })(),
     trackingBase: clicks.baseUrl(cfg), trackClicks: cfg.sending.track_clicks && cfg.sending.html_emails,
     scheduled: listScheduled(),
@@ -859,6 +934,27 @@ function status(cfg = loadConfig(), now = new Date()) {
     problems: readiness(cfg, cfg.mailboxes.filter((m) => m.enabled && m.email).map((m) => new Mailbox(m)), { live: !cfg.sending.dry_run }),
     running: run.running, startedAt: run.startedAt, runMode: run.mode, last: run.last, lastRun: readLastRun(), log: run.lines.length ? run.lines.slice(-200) : logTail(200),
   };
+}
+
+/** 0-100 mailbox health: bounces hurt most, then a pause, then warm-up mail landing in spam. */
+function healthScore({ bounceRate = 0, paused = false, spamRate = 0 }) {
+  return Math.max(0, Math.round(100 - Math.min(60, bounceRate * 12) - (paused ? 25 : 0) - Math.min(30, spamRate * 60)));
+}
+
+/** Reply and meeting numbers for the dashboard: by AI label, by email step, and the totals that matter (positive replies, meetings). */
+function analytics(track, started) {
+  const labels = {}, byStep = {};
+  for (const t of track) if (t.reply_label) labels[t.reply_label] = (labels[t.reply_label] || 0) + 1;
+  for (const s of [1, 2, 3, 4]) byStep[s] = { reached: started.filter((t) => Number(t.step || 0) >= s).length, replied: 0, positive: 0 };
+  for (const t of started) {
+    const st = Number(t.replied_step || t.step || 0);
+    if (!byStep[st] || !(t.status === "replied" || t.reply_label)) continue; // someone who wrote back, counted at the email they answered
+    byStep[st].replied++;
+    if (ai.POSITIVE.includes(t.reply_label)) byStep[st].positive++;
+  }
+  return { labels, byStep, positive: track.filter((t) => ai.POSITIVE.includes(t.reply_label)).length,
+    meetings: track.filter((t) => ["meeting_booked", "won"].includes(t.outcome)).length, won: track.filter((t) => t.outcome === "won").length,
+    scored: track.filter((t) => t.ai_score).length, referrals: track.filter((t) => t.referred_by).length, snoozed: track.filter((t) => t.status === "active" && t.snooze_until && t.snooze_until >= today(loadConfig())).length };
 }
 
 // ---------------------------------------------------------------- go-live checks
@@ -874,8 +970,8 @@ async function sendTest(to, cfg = loadConfig(), deps = {}) {
   for (const box of boxes) {
     try {
       const variant = tpl.pickVariant(sample, 1);
-      const r = tpl.render(1, sample, cfg, variant);
-      await box.send({ to, subject: "[TEST] " + r.subject, text: r.text, html: cfg.sending.html_emails ? r.html : undefined }, { saveCopy: false });
+      const r = tpl.render(1, sample, cfgFor(cfg, box), variant);
+      await box.send({ to, subject: "[TEST] " + r.subject, text: r.text, html: cfg.sending.html_emails ? r.html : undefined, unsubscribeUrl: unsub.urlFor(to, cfg) }, { saveCopy: false });
       results.push({ mailbox: box.addr, ok: true });
     } catch (e) { results.push({ mailbox: box.addr, ok: false, error: String(e.message).slice(0, 160) }); }
     finally { box.close && box.close(); }
@@ -1028,4 +1124,4 @@ async function processScheduled(cfg = loadConfig(), deps = {}, now = new Date())
 }
 
 module.exports = { sendReply, scheduleReply, cancelScheduled, listScheduled, processScheduled, autoRunDue, MAX_PER_MAILBOX_PER_DAY, RESCAN_MS, logTail, markInterrupted, readLastRun, windowState, inWindow, campaignDate, domainReceivesMail, nextEmail, sendTest, dnsHealth, resolveHeld, VERSION, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dailyLimitFor, bounceCheck, dueFollowups, runOnce,
-  startRun, requestStop, previewNext, status, readiness, applyRules, loadState, tzParts, isSendDay, today, daysSince, run, log };
+  startRun, requestStop, previewNext, status, queueOrder, cfgFor, healthScore, analytics, readiness, applyRules, loadState, tzParts, isSendDay, today, daysSince, run, log };

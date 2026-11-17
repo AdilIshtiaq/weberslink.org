@@ -18,6 +18,11 @@ const cleaner = require("./cleaner");
 const research = require("./research");
 const clicks = require("./clicks");
 const backup = require("./backup");
+const ai = require("./ai");
+const unsub = require("./unsub");
+const warmup = require("./warmup");
+const verify = require("./verify");
+const { Mailbox } = require("./mail");
 
 const PASSWORD = process.env.ADMIN_PASSWORD || "";
 const USERNAME = (process.env.ADMIN_USERNAME || "").trim().toLowerCase();
@@ -110,7 +115,7 @@ const clientIp = (req) => {
   return xff.length ? xff[xff.length - 1] : String(req.socket.remoteAddress || "");
 };
 
-const LEAD_VIEW = ["email", "first_name", "store", "domain", "country", "category", "step", "status", "mailbox", "variant", "last_sent", "psi", "note", "loom_sent"];
+const LEAD_VIEW = ["email", "first_name", "store", "domain", "country", "category", "step", "status", "mailbox", "variant", "last_sent", "psi", "note", "loom_sent", "ai_score", "ai_score_reason", "reply_label", "snooze_until", "outcome", "smtp"];
 
 async function route(req, res, url, method) {
   const p = url.pathname.replace(/^\/api\/outreach/, "") || "/";
@@ -201,6 +206,32 @@ async function route(req, res, url, method) {
     testSends.push(Date.now());
     try { return send(res, 200, { ok: true, ...(await eng.sendTest(String(body.to || "").trim())) }); } catch (e) { return send(res, 400, { ok: false, error: e.message }); }
   }
+  // --- Gemini: scoring, drafts, objections ---
+  if (p === "/ai/status" && method === "GET") return send(res, 200, { ok: true, ...ai.status() });
+  if (p === "/ai/score/start" && method === "POST") {
+    const body = await readJson(req);
+    const r = ai.startScoring({ limit: Math.max(1, Math.min(200, parseInt(body.limit, 10) || 25)), cfg: eng.loadConfig() });
+    return send(res, r.started ? 202 : 400, { ok: r.started, ...(r.started ? {} : { error: r.reason }) });
+  }
+  if (p === "/ai/stop" && method === "POST") { ai.stopJob(); return send(res, 200, { ok: true }); }
+  if (p === "/ai/draft" && method === "POST") {
+    const body = await readJson(req);
+    const lead = store.loadTracking().find((t) => t.email.toLowerCase() === String(body.email || "").toLowerCase());
+    if (!lead) return send(res, 404, { ok: false, error: "Lead not found." });
+    try {
+      const draft = await ai.draftReply(lead, eng.loadConfig(), { text: lead.reply_snippet, label: lead.reply_label });
+      if (!draft) return send(res, 422, { ok: false, error: "Gemini's draft didn't pass the safety checks (length or links). Try again." });
+      store.updateLead(lead.email, { draft_reply: draft });
+      return send(res, 200, { ok: true, draft });
+    } catch (e) { return send(res, 400, { ok: false, error: String(e.message).slice(0, 200) }); }
+  }
+  if (p === "/ai/objections" && method === "POST") {
+    try { const r = await ai.mineObjections(); return send(res, r.ok ? 200 : 400, r); } catch (e) { return send(res, 400, { ok: false, error: String(e.message).slice(0, 200) }); }
+  }
+  if (p === "/warmup/run" && method === "POST") {
+    if (eng.run.running) return send(res, 409, { ok: false, error: "A run is in progress. Try again when it finishes." });
+    try { return send(res, 200, { ok: true, ...(await runWarmup({ force: true })) }); } catch (e) { return send(res, 400, { ok: false, error: String(e.message).slice(0, 200) }); }
+  }
   if (p === "/dns" && method === "GET") return send(res, 200, { ok: true, domains: await eng.dnsHealth() });
 
   if (p === "/preview" && method === "GET") {
@@ -254,7 +285,9 @@ async function route(req, res, url, method) {
     return send(res, 200, { ok: true, approved: research.approveShown(body.items) });
   }
   if (p === "/leads/clean/start" && method === "POST") {
-    const r = cleaner.startScan({ mx: eng.domainReceivesMail });
+    const body = await readJson(req);
+    const fromDomain = (eng.loadConfig().mailboxes.find((m) => m.email) || { email: "@example.com" }).email.split("@")[1];
+    const r = cleaner.startScan({ mx: eng.domainReceivesMail, smtp: body.smtp === true ? (e) => verify.probe(e, { fromDomain }) : undefined });
     return send(res, r.started ? 202 : 409, { ok: r.started, ...(r.started ? {} : { error: r.reason }) });
   }
   if (p === "/leads/clean/status" && method === "GET") return send(res, 200, { ok: true, ...cleaner.jobStatus() });
@@ -273,6 +306,9 @@ async function route(req, res, url, method) {
     let r = null;
     if (body.action === "restore") r = cleaner.restore(email);
     else if (body.action === "retry_held" || body.action === "skip_held") r = eng.resolveHeld(email, body.action === "retry_held" ? "retry" : "skip");
+    else if (["meeting_booked", "won", "lost"].includes(body.action)) r = store.updateLead(email, { outcome: body.action });
+    else if (body.action === "clear_outcome") r = store.updateLead(email, { outcome: "" });
+    else if (body.action === "clear_snooze") r = store.updateLead(email, { snooze_until: "" });
     else if (body.action === "loom_sent") r = store.updateLead(email, { loom_sent: "1" });
     else if (body.action === "loom_unsent") r = store.updateLead(email, { loom_sent: "" });
     else if (body.action === "dnc") {
@@ -294,6 +330,19 @@ async function route(req, res, url, method) {
     const edited = new Set(fs.existsSync(tpl.OVERRIDE) ? fs.readdirSync(tpl.OVERRIDE) : []);
     return send(res, 200, { ok: true, templates: tpl.listTemplateFiles().map((t) => ({ name: t.name, step: t.step, variant: t.variant, text: fs.readFileSync(t.file, "utf8"), edited: edited.has(t.name), bundled: bundled.has(t.name) })),
       fields: Object.keys(tpl.fieldsFor(tpl.SAMPLE_LEAD, eng.loadConfig())) });
+  }
+  if (p === "/templates/check" && method === "POST") {
+    const body = await readJson(req);
+    try {
+      const step = Math.min(4, Math.max(1, parseInt(body.step, 10) || 1));
+      const r = tpl.render(step, tpl.SAMPLE_LEAD, eng.loadConfig(), "a", String(body.text || ""));
+      const main = r.text.split("\n\n--\n")[0];
+      const out = { ok: true, ...tpl.copyCheck(r.subject, main, { first: step === 1 }) };
+      if (body.ai === true) {
+        try { out.ai = await ai.reviewCopy(r.subject, main); } catch (e) { out.aiError = String(e.message).slice(0, 160); }
+      }
+      return send(res, 200, out);
+    } catch (e) { return send(res, 400, { ok: false, error: e.message }); }
   }
   if (p === "/templates/preview" && method === "POST") {
     const body = await readJson(req);
@@ -338,11 +387,22 @@ async function route(req, res, url, method) {
   return send(res, 404, { ok: false, error: "Not found." });
 }
 
+let warming = false;
+/** One warm-up pass between the enabled mailboxes that have a password. */
+async function runWarmup({ force = false } = {}) {
+  if (warming) return { skipped: "already running" };
+  warming = true;
+  const cfg = eng.loadConfig();
+  const boxes = cfg.mailboxes.filter((m) => m.enabled && m.email).map((m) => new Mailbox(m)).filter((b) => b.hasPassword());
+  try { return await warmup.tick({ cfg, boxes, force, log: eng.log }); } finally { for (const b of boxes) b.close(); warming = false; }
+}
+
 /** Returns true if the request was for the outreach API (and has been answered). */
 function handle(req, res) {
   let url;
   try { url = new URL(req.url, "http://x"); } catch (e) { return false; }
   if (url.pathname.startsWith("/r/") && (req.method === "GET" || req.method === "HEAD")) return clicks.handle(req, res); // tracked email links
+  if (url.pathname.startsWith("/u/") && ["GET", "HEAD", "POST"].includes(req.method)) { try { unsub.handle(req, res, url); } catch (e) { if (!res.headersSent) { res.writeHead(404); res.end(); } } return true; } // one-click unsubscribe
   if (url.pathname !== "/api/outreach" && !url.pathname.startsWith("/api/outreach/")) return false;
   if (!enabled) { send(res, 503, { ok: false, error: "Outreach is off. Set ADMIN_PASSWORD (10+ characters) on the server to turn it on." }); return true; }
   route(req, res, url, req.method).catch((e) => {
@@ -384,6 +444,12 @@ function startScheduler() {
     setInterval(due, 60 * 1000).unref();
     setTimeout(due, 20 * 1000).unref();
   }
+  // Warm-up between your own mailboxes: every 30 minutes, daytime only, only when switched on in Settings.
+  if (enabled) {
+    const wu = () => { try { if (eng.loadConfig().warmup.enabled && !eng.run.running) runWarmup().catch((e) => console.error("outreach warm-up:", e.message)); } catch (e) { console.error("outreach warm-up:", e.message); } };
+    setInterval(wu, 30 * 60 * 1000).unref();
+    setTimeout(wu, 2 * 60 * 1000).unref();
+  }
   const raw = process.env.OUTREACH_AUTO_RUN_HOUR;
   if (!enabled || raw === undefined || raw === "") return;
   const hour = Number(raw);
@@ -403,4 +469,4 @@ function startScheduler() {
   console.log(`Outreach auto-run on: daily after ${hour}:00.`);
 }
 
-module.exports = { handle, enabled, startScheduler, authed: (req) => enabled && authed(req) };
+module.exports = { handle, enabled, startScheduler, runWarmup, authed: (req) => enabled && authed(req) };

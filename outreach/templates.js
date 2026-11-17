@@ -49,6 +49,18 @@ function variantsFor(step) {
   return listTemplateFiles().filter((t) => t.step === step).map((t) => t.variant);
 }
 
+/**
+ * Spintax: "{Hi|Hey|Hello} there" becomes one of the options, chosen by a hash of `seed` (the lead's address and the step), so
+ * no two leads get identical wording but the same lead always gets the same text (previews and resends never change).
+ */
+function spin(text, seed) {
+  let n = 0;
+  return String(text).replace(/\{([^{}|]*\|[^{}]*)\}/g, (m, inner) => {
+    const opts = inner.split("|");
+    return opts[crypto.createHash("sha1").update(`${seed}:${n++}`).digest().readUInt32BE(0) % opts.length];
+  });
+}
+
 /** Fill {field} placeholders. Unknown fields throw so a typo can never reach a real email. */
 function fill(text, fields) {
   return text.replace(/\{(\w+)\}/g, (m, k) => {
@@ -183,9 +195,37 @@ function render(step, lead, cfg, variant = "a", rawTemplate = null) {
   const { subject, body } = rawTemplate ? parseTemplate(rawTemplate) : loadTemplate(step, variant);
   const fields = fieldsFor(lead, cfg);
   const sig = cfg.signature;
-  const main = fill(body, fields).trimEnd();
+  const seed = `${String(lead.email || "").toLowerCase()}|${step}`;
+  const main = fill(spin(body, seed), fields).trimEnd();
   const footer = `\n\n--\n${sig.company} | ${sig.website}\n${sig.postal_address}\n${OPT_OUT_TEXT}`;
-  return { subject: fill(subject, fields), text: main + footer, html: renderHtml(main, cfg) };
+  return { subject: fill(spin(subject, seed + "|s"), fields), text: main + footer, html: renderHtml(main, cfg) };
+}
+
+// ---------------------------------------------------------------- copy check (before launch, no AI needed)
+const SPAMMY = /\b(act now|buy now|order now|limited time|risk[- ]free|100% (free|guaranteed)|guarantee[ds]?|winner|congratulations|cash|make money|earn \$|urgent|click here|no obligation|special promotion|exclusive deal|lowest price|cheap|discount|amazing deal|incredible|once in a lifetime|dear friend)\b/gi;
+const PUSHY_CTA = /\b(reply now|call me (now|today)|book (now|today)|don'?t miss|last chance|asap|hurry)\b/gi;
+/** Deliverability and quality check of one email. Returns { score 1-10, issues: [{ level: "bad"|"warn", text }], stats }. */
+function copyCheck(subject, body, { first = true } = {}) {
+  const issues = [], b = String(body || ""), sub = String(subject || "");
+  const words = (b.match(/\S+/g) || []).length;
+  const links = (b.match(/https?:\/\/\S+|\bwww\.\S+/gi) || []).length;
+  const bad = (text) => issues.push({ level: "bad", text }), warn = (text) => issues.push({ level: "warn", text });
+  const hits = [...new Set([...(sub.match(SPAMMY) || []), ...(b.match(SPAMMY) || [])].map((x) => x.toLowerCase()))];
+  if (hits.length) (hits.length > 1 ? bad : warn)(`Spam-filter trigger words: ${hits.join(", ")}`);
+  const cta = [...new Set((b.match(PUSHY_CTA) || []).map((x) => x.toLowerCase()))];
+  if (cta.length) warn(`Pushy call to action: ${cta.join(", ")}. A soft question gets more replies.`);
+  if (sub.length > 60) warn(`Subject is ${sub.length} characters; under 50 shows fully on phones.`);
+  if (!sub.trim()) bad("The subject is empty.");
+  if (/[A-Z]{4,}/.test(sub.replace(/\b(US|UK|AI|SEO|CBD|PSI|LCP|FAQ)\b/g, ""))) warn("Subject has ALL-CAPS words.");
+  if ((sub.match(/!/g) || []).length) warn("Avoid exclamation marks in the subject.");
+  if ((b.match(/!/g) || []).length > 1) warn("More than one exclamation mark in the body.");
+  if (first && links > 1) (links > 2 ? bad : warn)(`${links} links in the first email; use none or one.`);
+  else if (!first && links > 2) warn(`${links} links; keep follow-ups to one.`);
+  if (first && words > 150) (words > 220 ? bad : warn)(`${words} words is long for a first cold email; under 120 reads best.`);
+  if (words < 25) warn("Very short; add one specific detail so it doesn't look automated.");
+  if (/<[a-z][\s\S]*>/i.test(b)) warn("Contains HTML-looking text; cold email works best as plain text.");
+  const score = Math.max(1, 10 - 3 * issues.filter((i) => i.level === "bad").length - issues.filter((i) => i.level === "warn").length);
+  return { score, issues, stats: { words, links, subjectLength: sub.length } };
 }
 
 /** Email 1 variants are shared out evenly, stably per address. */
@@ -212,4 +252,4 @@ function templateProblems(cfg) {
 }
 
 module.exports = { OPT_OUT_TEXT, OVERRIDE, listTemplateFiles, parseTemplate, loadTemplate, variantsFor, fill, prettyDomain, shopperQuestions,
-  fieldsFor, render, renderHtml, pickVariant, templateProblems, SAMPLE_LEAD, FILE_RE };
+  fieldsFor, render, renderHtml, pickVariant, spin, copyCheck, templateProblems, SAMPLE_LEAD, FILE_RE };

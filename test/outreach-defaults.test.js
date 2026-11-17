@@ -17,7 +17,14 @@ test("a fresh install (or wiped data folder) starts with the owner's own setting
   wipe();
   const c = eng.loadConfig();
   assert.deepStrictEqual(c.signature, { name: "Hassan Ali", title: "Founder", company: "WebersLink", website: "weberslink.org", postal_address: "2315 Chestnut Street, Montgomery, Alabama 36107, United States", accent_color: "#5b2ee5", logo: true });
-  assert.deepStrictEqual(c.mailboxes, [{ id: 1, email: "hassan@weberslink.org", from_name: "Hassan Ali", enabled: true, smtp_host: "smtp.hostinger.com", smtp_port: 465, imap_host: "imap.hostinger.com", imap_port: 993 }]);
+  const hostinger = { enabled: true, smtp_host: "smtp.hostinger.com", smtp_port: 465, imap_host: "imap.hostinger.com", imap_port: 993 };
+  assert.deepStrictEqual(c.mailboxes, [
+    { id: 1, email: "hassan@weberslink.org", from_name: "Hassan Ali", ...hostinger },
+    { id: 2, email: "adil_ishtiaq@weberslink.org", from_name: "Adil Ishtiaq", ...hostinger },
+    { id: 3, email: "sienna_carter@weberslink.org", from_name: "Sienna Carter", ...hostinger },
+  ]);
+  assert.strictEqual(c.ai.classify_replies, true);
+  assert.strictEqual(c.warmup.enabled, false, "warm-up is opt-in");
   const s = c.sending;
   assert.deepStrictEqual([s.timezone, s.window_enabled, s.window_start, s.window_end, s.daily_limit, s.ramp, s.bounce_pause_percent, s.followup_gaps_days, s.send_days, s.countries],
     ["America/New_York", true, "19:00", "07:00", 20, [5, 10, 15, 20], 3, [3, 4, 7], ["Mon", "Tue", "Wed", "Thu", "Fri"], ["US", "UK"]]);
