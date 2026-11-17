@@ -30,7 +30,6 @@ class Mailbox {
       const port = Number(this.conf.smtp_port || 465);
       this.transport = nodemailer.createTransport({
         host: this.conf.smtp_host || "smtp.hostinger.com", port, secure: port === 465, requireTLS: port !== 465, // never fall back to plain text
-        
         auth: { user: this.addr, pass: this.pw }, connectionTimeout: 30000, socketTimeout: 60000,
       });
     }
@@ -48,8 +47,21 @@ class Mailbox {
       date: new Date(),
       inReplyTo: msg.inReplyTo || undefined,
       references: msg.references && msg.references.length ? msg.references : undefined,
-      headers: msg.listUnsubscribe === false ? {} : { "List-Unsubscribe": `<mailto:${this.addr}?subject=unsubscribe>` },
+      headers: this.headers(msg),
     };
+  }
+
+  /** Cold emails carry the one-click unsubscribe pair Gmail and Yahoo require (RFC 8058) when we have an https address for it. */
+  headers(msg) {
+    const h = {};
+    if (msg.warmup) h["X-Warmup"] = msg.warmup;
+    if (msg.listUnsubscribe === false) return h;
+    const mailto = `<mailto:${this.addr}?subject=unsubscribe>`;
+    if (/^https:\/\/|^http:\/\/localhost/.test(msg.unsubscribeUrl || "")) {
+      h["List-Unsubscribe"] = `<${msg.unsubscribeUrl}>, ${mailto}`;
+      h["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click";
+    } else h["List-Unsubscribe"] = mailto;
+    return h;
   }
 
   async send(msg, { saveCopy = true } = {}) {
@@ -110,6 +122,40 @@ class Mailbox {
       } finally { lock.release(); }
     } finally { await client.logout().catch(() => {}); }
     return { messages, maxUid, uidValidity };
+  }
+
+  /**
+   * Warm-up helper: finds unread warm-up messages (header X-Warmup) in the inbox and the spam folder, marks them read,
+   * moves any found in spam back to the inbox, and says where each one had landed. Returns
+   * [{ folder: "inbox" | "spam", from, subject, messageId, token, isReply }]. Only our own warm-up mail is touched.
+   */
+  async warmupSweep({ max = 20 } = {}) {
+    const { simpleParser } = require("mailparser");
+    const client = await this.imap();
+    const out = [];
+    try {
+      const list = await client.list();
+      const junk = list.find((b) => b.specialUse === "\\Junk") || list.find((b) => /^(inbox\.)?(junk|spam)( e-?mail)?$/i.test(b.path));
+      const folders = [["inbox", "INBOX"], ...(junk ? [["spam", junk.path]] : [])];
+      for (const [folder, path] of folders) {
+        const lock = await client.getMailboxLock(path);
+        try {
+          const uids = ((await client.search({ seen: false, header: { "x-warmup": true } }, { uid: true })) || []).slice(0, max);
+          for (const uid of uids) {
+            const m = await client.fetchOne(String(uid), { source: { maxLength: 30000 } }, { uid: true });
+            if (!m || !m.source) continue;
+            const p = await simpleParser(m.source);
+            const token = String(p.headers.get("x-warmup") || "");
+            if (!token) continue;
+            const from = p.from && p.from.value && p.from.value[0] ? String(p.from.value[0].address || "").toLowerCase() : "";
+            await client.messageFlagsAdd(String(uid), ["\\Seen"], { uid: true });
+            if (folder === "spam") await client.messageMove(String(uid), "INBOX", { uid: true });
+            out.push({ folder, from, subject: p.subject || "", messageId: p.messageId || "", token, isReply: Boolean(p.inReplyTo) });
+          }
+        } finally { lock.release(); }
+      }
+    } finally { await client.logout().catch(() => {}); }
+    return out;
   }
 
   close() { try { this.transport && this.transport.close(); } catch (e) { /* ignore */ } this.transport = null; }

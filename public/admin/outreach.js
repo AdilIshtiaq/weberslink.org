@@ -39,13 +39,14 @@
   $("logout").addEventListener("click", function () { try { localStorage.removeItem("wl_owner"); } catch (e) {} api("POST", "/api/outreach/logout", {}).finally(showLogin); });
 
   // ---------------------------------------------------------------- navigation
-  var TITLES = { dashboard: "Dashboard", replies: "Replies", leads: "Leads", templates: "Emails", settings: "Settings" };
+  var TITLES = { dashboard: "Dashboard", replies: "Replies", campaigns: "Campaigns", leads: "Leads", templates: "Emails", settings: "Settings" };
   function go(view) {
     state.view = view;
-    ["dashboard", "replies", "leads", "templates", "settings"].forEach(function (v) { $("v-" + v).hidden = v !== view; });
+    ["dashboard", "replies", "campaigns", "leads", "templates", "settings"].forEach(function (v) { $("v-" + v).hidden = v !== view; });
     document.querySelectorAll(".nav-btn[data-view]").forEach(function (b) { b.classList.toggle("on", b.dataset.view === view); });
     $("title").textContent = TITLES[view];
     if (history.replaceState) history.replaceState(null, "", "#" + view);
+    if (view === "campaigns") loadCampaigns();
     if (view === "leads") loadLeads();
     if (view === "templates") loadTemplates();
     if (view === "settings") { loadSettings(); showDataInfo(); }
@@ -73,7 +74,7 @@
     var nr = s.replied.filter(function (r) { return !r.loomSent; }).length;
     $("replyBadge").hidden = !nr; $("replyBadge").textContent = nr;
 
-    var c = s.byStatus || {}, started = (s.total || 0) - (c["new"] || 0) - (c["skipped-country"] || 0) - (c["skipped-no-mailserver"] || 0) - (c["do-not-contact"] || 0) - (c["skipped-bad-address"] || 0);
+    var c = s.byStatus || {};
     $("cards").innerHTML = [
       ["Leads", s.total], ["Not yet contacted", s.remaining], ["In sequence", c.active || 0], ["Replied", c.replied || 0],
       ["Bounced", c.bounced || 0], ["Days to finish", s.daysLeft || "–"]
@@ -96,12 +97,13 @@
     $("problems").hidden = !s.problems.length;
     $("problemList").innerHTML = s.problems.map(function (p) { return "<li>" + esc(p) + "</li>"; }).join("");
 
-    $("mbTable").innerHTML = s.mailboxes.length ? "<tr><th>Mailbox</th><th>Today</th><th>First live send</th><th>Bounces</th><th>Password</th></tr>" + s.mailboxes.map(function (m) {
+    $("mbTable").innerHTML = s.mailboxes.length ? "<tr><th>Mailbox</th><th>Today</th><th>First live send</th><th>Bounces</th><th>Health</th><th>Warm-up mail</th><th>Password</th></tr>" + s.mailboxes.map(function (m) {
       var pct = m.todayLimit ? Math.min(100, Math.round(100 * m.sentToday / m.todayLimit)) : 0;
       return "<tr><td>" + esc(m.email) + (m.enabled ? "" : ' <span class="chip">off</span>') + (m.paused ? ' <span class="chip bounced">paused</span>' : "") + '</td><td><div class="bar"><b style="width:' + pct + '%"></b></div><span class="hint">' + m.sentToday + " of " + m.todayLimit + "</span></td><td>" +
-        esc(m.firstLiveSend || "not started") + "</td><td>" + m.bounceRate + "%</td><td>" + (m.passwordSet ? '<span class="ok">set</span>' : '<span class="warn">not set</span>') + "</td></tr>";
+        esc(m.firstLiveSend || "not started") + "</td><td>" + m.bounceRate + "%</td><td>" + healthChip(m.health) + "</td><td class='hint'>" + (m.placement ? m.placement.inbox + " inbox · " + m.placement.spam + " spam" : "–") + "</td><td>" + (m.passwordSet ? '<span class="ok">set</span>' : '<span class="warn">not set</span>') + "</td></tr>";
     }).join("") : '<tr><td class="empty">No mailbox yet. Add one in Settings.</td></tr>';
 
+    renderResults(); renderObjections(); renderInsights(); renderCampaignCards(); fillCampaignSelects();
     var vs = Object.keys(s.byVariant || {}).sort();
     $("abBox").innerHTML = vs.length ? "<table><tr><th>Version</th><th>Started</th><th>Replied</th><th>Rate</th></tr>" + vs.map(function (v) {
       var x = s.byVariant[v]; return "<tr><td>Email 1 · " + esc(v.toUpperCase()) + "</td><td>" + x.started + "</td><td>" + x.replied + "</td><td>" + (x.started ? (100 * x.replied / x.started).toFixed(1) : "0.0") + "%</td></tr>";
@@ -157,18 +159,40 @@
   }
 
   // ---------------------------------------------------------------- replies
+  var LABEL = { interested: "interested", question: "has a question", not_now: "not now", not_interested: "not interested", out_of_office: "out of office", wrong_person: "wrong person", unsubscribe: "asked to stop", other: "other" };
+  var POSITIVE = ["interested", "question"];
+  var healthChip = function (h) { return typeof h === "number" ? '<span class="' + (h >= 80 ? "ok" : h >= 50 ? "warn" : "bad") + '">' + h + "/100</span>" : "–"; };
   function renderReplies() {
-    var rs = state.status.replied;
+    var f = $("replyFilter").value;
+    var rs = state.status.replied.filter(function (r) {
+      return !f || (f === "positive" ? POSITIVE.indexOf(r.label) >= 0 : f === "unlabelled" ? !r.label : f === "other" ? r.label === "other" || r.label === "out_of_office" || r.label === "unsubscribe" : r.label === f);
+    });
+    $("replyCount").textContent = rs.length + " of " + state.status.replied.length;
     $("replyList").innerHTML = rs.length ? rs.map(function (r) {
       var late = !r.loomSent && r.repliedAt && Date.now() - new Date(r.repliedAt).getTime() > 24 * 36e5;
-      return '<div class="reply"><div><div class="who">' + esc(r.store || r.domain) + '</div><div class="meta">' + esc(r.email) + " · via " + esc(r.mailbox || "?") + (r.repliedAt ? " · " + esc(ago(r.repliedAt)) : "") + "</div>" +
+      var pos = POSITIVE.indexOf(r.label) >= 0 || r.label === "not_now" || r.label === "wrong_person";
+      return '<div class="reply"><div><div class="who">' + esc(r.store || r.domain) + (r.label ? ' <span class="chip lab-' + esc(r.label) + '">' + esc(LABEL[r.label] || r.label) + "</span>" : "") + (r.outcome ? ' <span class="chip high">' + esc(r.outcome.replace("_", " ")) + "</span>" : "") + '</div><div class="meta">' + esc(r.email) + " · via " + esc(r.mailbox || "?") + (r.repliedAt ? " · " + esc(ago(r.repliedAt)) : "") + "</div>" +
+        (r.summary || r.snippet ? '<div class="meta" style="color:var(--text);margin-top:4px">' + esc(r.summary || r.snippet) + "</div>" : "") +
         clickLine(r.clicks) +
+        (r.draft ? '<div class="draft"><b>Suggested reply</b> (review it before sending)\n' + esc(r.draft) + "</div>" : "") +
         (late ? '<div class="bad" style="font-size:13px">Over 24 hours — send the video now</div>' : "") + '</div><div class="acts">' +
         '<button class="btn sm" data-reply="' + esc(r.email) + '">Reply</button>' +
+        (r.draft ? '<button class="btn sm primary" data-usedraft="' + esc(r.email) + '">Use suggested reply</button>' : pos && state.status.ai && state.status.ai.configured ? '<button class="btn sm" data-draft="' + esc(r.email) + '">Suggest a reply</button>' : "") +
+        '<select data-outcome="' + esc(r.email) + '" style="font-size:13px"><option value="">Outcome…</option><option value="meeting_booked"' + (r.outcome === "meeting_booked" ? " selected" : "") + '>Meeting booked</option><option value="won"' + (r.outcome === "won" ? " selected" : "") + '>Won</option><option value="lost"' + (r.outcome === "lost" ? " selected" : "") + '>Lost</option><option value="clear_outcome">Clear</option></select>' +
         '<label class="check" style="font-size:13px"><input type="checkbox" data-loom="' + esc(r.email) + '"' + (r.loomSent ? " checked" : "") + "> Video sent</label></div></div>";
-    }).join("") : '<p class="empty">No replies yet. When someone answers, the sequence stops for them automatically.</p>';
+    }).join("") : '<p class="empty">' + (state.status.replied.length ? "No replies match this filter." : "No replies yet. When someone answers, the sequence stops for them automatically.") + "</p>";
     renderScheduled();
   }
+  $("replyFilter").addEventListener("change", renderReplies);
+  $("replyList").addEventListener("click", function (e) {
+    var u = e.target.closest("button[data-usedraft]"), d = e.target.closest("button[data-draft]");
+    if (u) { var r = state.status.replied.filter(function (x) { return x.email === u.dataset.usedraft; })[0]; openReply(u.dataset.usedraft); if (r && r.draft) ed.innerHTML = textToHtml(r.draft); }
+    if (d) { d.disabled = true; d.textContent = "Writing…"; api("POST", "/api/outreach/ai/draft", { email: d.dataset.draft }).then(function () { toast("Suggested reply ready"); return refresh(); }).catch(function (err) { fail(err); d.disabled = false; d.textContent = "Suggest a reply"; }); }
+  });
+  $("replyList").addEventListener("change", function (e) {
+    var em = e.target.getAttribute("data-outcome"); if (!em || !e.target.value) return;
+    api("POST", "/api/outreach/leads/action", { email: em, action: e.target.value }).then(function () { toast("Saved"); return refresh(); }).catch(fail);
+  });
   // Reply window: sends from the mailbox that emailed them, in the same thread; or schedules it for later.
   var replyTo = null;
   var pad = function (n) { return (n < 10 ? "0" : "") + n; };
@@ -350,11 +374,11 @@
   var STATUSES = ["new", "active", "finished", "replied", "unsubscribed", "bounced", "do-not-contact", "skipped-bad-address", "skipped-country", "skipped-no-mailserver"];
   $("leadStatus").innerHTML += STATUSES.map(function (s) { return '<option value="' + s + '">' + s + "</option>"; }).join("") + '<option value="clicked">clicked a link</option>';
   function loadLeads() {
-    var q = new URLSearchParams({ q: $("leadQ").value, status: $("leadStatus").value, limit: PAGE, offset: state.leadPage * PAGE });
+    var q = new URLSearchParams({ q: $("leadQ").value, status: $("leadStatus").value, campaign: $("leadCampaign").value, limit: PAGE, offset: state.leadPage * PAGE });
     api("GET", "/api/outreach/leads?" + q).then(function (r) {
-      $("leadTable").innerHTML = r.rows.length ? "<tr><th>Store</th><th>Email</th><th>Country</th><th>Status</th><th>Emails sent</th><th>Last sent</th><th>Next</th><th>Clicks</th><th>Mailbox</th><th>Ver.</th></tr>" + r.rows.map(function (t) {
+      $("leadTable").innerHTML = r.rows.length ? "<tr><th>Store</th><th>Email</th><th>Place</th><th>Campaign</th><th>Score</th><th>Status</th><th>Emails sent</th><th>Last sent</th><th>Next</th><th>Clicks</th><th>Mailbox</th><th>Ver.</th></tr>" + r.rows.map(function (t) {
         var sent = Number(t.step) || 0;
-        return "<tr><td>" + esc(t.store || t.domain) + "</td><td>" + esc(t.email) + "</td><td>" + esc(t.country) + '</td><td><span class="chip ' + esc(t.status) + '">' + esc(t.status === "skipped-bad-address" ? "set aside" : t.status) + "</span></td><td>" + (sent ? sent + " of 4" : "–") + "</td><td>" + esc((t.last_sent || "").slice(0, 10) || "–") + "</td><td class='hint'>" + esc(t.next || "") + (t.status === "skipped-bad-address" ? ' <button class="btn sm" data-restore="' + esc(t.email) + '">Restore</button>' : "") + "</td><td>" + (t.clicks ? '<span class="clicked">' + t.clicks + "</span>" : "–") + "</td><td>" + esc(t.mailbox) + "</td><td>" + esc((t.variant || "").toUpperCase()) + "</td></tr>";
+        return "<tr><td>" + esc(t.store || t.domain) + "</td><td>" + esc(t.email) + "</td><td>" + esc([t.city, t.state, t.country].filter(Boolean).join(", ")) + "</td><td>" + esc(campName(t.campaign)) + '</td><td title="' + esc(t.ai_score_reason || "") + '">' + esc(t.ai_score || "–") + '</td><td><span class="chip ' + esc(t.status) + '">' + esc(t.status === "skipped-bad-address" ? "set aside" : t.status) + "</span>" + (t.reply_label ? ' <span class="chip lab-' + esc(t.reply_label) + '">' + esc(LABEL[t.reply_label] || t.reply_label) + "</span>" : "") + (t.smtp === "catch-all" ? ' <span class="chip medium" title="This domain accepts any address, so the mailbox could not be verified">catch-all</span>' : "") + "</td><td>" + (sent ? sent + " of 4" : "–") + "</td><td>" + esc((t.last_sent || "").slice(0, 10) || "–") + "</td><td class='hint'>" + esc(t.next || "") + (t.snooze_until && t.status === "active" ? ' <button class="btn sm" data-unsnooze="' + esc(t.email) + '">Resume now</button>' : "") + (t.status === "skipped-bad-address" ? ' <button class="btn sm" data-restore="' + esc(t.email) + '">Restore</button>' : "") + "</td><td>" + (t.clicks ? '<span class="clicked">' + t.clicks + "</span>" : "–") + "</td><td>" + esc(t.mailbox) + "</td><td>" + esc((t.variant || "").toUpperCase()) + "</td></tr>";
       }).join("") : '<tr><td class="empty">No leads match.</td></tr>';
       var from = r.total ? state.leadPage * PAGE + 1 : 0;
       $("pgInfo").textContent = from + "–" + Math.min(r.total, (state.leadPage + 1) * PAGE) + " of " + r.total;
@@ -362,6 +386,7 @@
     }).catch(fail);
   }
   var qT; $("leadQ").addEventListener("input", function () { clearTimeout(qT); qT = setTimeout(function () { state.leadPage = 0; loadLeads(); }, 250); });
+  $("leadCampaign").addEventListener("change", function () { state.leadPage = 0; loadLeads(); });
   $("leadStatus").addEventListener("change", function () { state.leadPage = 0; loadLeads(); });
   $("prevPg").addEventListener("click", function () { state.leadPage--; loadLeads(); });
   $("nextPg").addEventListener("click", function () { state.leadPage++; loadLeads(); });
@@ -450,11 +475,11 @@
   });
 
   // ---------------------------------------------------------------- list cleaner
-  var KIND = { syntax: "invalid address", junk: "scraped junk", disposable: "throwaway domain", typo: "typo", system: "system address", placeholder: "placeholder", "no-mail-server": "domain can't receive mail", role: "shared mailbox" };
+  var KIND = { syntax: "invalid address", junk: "scraped junk", disposable: "throwaway domain", typo: "typo", system: "system address", placeholder: "placeholder", "no-mail-server": "domain can't receive mail", "smtp-invalid": "mailbox doesn't exist", role: "shared mailbox" };
   var cleanTimer;
   $("cleanBtn").addEventListener("click", function () {
     $("cleanBox").hidden = false; $("cleanBody").innerHTML = '<p class="hint">Starting…</p>';
-    api("POST", "/api/outreach/leads/clean/start", {}).then(pollClean).catch(function (e) { if (/already/i.test(e.message)) pollClean(); else { fail(e); $("cleanBox").hidden = true; } });
+    api("POST", "/api/outreach/leads/clean/start", { smtp: $("smtpChk").checked }).then(pollClean).catch(function (e) { if (/already/i.test(e.message)) pollClean(); else { fail(e); $("cleanBox").hidden = true; } });
   });
   function pollClean() {
     clearTimeout(cleanTimer);
@@ -469,6 +494,7 @@
     var c = r.counts, kinds = Object.keys(c.byKind).map(function (k) { return c.byKind[k] + " " + (KIND[k] || k); }).join(", ");
     if (!c.total) { $("cleanBody").innerHTML = '<p class="hint">No leads are waiting to be emailed, so there is nothing to clean. Import leads first.</p><button class="btn sm" id="cleanClose">Close</button>'; return; }
     $("cleanBody").innerHTML = '<p><b>' + c.total + "</b> leads are waiting. <span class='ok'>" + c.ok + " look fine.</span></p>" +
+      (c.smtpInvalid !== undefined ? '<p class="hint">SMTP check: ' + c.smtpInvalid + " mailbox" + (c.smtpInvalid === 1 ? "" : "es") + " do not exist; " + c.catchAll + " domain" + (c.catchAll === 1 ? " is a catch-all" : "s are catch-alls") + " (kept, marked). Mail servers that would not answer count as unknown and are left alone.</p>" : "") +
       (already ? '<p class="hint">' + already + " more were already set aside when you imported (filter the list by “skipped-bad-address” to see them).</p>" : "") +
       "<p>" + (c.remove ? '<span class="bad">' + c.remove + " will be skipped</span> (" + esc(kinds) + ")" : "<span class='ok'>No bad addresses found.</span>") + "</p>" +
       (c.role ? '<p><span class="warn">' + c.role + ' shared mailboxes</span> (info@, sales@ …) are kept unless you tick: <label class="check" style="display:inline-flex;margin-left:6px"><input type="checkbox" id="skipRoles"> skip these too</label></p>' : "") +
@@ -508,7 +534,8 @@
   // ---------------------------------------------------------------- templates
   function tplLabel(t) { return "Email " + t.step + (t.step === 1 ? " · version " + t.variant.toUpperCase() : ""); }
   function loadTemplates() {
-    return api("GET", "/api/outreach/templates").then(function (r) {
+    $("tplCampaign").value = state.tplCampaign || "";
+    return api("GET", "/api/outreach/templates" + (state.tplCampaign ? "?campaign=" + encodeURIComponent(state.tplCampaign) : "")).then(function (r) {
       state.templates = r.templates; state.fields = r.fields;
       if (!state.tpl || !r.templates.some(function (t) { return t.name === state.tpl; })) state.tpl = r.templates[0] && r.templates[0].name;
       $("fieldChips").innerHTML = '<span class="hint">Insert:</span>' + r.fields.filter(function (f) { return ["psi", "lcp", "speed_line", "sender_name", "niche", "country", "first_name"].indexOf(f) < 0; }).map(function (f) { return '<span class="chip field-chip" data-f="' + f + '">{' + f + "}</span>"; }).join("");
@@ -525,6 +552,7 @@
     state.tpl = name; var t = state.templates.filter(function (x) { return x.name === name; })[0]; if (!t) return;
     $("tplText").value = t.text; $("tplReset").hidden = !t.edited; renderTplList(); previewTpl();
   }
+  $("tplCampaign").addEventListener("change", function () { state.tplCampaign = this.value; state.tpl = null; loadTemplates(); });
   $("tplList").addEventListener("click", function (e) { var b = e.target.closest("button[data-t]"); if (b) selectTpl(b.dataset.t); });
   $("fieldChips").addEventListener("click", function (e) {
     var f = e.target.getAttribute("data-f"); if (!f) return; var ta = $("tplText"), s = ta.selectionStart, en = ta.selectionEnd;
@@ -540,11 +568,11 @@
     }).catch(function (e) { $("pvSubject").textContent = ""; $("pvFrame").srcdoc = ""; $("tplStats").innerHTML = '<span class="bad">' + esc(e.message) + "</span>"; });
   }
   $("tplSave").addEventListener("click", function () {
-    api("PUT", "/api/outreach/templates", { name: state.tpl, text: $("tplText").value }).then(function () { toast("Saved"); return loadTemplates(); }).catch(fail);
+    api("PUT", "/api/outreach/templates", { name: state.tpl, text: $("tplText").value, campaign: state.tplCampaign || undefined }).then(function () { toast("Saved"); return loadTemplates(); }).catch(fail);
   });
   $("tplReset").addEventListener("click", function () {
     if (!confirm("Discard your edits and go back to the default text?")) return;
-    api("DELETE", "/api/outreach/templates?name=" + encodeURIComponent(state.tpl), {}).then(function () { toast("Reset"); return loadTemplates(); }).catch(fail);
+    api("DELETE", "/api/outreach/templates?name=" + encodeURIComponent(state.tpl) + (state.tplCampaign ? "&campaign=" + encodeURIComponent(state.tplCampaign) : ""), {}).then(function () { toast("Reset"); return loadTemplates(); }).catch(fail);
   });
   $("queueBtn").addEventListener("click", function () {
     api("GET", "/api/outreach/preview?n=3").then(function (r) {
@@ -560,6 +588,7 @@
     return '<div class="mb" data-id="' + esc(m.id || "") + '"><div class="mb-head"><span class="mb-title">' + (m.id ? "Mailbox " + esc(m.id) : "New mailbox") + '</span><button type="button" class="btn sm danger" data-rm="1">Remove</button></div><div class="row">' +
       '<div class="field"><label>Email address</label><input type="email" data-k="email" value="' + esc(m.email || "") + '" placeholder="hassan@getweberslink.com"></div>' +
       '<div class="field"><label>Sender name</label><input type="text" data-k="from_name" value="' + esc(m.from_name || "") + '"></div></div>' +
+      '<div class="field"><label>Job title <span class="hint">(blank for none; used only when the sender name differs from yours in Signature)</span></label><input type="text" data-k="title" value="' + esc(m.title || "") + '" maxlength="100"></div>' +
       '<div class="row"><div class="field"><label>SMTP host / port</label><div style="display:flex;gap:8px"><input type="text" data-k="smtp_host" value="' + esc(m.smtp_host || "smtp.hostinger.com") + '"><input type="number" data-k="smtp_port" value="' + esc(m.smtp_port || 465) + '" style="width:90px"></div></div>' +
       '<div class="field"><label>IMAP host / port</label><div style="display:flex;gap:8px"><input type="text" data-k="imap_host" value="' + esc(m.imap_host || "imap.hostinger.com") + '"><input type="number" data-k="imap_port" value="' + esc(m.imap_port || 993) + '" style="width:90px"></div></div></div>' +
       '<label class="check"><input type="checkbox" data-k="enabled"' + (m.enabled === false ? "" : " checked") + '> Use this mailbox</label><p class="hint" style="margin-top:8px">Password variable on the server: <code>' + (m.id ? "OUTREACH_PASSWORD_" + esc(m.id) : "OUTREACH_PASSWORD_(number shown after saving)") + "</code></p></div>";
@@ -572,6 +601,10 @@
       $("x_ramp").value = s.ramp.join(","); $("x_limit").value = s.daily_limit; $("x_gaps").value = s.followup_gaps_days.join(","); $("x_bounce").value = s.bounce_pause_percent;
       $("x_win").checked = s.window_enabled; $("x_wstart").value = s.window_start; $("x_wend").value = s.window_end; $("x_min").value = s.min_delay_seconds; $("x_max").value = s.max_delay_seconds; $("x_html").checked = s.html_emails; $("x_mx").checked = s.check_mx; $("x_live").checked = !s.dry_run; $("x_auto").checked = s.auto_run !== false; $("x_track").checked = s.track_clicks !== false;
       $("mbList").innerHTML = c.mailboxes.map(mbBlock).join("");
+      var a = c.ai || {}, w = c.warmup || {};
+      $("a_icp").value = a.icp || ""; $("a_book").value = a.booking_link || ""; $("a_offer").value = a.offer || ""; $("a_min").value = a.min_score || 0; $("a_hook").value = a.webhook_url || "";
+      $("a_classify").checked = a.classify_replies !== false; $("a_draft").checked = a.draft_replies !== false; $("a_prio").checked = a.prioritise_by_score !== false;
+      $("w_on").checked = !!w.enabled; $("w_per").value = w.per_day || 4; $("w_reply").value = w.reply_percent == null ? 60 : w.reply_percent;
     }).catch(fail);
   }
   $("addMb").addEventListener("click", function () { var n = $("mbList").children.length; if (n >= 10) return; $("mbList").insertAdjacentHTML("beforeend", mbBlock(null, n)); });
@@ -588,9 +621,143 @@
       sending: { notify_email: $("x_notify").value, send_days: $("x_days").value, timezone: $("x_tz").value, countries: $("x_countries").value, ramp: $("x_ramp").value, daily_limit: $("x_limit").value,
         followup_gaps_days: $("x_gaps").value, bounce_pause_percent: $("x_bounce").value, min_delay_seconds: $("x_min").value, max_delay_seconds: $("x_max").value,
         window_enabled: $("x_win").checked, window_start: $("x_wstart").value, window_end: $("x_wend").value, html_emails: $("x_html").checked, check_mx: $("x_mx").checked, dry_run: !live, auto_run: $("x_auto").checked, track_clicks: $("x_track").checked, check_inbox_in_dry_run: state.config ? state.config.sending.check_inbox_in_dry_run : false },
-      mailboxes: boxes
+      mailboxes: boxes,
+      ai: { icp: $("a_icp").value, booking_link: $("a_book").value, offer: $("a_offer").value, min_score: $("a_min").value, webhook_url: $("a_hook").value, classify_replies: $("a_classify").checked, draft_replies: $("a_draft").checked, prioritise_by_score: $("a_prio").checked },
+      warmup: { enabled: $("w_on").checked, per_day: $("w_per").value, reply_percent: $("w_reply").value }
     };
     api("PUT", "/api/outreach/config", body).then(function (r) { state.config = r.config; toast("Settings saved"); loadSettings(); refresh(); }).catch(fail);
+  });
+
+  // ---------------------------------------------------------------- campaigns
+  var camps = function () { return (state.status && state.status.campaigns) || []; };
+  function campName(id) { if (!id) return camps().length ? "none" : "–"; var c = camps().filter(function (x) { return String(x.id) === String(id); })[0]; return c ? c.name : "(removed)"; }
+  function fillCampaignSelects() {
+    var opts = camps().map(function (c) { return '<option value="' + c.id + '">' + esc(c.name) + "</option>"; }).join("");
+    var lc = $("leadCampaign"), cur = lc.value;
+    lc.innerHTML = '<option value="">All campaigns</option>' + opts + (camps().length ? '<option value="none">No campaign</option>' : ""); lc.value = cur;
+    var tc = $("tplCampaign"), tcur = state.tplCampaign || "";
+    tc.innerHTML = '<option value="">Everyone (default)</option>' + opts; tc.value = tcur;
+    $("tplCampBar").hidden = !camps().length;
+  }
+  function renderInsights() {
+    var ins = (state.status && state.status.insights) || [];
+    $("insightBox").hidden = !ins.length;
+    $("insightList").innerHTML = ins.map(function (i) { return '<li class="' + (i.level === "bad" ? "bad" : i.level === "warn" ? "warn" : "") + '">' + esc(i.text) + "</li>"; }).join("");
+  }
+  function renderCampaignCards() {
+    var cs = camps(); $("campBox").hidden = !cs.length;
+    $("campTable").innerHTML = cs.length ? "<tr><th>Campaign</th><th>Waiting</th><th>In sequence</th><th>Today</th><th>Replies</th><th>Positive</th><th>Bounces</th><th>Finishes in</th></tr>" + cs.map(function (c) {
+      var where = [].concat(c.countries, c.states, c.cities).join(", ") || "anywhere", what = c.types.join(", ") || "any business";
+      return "<tr><td>" + esc(c.name) + (c.enabled ? "" : ' <span class="chip">paused</span>') + '<div class="hint">' + esc(where + " · " + what) + "</div></td><td>" + c.waiting + "</td><td>" + c.active + "</td><td>" + c.sentToday + (c.daily_limit ? " of " + c.daily_limit : "") + "</td><td>" + c.replied + " <span class='hint'>(" + c.replyRate + "%)</span></td><td>" + c.positive + "</td><td>" + c.bounceRate + "%</td><td>" + (c.daysLeft ? c.daysLeft + " day" + (c.daysLeft === 1 ? "" : "s") : "–") + "</td></tr>";
+    }).join("") : "";
+  }
+  $("campBox").addEventListener("click", function (e) { var b = e.target.closest("[data-view-go]"); if (b) go(b.dataset.viewGo); });
+  var campOpts = null, campMbs = [];
+  var FILTERS = [["countries", "Countries", "US, UK"], ["states", "States / regions", "TX, Florida"], ["cities", "Cities", "Austin, Dallas"], ["types", "Business types", "roofing, hvac, dentist"]];
+  function campBlock(c) {
+    c = c || {};
+    var f = FILTERS.map(function (k) {
+      var sug = ((campOpts || {})[k[0]] || []).slice(0, 8).map(function (o) { return '<span class="chip field-chip" data-add="' + k[0] + '" data-v="' + esc(o.value) + '">' + esc(o.value) + " · " + o.count + "</span>"; }).join(" ");
+      return '<div class="field"><label>' + k[1] + '</label><input type="text" data-f="' + k[0] + '" value="' + esc(Array.isArray(c[k[0]]) ? c[k[0]].join(", ") : c[k[0]] || "") + '" placeholder="' + k[2] + '"><div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">' + sug + "</div></div>";
+    });
+    var mbs = campMbs.map(function (m) { return '<label class="check" style="margin-right:14px"><input type="checkbox" data-mb="' + m.id + '"' + ((c.mailboxes || []).indexOf(m.id) >= 0 ? " checked" : "") + "> " + esc(m.email) + "</label>"; }).join("");
+    return '<div class="mb camp" data-id="' + esc(c.id || "") + '"><div class="mb-head"><input type="text" data-n="name" value="' + esc(c.name || "") + '" placeholder="Campaign name, e.g. Texas roofers" maxlength="60" style="max-width:340px;font-weight:600">' +
+      '<span style="flex:1"></span><label class="check"><input type="checkbox" data-n="enabled"' + (c.enabled === false ? "" : " checked") + '> On</label>' +
+      '<button type="button" class="btn sm" data-mv="-1" title="Earlier: fits leads first">↑</button><button type="button" class="btn sm" data-mv="1" title="Later">↓</button><button type="button" class="btn sm danger" data-rmc="1">Remove</button></div>' +
+      '<div class="row">' + f.slice(0, 2).join("") + '</div><div class="row">' + f.slice(2).join("") + "</div>" +
+      '<div class="row"><div class="field"><label>Send from <span class="hint">(none ticked = every mailbox)</span></label><div>' + (mbs || '<span class="hint">Add mailboxes in Settings first.</span>') + '</div></div><div class="field"><label>Daily limit for this campaign <span class="hint">(0 = only the mailboxes\' limits)</span></label><input type="number" data-n="daily_limit" min="0" max="1000" value="' + esc(c.daily_limit || 0) + '"></div></div>' +
+      '<p class="hint cp" style="margin:6px 0">Checking…</p>' + (c.id ? '<button type="button" class="btn sm" data-emails="' + esc(c.id) + '">Edit emails for this campaign</button>' : '<span class="hint">Save to give it its own emails.</span>') + "</div>";
+  }
+  function collectCamps() {
+    return [].map.call($("campList").querySelectorAll(".camp"), function (el) {
+      var c = { id: el.dataset.id ? Number(el.dataset.id) : undefined, name: el.querySelector('[data-n="name"]').value, enabled: el.querySelector('[data-n="enabled"]').checked, daily_limit: el.querySelector('[data-n="daily_limit"]').value,
+        mailboxes: [].map.call(el.querySelectorAll("[data-mb]:checked"), function (i) { return Number(i.dataset.mb); }) };
+      el.querySelectorAll("[data-f]").forEach(function (i) { c[i.dataset.f] = i.value; });
+      return c;
+    });
+  }
+  function renderCamps(list) {
+    $("campList").innerHTML = list.length ? list.map(campBlock).join("") : '<p class="empty">No campaigns yet. Add one to email a place or business type on its own.</p>';
+    $("campIntro").textContent = campOpts && campOpts.total ? "Your " + campOpts.total + " leads: click a suggestion under a box to add it." : "Import leads first, then build campaigns from the places and business types in them.";
+    [].forEach.call($("campList").querySelectorAll(".camp"), previewCamp);
+  }
+  function loadCampaigns() {
+    api("GET", "/api/outreach/campaigns").then(function (r) { campOpts = r.options; campMbs = r.mailboxes; renderCamps(r.campaigns); }).catch(fail);
+  }
+  var cpT = {};
+  function previewCamp(el) {
+    var c = collectCamps()[[].indexOf.call($("campList").querySelectorAll(".camp"), el)], out = el.querySelector(".cp");
+    api("POST", "/api/outreach/campaigns/preview", { filters: c, id: c.id }).then(function (r) {
+      out.innerHTML = "<b>" + r.total + "</b> lead" + (r.total === 1 ? "" : "s") + " match, <b>" + r.waiting + "</b> still waiting to be emailed" + (r.claimed ? ' <span class="warn">(' + r.claimed + " already belong to a campaign above)</span>" : "") +
+        (r.sample.length ? '<br><span class="hint">e.g. ' + r.sample.map(function (s) { return esc(s.store + (s.place ? " (" + s.place + ")" : "")); }).join(" · ") + "</span>" : "");
+    }).catch(function () { out.textContent = ""; });
+  }
+  $("campList").addEventListener("input", function (e) {
+    var el = e.target.closest(".camp"); if (!el || !e.target.dataset.f) return;
+    clearTimeout(cpT[el.dataset.id || "new"]); cpT[el.dataset.id || "new"] = setTimeout(function () { previewCamp(el); }, 350);
+  });
+  $("campList").addEventListener("change", function (e) { var el = e.target.closest(".camp"); if (el && (e.target.dataset.mb || e.target.dataset.n)) previewCamp(el); });
+  $("campList").addEventListener("click", function (e) {
+    var el = e.target.closest(".camp"); if (!el) return;
+    var add = e.target.closest("[data-add]"), mv = e.target.closest("[data-mv]"), rm = e.target.closest("[data-rmc]"), em = e.target.closest("[data-emails]");
+    if (add) { var inp = el.querySelector('[data-f="' + add.dataset.add + '"]'), have = inp.value.split(",").map(function (x) { return x.trim().toLowerCase(); }); if (have.indexOf(add.dataset.v.toLowerCase()) < 0) inp.value = (inp.value.trim() ? inp.value.trim().replace(/,$/, "") + ", " : "") + add.dataset.v; previewCamp(el); }
+    if (mv) { var list = collectCamps(), i = [].indexOf.call($("campList").querySelectorAll(".camp"), el), j = i + Number(mv.dataset.mv); if (j >= 0 && j < list.length) { var t = list[i]; list[i] = list[j]; list[j] = t; renderCamps(list); } }
+    if (rm && confirm("Remove this campaign? Its leads that are still waiting stop being emailed unless another campaign fits them.")) { var l2 = collectCamps(); l2.splice([].indexOf.call($("campList").querySelectorAll(".camp"), el), 1); renderCamps(l2); }
+    if (em) { state.tplCampaign = em.dataset.emails; state.tpl = null; go("templates"); }
+  });
+  $("addCamp").addEventListener("click", function () { var l = collectCamps(); if (l.length >= 20) return; l.push({ name: "", enabled: true }); renderCamps(l); });
+  $("saveCamps").addEventListener("click", function () {
+    api("PUT", "/api/outreach/campaigns", { campaigns: collectCamps() }).then(function (r) { toast("Campaigns saved"); $("campMsg").textContent = ""; renderCamps(r.campaigns); refresh(); }).catch(fail);
+  });
+
+  // ---------------------------------------------------------------- results, objections, scoring, warm-up, copy check
+  function renderResults() {
+    var an = state.status.analytics || {}, labs = an.labels || {}, steps = an.byStep || {};
+    var cards = [["Positive replies", an.positive || 0], ["Meetings booked", an.meetings || 0], ["Won", an.won || 0], ["Referrals added", an.referrals || 0], ["Paused (out of office)", an.snoozed || 0], ["Leads scored", an.scored || 0]]
+      .map(function (x) { return '<div class="card"><div class="n">' + x[1] + '</div><div class="l">' + esc(x[0]) + "</div></div>"; }).join("");
+    var lt = Object.keys(labs).length ? "<table><tr><th>What they said</th><th>Replies</th></tr>" + Object.keys(labs).sort(function (a, b) { return labs[b] - labs[a]; }).map(function (k) { return '<tr><td><span class="chip lab-' + esc(k) + '">' + esc(LABEL[k] || k) + "</span></td><td>" + labs[k] + "</td></tr>"; }).join("") + "</table>" : '<p class="empty">Replies are labelled once Gemini is set up and someone answers.</p>';
+    var st = Object.keys(steps).some(function (k) { return steps[k].reached; }) ? "<table><tr><th>Email</th><th>Reached</th><th>Replies</th><th>Positive</th><th>Reply rate</th></tr>" + Object.keys(steps).map(function (k) { var x = steps[k]; return "<tr><td>Email " + k + "</td><td>" + x.reached + "</td><td>" + x.replied + "</td><td>" + x.positive + "</td><td>" + (x.reached ? (100 * x.replied / x.reached).toFixed(1) : "0.0") + "%</td></tr>"; }).join("") + "</table>" : "";
+    var mb = Object.keys(state.status.byMailbox || {}).filter(function (k) { return k !== "?"; });
+    var mt = mb.length ? "<table><tr><th>Mailbox</th><th>Started</th><th>Replies</th><th>Positive</th><th>Bounced</th></tr>" + mb.map(function (k) { var x = state.status.byMailbox[k]; return "<tr><td>" + esc(k) + "</td><td>" + x.started + "</td><td>" + x.replied + "</td><td>" + (x.positive || 0) + "</td><td>" + x.bounced + "</td></tr>"; }).join("") + "</table>" : "";
+    $("resultsBody").innerHTML = '<div class="cards" style="margin-bottom:14px">' + cards + '</div><div class="grid2"><div>' + lt + "</div><div>" + st + "</div></div>" + (mt ? '<div style="margin-top:14px">' + mt + "</div>" : "");
+  }
+  function renderObjections() {
+    var o = state.status.ai && state.status.ai.objections;
+    $("objBody").innerHTML = o && o.themes && o.themes.length ? "<p>" + esc(o.summary) + '</p><table><tr><th>Theme</th><th>Replies</th><th>What to change</th></tr>' + o.themes.map(function (t) { return "<tr><td>" + esc(t.theme) + "</td><td>" + t.count + "</td><td class='hint'>" + esc(t.advice) + "</td></tr>"; }).join("") + '</table><p class="hint" style="margin-top:8px">From ' + o.replies + " replies · " + esc(ago(o.at)) + "</p>" : '<p class="empty">Needs at least 3 labelled “no” or “not now” replies.</p>';
+  }
+  $("objBtn").addEventListener("click", function () {
+    var b = this; b.disabled = true; b.textContent = "Reading replies…";
+    api("POST", "/api/outreach/ai/objections", {}).then(function () { return refresh(); }).catch(fail).then(function () { b.disabled = false; b.textContent = "Summarise objections"; });
+  });
+  var scoreTimer;
+  function pollScore() {
+    clearTimeout(scoreTimer);
+    api("GET", "/api/outreach/ai/status").then(function (s) {
+      var j = s.job || {};
+      $("scoreInfo").textContent = j.running ? "Scoring " + j.done + " of " + j.total + "…" : (j.kind === "score" && j.message ? j.message + " (" + j.ok + " scored" + (j.failed ? ", " + j.failed + " failed" : "") + ")" : "");
+      if (j.running) scoreTimer = setTimeout(pollScore, 2000); else loadLeads();
+    }).catch(function () {});
+  }
+  $("scoreBtn").addEventListener("click", function () {
+    api("POST", "/api/outreach/ai/score/start", { limit: 50 }).then(function () { toast("Scoring started"); pollScore(); }).catch(function (e) { if (/already/i.test(e.message)) pollScore(); else fail(e); });
+  });
+  $("leadTable").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-unsnooze]"); if (!b) return;
+    api("POST", "/api/outreach/leads/action", { email: b.dataset.unsnooze, action: "clear_snooze" }).then(function () { toast("Follow-ups resume on the next run"); loadLeads(); }).catch(fail);
+  });
+  $("wuRun").addEventListener("click", function () {
+    var b = this; b.disabled = true; $("wuInfo").textContent = "Running… this takes a few minutes (messages are spaced out like a person's).";
+    api("POST", "/api/outreach/warmup/run", {}).then(function (r) {
+      $("wuInfo").textContent = r.skipped ? "Skipped: " + r.skipped : "Sent " + r.sent + ", answered " + r.replied + "; landed in inbox " + r.inbox + ", in spam " + r.spam + ".";
+    }).catch(function (e) { $("wuInfo").textContent = ""; fail(e); }).then(function () { b.disabled = false; });
+  });
+  $("tplCheck").addEventListener("click", function () {
+    var b = this; b.disabled = true;
+    api("POST", "/api/outreach/templates/check", { text: $("tplText").value, step: Number((state.tpl || "email1.txt")[5]) || 1, ai: $("tplCheckAi").checked }).then(function (r) {
+      var iss = r.issues.map(function (i) { return '<li class="' + (i.level === "bad" ? "bad" : "warn") + '">' + esc(i.text) + "</li>"; }).join("");
+      $("copyCheckOut").innerHTML = '<p><b class="' + (r.score >= 8 ? "ok" : r.score >= 5 ? "warn" : "bad") + '">Score ' + r.score + "/10</b> · " + r.stats.words + " words · " + r.stats.links + " link" + (r.stats.links === 1 ? "" : "s") + "</p>" + (iss ? "<ul>" + iss + "</ul>" : '<p class="ok">No problems found.</p>') +
+        (r.ai ? "<p><b>Gemini: " + r.ai.score + "/10</b></p>" + (r.ai.issues.length ? "<ul>" + r.ai.issues.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") + (r.ai.suggestions.length ? '<p class="hint">Suggestions</p><ul>' + r.ai.suggestions.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") : "") + (r.aiError ? '<p class="warn">Gemini review unavailable: ' + esc(r.aiError) + "</p>" : "");
+    }).catch(fail).then(function () { b.disabled = false; });
   });
 
   // ---------------------------------------------------------------- data + backup

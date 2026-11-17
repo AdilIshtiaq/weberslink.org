@@ -99,6 +99,8 @@ input[type=color]{width:44px;height:36px;padding:2px;background:var(--panel-2);b
 .toolbar select{width:auto}
 .chip{display:inline-block;padding:2px 10px;border-radius:99px;font-size:12px;background:var(--panel-2);color:var(--dim);border:1px solid var(--line)}
 textarea.ai-line{width:100%;min-width:300px;resize:vertical;line-height:1.4}.chip.high{color:var(--ok)} .chip.medium{color:var(--warn)} .chip.skipped-bad-address{color:var(--warn)} .chip.replied{color:var(--accent);border-color:rgba(139,108,255,.4)} .chip.active{color:var(--ok)} .chip.bounced,.chip.unsubscribed,.chip.do-not-contact{color:var(--bad)}
+.chip.lab-interested,.chip.lab-question{color:var(--ok);border-color:rgba(74,222,128,.4)} .chip.lab-not_now,.chip.lab-out_of_office,.chip.lab-wrong_person{color:var(--warn)} .chip.lab-not_interested,.chip.lab-unsubscribe{color:var(--bad)}
+.draft{margin-top:8px;padding:10px 12px;border:1px dashed var(--line);border-radius:10px;font-size:13px;color:var(--dim);white-space:pre-wrap}
 .chip.field-chip{cursor:pointer;font-family:var(--mono)} .chip.field-chip:hover{color:var(--text);border-color:var(--text)}
 
 .reply{display:grid;grid-template-columns:1fr auto;gap:8px 16px;padding:14px 0;border-top:1px solid var(--line)}
@@ -177,6 +179,7 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
     <div class="brand"><img src="/assets/logo-icon.png" alt="" width="30" height="30" style="border-radius:8px">Outreach</div>
     <button class="nav-btn on" data-view="dashboard"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Dashboard</button>
     <button class="nav-btn" data-view="replies"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Replies<span class="badge" id="replyBadge" hidden></span></button>
+    <button class="nav-btn" data-view="campaigns"><svg viewBox="0 0 24 24"><path d="M12 21s-7-5.6-7-11a7 7 0 0 1 14 0c0 5.4-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>Campaigns</button>
     <button class="nav-btn" data-view="leads"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/></svg>Leads</button>
     <button class="nav-btn" data-view="templates"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 9l8 5 8-5"/></svg>Emails</button>
     <button class="nav-btn" data-view="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button>
@@ -197,19 +200,33 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
       <div class="panel problems" id="problems" hidden><h3>Fix these before live sending</h3><ul id="problemList"></ul></div>
       <div class="panel problems" id="dataWarn" hidden><h3>Protect your data</h3><ul id="dataWarnList"></ul></div>
       <div class="panel problems" id="heldBox" hidden><h3>Needs your check <small>a send was interrupted: look in your Sent folder, then choose</small></h3><div id="heldList"></div></div>
+      <div class="panel" id="insightBox" hidden><h3>Worth your attention</h3><ul id="insightList" style="margin:0;padding-left:18px;line-height:1.7"></ul></div>
       <div class="panel" id="lastRunBox" hidden><p id="lastRunText" style="margin:0"></p></div>
       <div class="panel" id="windowBox" hidden><p id="windowInfo" style="margin:0"></p></div>
       <div class="cards" id="cards"></div>
       <div class="panel" id="clickBox"><h3>Link clicks <small>people who clicked a link in your emails; mail scanners are filtered out</small></h3><div id="clickList"></div></div>
+      <div class="panel" id="campBox" hidden><h3>Campaigns <small>leads grouped by place and business type</small><button class="btn sm" style="margin-left:auto" data-view-go="campaigns">Manage</button></h3><div class="scroll"><table id="campTable"></table></div></div>
       <div class="panel"><h3>Mailboxes <small>each one warms up automatically</small></h3><div class="scroll"><table id="mbTable"></table></div></div>
       <div class="grid2">
         <div class="panel"><h3>Subject line test <small>change one thing at a time</small></h3><div id="abBox"></div></div>
         <div class="panel"><h3>Sequence progress</h3><div id="funnel"></div></div>
       </div>
+      <div class="panel"><h3>Results <small>replies by what people said, and which email got the answer</small></h3><div id="resultsBody"></div></div>
+      <div class="panel"><h3>Why people say no <small>Gemini groups the “not interested” and “not now” replies so you can fix the copy</small></h3><div id="objBody"></div><div class="toolbar" style="margin:10px 0 0"><button class="btn sm" id="objBtn">Summarise objections</button></div></div>
       <div class="panel"><h3>Run log <small id="lastRun"></small></h3><pre class="log" id="log">No activity yet.</pre></div>
     </section>
 
+    <section id="v-campaigns" hidden>
+      <div class="panel"><h3>Campaigns <small>each group of leads gets its own mailboxes, daily limit and, if you like, its own emails. A lead goes to the first campaign (top to bottom) that fits it.</small></h3>
+        <p class="hint" id="campIntro" style="margin:0 0 12px"></p>
+        <div id="campList"></div>
+        <div class="toolbar" style="margin:12px 0 0"><button class="btn sm" id="addCamp" type="button">Add campaign</button><button class="btn primary sm" id="saveCamps" type="button">Save campaigns</button><span class="hint" id="campMsg"></span></div>
+        <p class="hint" style="margin-top:12px">Leave a box empty to mean "any". Places come from your spreadsheet's <b>country</b>, <b>state</b> and <b>city</b> columns (state and city are also read from a US street address). Business types match as words inside the lead's category, niche, store name or website, so "roof" catches "Roofing contractor". Until you create a campaign, every lead is emailed; after that, only leads in a campaign that is switched on.</p>
+      </div>
+    </section>
+
     <section id="v-replies" hidden>
+      <div class="toolbar"><select id="replyFilter"><option value="">All replies</option><option value="positive">Interested or question</option><option value="not_now">Not now</option><option value="not_interested">Not interested</option><option value="wrong_person">Wrong person</option><option value="unlabelled">Not labelled</option></select><span class="hint" id="replyCount"></span></div>
       <div class="panel"><h3>People who replied <small>send each the free video audit within 24 hours</small></h3><div id="replyList"></div></div>
       <div class="panel" id="schedPanel" hidden><h3>Scheduled messages <small>sent automatically at the time you pick</small></h3><div id="schedList"></div></div>
     </section>
@@ -249,9 +266,11 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
       <div class="toolbar">
         <input type="search" id="leadQ" placeholder="Search store, email or domain">
         <select id="leadStatus"><option value="">All statuses</option></select>
+        <select id="leadCampaign"><option value="">All campaigns</option></select>
         <span style="flex:1"></span>
         <button class="btn sm" id="aiBtn">Personalise (Gemini)</button>
-        <button class="btn sm" id="cleanBtn">Clean list</button>
+        <button class="btn sm" id="scoreBtn">Score leads (Gemini)</button><span class="hint" id="scoreInfo"></span>
+        <button class="btn sm" id="cleanBtn">Clean list</button><label class="check" style="margin:0" title="Asks each store's mail server whether the mailbox exists. Needs outgoing port 25, which many hosts block (then it just says unknown)."><input type="checkbox" id="smtpChk"> SMTP check</label>
         <button class="btn sm" id="dncBtn">Never contact…</button>
         <button class="btn sm" id="rmBouncedBtn">Remove bounced</button>
         <a class="btn sm" href="/api/outreach/export?file=tracking" download>Export CSV</a>
@@ -265,6 +284,7 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
     </section>
 
     <section id="v-templates" hidden>
+      <div class="toolbar" id="tplCampBar"><label class="hint" for="tplCampaign">Emails for</label><select id="tplCampaign"><option value="">Everyone (default)</option></select><span class="hint">A campaign can have its own wording; anything you don't change there uses the default emails.</span></div>
       <div class="tpl">
         <div class="tpl-list" id="tplList"></div>
         <div>
@@ -272,6 +292,8 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
             <div class="field"><label>Email text <span class="hint">(first line is the subject)</span></label><textarea class="editor" id="tplText" spellcheck="true"></textarea></div>
             <div class="toolbar" id="fieldChips"></div>
             <div class="toolbar"><button class="btn primary sm" id="tplSave">Save</button><button class="btn sm" id="tplReset" hidden>Reset to default</button><span class="hint" id="tplStats"></span></div>
+            <div class="toolbar"><button class="btn sm" id="tplCheck">Check copy</button><label class="check" style="margin:0"><input type="checkbox" id="tplCheckAi"> also ask Gemini</label></div>
+            <div id="copyCheckOut"></div>
           </div>
           <div class="panel"><h3>Preview <small>sample store; the real email is personalised per lead</small></h3><p style="font-weight:600;margin-bottom:10px" id="pvSubject"></p><iframe class="preview" id="pvFrame" sandbox="" title="Email preview"></iframe></div>
           <div class="panel"><h3>Preview real leads <small>next emails in the queue, nothing is sent</small></h3><div id="queuePv"><button class="btn sm" id="queueBtn">Show next 3</button></div></div>
@@ -299,6 +321,28 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
           <div id="mbList"></div>
           <button type="button" class="btn sm" id="addMb">Add mailbox</button>
           <p class="hint" style="margin-top:12px">Passwords are never entered here. On the server, set one environment variable per mailbox, named as shown under each mailbox (for example <code>OUTREACH_PASSWORD_1</code>). Mail servers other than Hostinger must be listed in <code>OUTREACH_ALLOWED_HOSTS</code>.</p>
+        </div>
+
+        <div class="panel"><h3>Gemini and warm-up <small>Gemini needs <code>GEMINI_OUTREACH_KEY</code> on the server. It labels replies and suggests answers; it never sends anything.</small></h3>
+          <div class="field"><label>Your ideal customer <span class="hint">(used to score leads 1–10 and order the queue)</span></label><textarea id="a_icp" rows="3" maxlength="1200" placeholder="e.g. Online stores in the US/UK selling apparel or cosmetics, with a slow mobile site, a small team and no live chat."></textarea></div>
+          <div class="row">
+            <div class="field"><label>Booking link <span class="hint">(https, offered in AI reply drafts)</span></label><input type="url" id="a_book" placeholder="https://cal.com/you/15min"></div>
+            <div class="field"><label>What you offer <span class="hint">(one line, for drafts)</span></label><input type="text" id="a_offer" maxlength="200"></div>
+          </div>
+          <div class="row">
+            <div class="field"><label>Skip leads scoring below <span class="hint">(0 = never skip)</span></label><input type="number" id="a_min" min="0" max="10"></div>
+            <div class="field"><label>Tell this address about positive replies <span class="hint">(webhook, https; optional)</span></label><input type="url" id="a_hook" placeholder="https://hooks.zapier.com/..."></div>
+          </div>
+          <div class="field"><label class="check"><input type="checkbox" id="a_classify"> Label every reply with Gemini (interested, not now, out of office, wrong person …) and read return dates and referrals</label></div>
+          <div class="field"><label class="check"><input type="checkbox" id="a_draft"> Write a suggested answer for interested replies (you review and send it)</label></div>
+          <div class="field"><label class="check"><input type="checkbox" id="a_prio"> Email the best-scoring leads first</label></div>
+          <h3 style="margin-top:18px;font-size:14px">Warm-up between your mailboxes</h3>
+          <div class="field"><label class="check"><input type="checkbox" id="w_on"> Mailboxes email each other a few times a day, open the messages, rescue them from spam and answer some (daytime only, never counts toward the cold-email limit)</label></div>
+          <div class="row">
+            <div class="field"><label>Messages per mailbox per day</label><input type="number" id="w_per" min="1" max="20"></div>
+            <div class="field"><label>Answer this % of them</label><input type="number" id="w_reply" min="0" max="100"></div>
+          </div>
+          <div class="toolbar"><button type="button" class="btn sm" id="wuRun">Run warm-up now</button><span class="hint" id="wuInfo"></span></div>
         </div>
 
         <div class="panel"><h3>Sending rules <button type="button" class="btn sm" id="roundclock" style="margin-left:auto">Use 24/7 settings</button> <button type="button" class="btn sm" id="cautious" style="margin-left:6px">Use cautious settings</button></h3>

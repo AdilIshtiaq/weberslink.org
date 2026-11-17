@@ -15,8 +15,12 @@ const { Mailbox, passwordFor } = require("./mail");
 const { stripOurFooter } = require("./inbound");
 const richtext = require("./richtext");
 const clicks = require("./clicks");
+const ai = require("./ai");
+const unsub = require("./unsub");
+const webhook = require("./webhook");
+const warmup = require("./warmup");
 
-const VERSION = "2.4";
+const VERSION = "2.5";
 const MAX_PER_MAILBOX_PER_DAY = 100; // hard cap per mailbox (raised from 40 so one mailbox can send every 15-20 minutes around the clock)
 const RESCAN_MS = 10 * 60 * 1000;    // during a long run, re-read the inboxes at least this often so replies and opt-outs stop the sequence promptly
 const DONE_STATUSES = ["replied", "unsubscribed", "bounced", "do-not-contact"];
@@ -45,7 +49,18 @@ const DEFAULT_CONFIG = {
     notify_email: "", html_emails: true, check_mx: true, bounce_pause_percent: 3, check_inbox_in_dry_run: false, auto_run: true, track_clicks: true,
     window_enabled: true, window_start: "19:00", window_end: "07:00",
   },
-  mailboxes: [{ id: 1, email: "hassan@weberslink.org", from_name: "Hassan Ali", enabled: true, smtp_host: "smtp.hostinger.com", smtp_port: 465, imap_host: "imap.hostinger.com", imap_port: 993 }],
+  mailboxes: [
+    { id: 1, email: "hassan@weberslink.org", from_name: "Hassan Ali", enabled: true, smtp_host: "smtp.hostinger.com", smtp_port: 465, imap_host: "imap.hostinger.com", imap_port: 993 },
+    { id: 2, email: "adil_ishtiaq@weberslink.org", from_name: "Adil Ishtiaq", enabled: true, smtp_host: "smtp.hostinger.com", smtp_port: 465, imap_host: "imap.hostinger.com", imap_port: 993 },
+    { id: 3, email: "sienna_carter@weberslink.org", from_name: "Sienna Carter", enabled: true, smtp_host: "smtp.hostinger.com", smtp_port: 465, imap_host: "imap.hostinger.com", imap_port: 993 },
+  ],
+  // Gemini features (need GEMINI_OUTREACH_KEY on the server). They only ever make sending MORE careful; nothing is sent by the AI.
+  ai: { classify_replies: true, draft_replies: true, icp: "", min_score: 0, prioritise_by_score: true, booking_link: "", offer: "a free 3-minute video audit of their store's website", webhook_url: "" },
+  // Mailboxes warm each other up: a few short messages a day between your own inboxes, opened, rescued from spam and answered.
+  warmup: { enabled: false, per_day: 4, reply_percent: 60 },
+  // Campaigns: groups of leads by place and business type, each with its own mailboxes, daily cap and (optionally) email copy.
+  // With no campaigns every lead is emailed as before; once any exist, only leads in an ON campaign are emailed.
+  campaigns: [],
 };
 
 function loadConfig() {
@@ -55,6 +70,9 @@ function loadConfig() {
     sending: { ...DEFAULT_CONFIG.sending, ...(saved.sending || {}) },
     // Defaults only apply when nothing was ever saved; a saved empty list means "no mailboxes" on purpose.
     mailboxes: Array.isArray(saved.mailboxes) ? saved.mailboxes : DEFAULT_CONFIG.mailboxes.map((m) => ({ ...m })),
+    ai: { ...DEFAULT_CONFIG.ai, ...(saved.ai || {}) },
+    warmup: { ...DEFAULT_CONFIG.warmup, ...(saved.warmup || {}) },
+    campaigns: Array.isArray(saved.campaigns) ? saved.campaigns : [],
   };
   if (!cfg.sending.notify_email) cfg.sending.notify_email = String(process.env.OUTREACH_NOTIFY_EMAIL || "").trim();
   return cfg;
@@ -91,6 +109,9 @@ function sanitizeConfig(input) {
       window_enabled: s.window_enabled === true, window_start: hhmm(s.window_start, d.sending.window_start), window_end: hhmm(s.window_end, d.sending.window_end),
     },
     mailboxes: sanitizeMailboxes(input.mailboxes),
+    ai: sanitizeAi(input.ai),
+    warmup: sanitizeWarmup(input.warmup),
+    campaigns: sanitizeCampaigns(input.campaigns),
   };
   if (out.sending.notify_email && !store.isEmail(out.sending.notify_email)) throw new Error("Notification email is not a valid address");
   for (const m of out.mailboxes) if (m.email && !store.isEmail(m.email)) throw new Error(`Mailbox "${m.email}" is not a valid address`);
@@ -98,6 +119,40 @@ function sanitizeConfig(input) {
   if (out.sending.window_enabled && out.sending.window_start === out.sending.window_end) throw new Error("The sending window's start and end times must be different");
   return out;
 }
+function sanitizeAi(a = {}) {
+  const d = DEFAULT_CONFIG.ai;
+  const https = (v) => { const x = str(v, 500); if (!x) return ""; try { const u = new URL(x); if (u.protocol !== "https:") throw 0; return u.toString(); } catch (e) { throw new Error(`"${x.slice(0, 60)}" must be a full https:// address`); } };
+  return {
+    classify_replies: a.classify_replies !== false, draft_replies: a.draft_replies !== false, prioritise_by_score: a.prioritise_by_score !== false,
+    icp: str(a.icp, 1200), min_score: intIn(a.min_score, 0, 10, 0), booking_link: https(a.booking_link), offer: str(a.offer, 200) || d.offer, webhook_url: https(a.webhook_url),
+  };
+}
+const US_STATES = { alabama: "AL", alaska: "AK", arizona: "AZ", arkansas: "AR", california: "CA", colorado: "CO", connecticut: "CT", delaware: "DE", florida: "FL", georgia: "GA", hawaii: "HI", idaho: "ID", illinois: "IL", indiana: "IN", iowa: "IA", kansas: "KS", kentucky: "KY", louisiana: "LA", maine: "ME", maryland: "MD", massachusetts: "MA", michigan: "MI", minnesota: "MN", mississippi: "MS", missouri: "MO", montana: "MT", nebraska: "NE", nevada: "NV", "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM", "new york": "NY", "north carolina": "NC", "north dakota": "ND", ohio: "OH", oklahoma: "OK", oregon: "OR", pennsylvania: "PA", "rhode island": "RI", "south carolina": "SC", "south dakota": "SD", tennessee: "TN", texas: "TX", utah: "UT", vermont: "VT", virginia: "VA", washington: "WA", "west virginia": "WV", wisconsin: "WI", wyoming: "WY", "district of columbia": "DC" };
+/** "Texas", "texas" and "tx" all become "TX"; anything else (a UK county, say) is kept as written, upper-cased. */
+const normState = (s) => { const v = String(s || "").trim().replace(/\./g, ""); return US_STATES[v.toLowerCase()] || v.toUpperCase(); };
+
+/** Campaigns from the dashboard. Ids are permanent (like mailbox ids) because leads remember the id of their campaign. */
+function sanitizeCampaigns(list) {
+  const incoming = (Array.isArray(list) ? list : []).slice(0, 20);
+  const used = new Set();
+  const ids = incoming.map((c) => { const id = Number(c && c.id); if (Number.isInteger(id) && id >= 1 && id <= 99 && !used.has(id)) { used.add(id); return id; } return 0; });
+  const words = (v, f = (x) => x) => [...new Set(intList0(v, []).map((x) => f(str(x, 60))).filter(Boolean))].slice(0, 40);
+  return incoming.map((c, i) => {
+    let id = ids[i];
+    if (!id) { id = 1; while (used.has(id)) id++; used.add(id); }
+    return {
+      id, name: str(c.name, 60) || `Campaign ${id}`, enabled: c.enabled !== false,
+      countries: words(c.countries, (x) => normCountry(x)), states: words(c.states, normState), cities: words(c.cities), types: words(c.types),
+      mailboxes: [...new Set((Array.isArray(c.mailboxes) ? c.mailboxes : []).map(Number).filter((n) => Number.isInteger(n) && n >= 1 && n <= 99))],
+      daily_limit: intIn(c.daily_limit, 0, 1000, 0), // 0 = no cap of its own (the mailboxes' limits still apply)
+    };
+  });
+}
+
+function sanitizeWarmup(w = {}) {
+  return { enabled: w.enabled === true, per_day: intIn(w.per_day, 1, 20, 4), reply_percent: intIn(w.reply_percent, 0, 100, 60) };
+}
+
 // Mail servers the dashboard may send passwords to. Without this, a hijacked admin session could point a mailbox at
 // a server it controls and capture the real password. Add others with OUTREACH_ALLOWED_HOSTS (comma separated).
 function hostAllowed(host) {
@@ -120,7 +175,7 @@ function sanitizeMailboxes(list) {
     let id = ids[i];
     if (!id) { id = 1; while (used.has(id)) id++; used.add(id); }
     const box = {
-      id, email: str(m.email, 200), from_name: str(m.from_name, 100), enabled: m.enabled !== false,
+      id, email: str(m.email, 200), from_name: str(m.from_name, 100), title: str(m.title, 100), enabled: m.enabled !== false,
       smtp_host: str(m.smtp_host, 200) || "smtp.hostinger.com", smtp_port: intIn(m.smtp_port, 1, 65535, 465),
       imap_host: str(m.imap_host, 200) || "imap.hostinger.com", imap_port: intIn(m.imap_port, 1, 65535, 993),
     };
@@ -215,6 +270,7 @@ function nextEmail(t, cfg, now = new Date()) {
   if (t.status === "finished") return "Sequence complete";
   if (t.status === cleaner.SKIPPED) return t.note ? `Skipped: ${t.note}` : "Skipped by the list cleaner";
   if (t.status !== "active" || step < 1 || step > 3) return "";
+  if (snoozed(t, cfg, now)) return `Paused until ${t.snooze_until} (out of office)`;
   const lastDay = campaignDate(cfg, new Date(t.last_sent));
   const gap = cfg.sending.followup_gaps_days[step - 1] || cfg.sending.followup_gaps_days[cfg.sending.followup_gaps_days.length - 1];
   const due = nextSendDay(addDays(lastDay, gap));
@@ -284,6 +340,13 @@ function guessCountry(r, pick) {
   const addr = pick(r, "address");
   return /\b[A-Z]{2} \d{5}\b/.test(addr) || /^\(\d{3}\) \d{3}-\d{4}/.test(pick(r, "phone (maps)", "phone")) ? "US" : "";
 }
+/** State and city from their own columns, or from a US street address ("..., Dallas, TX 75201"). */
+function placeOf(r, pick) {
+  let state = pick(r, "state", "province", "region"), city = pick(r, "city", "town");
+  const m = /,\s*([^,]+?),\s*([A-Z]{2})\s+\d{5}/.exec(pick(r, "address"));
+  if (m) { city = city || m[1]; state = state || m[2]; }
+  return { state: state ? normState(state).slice(0, 40) : "", city: city.slice(0, 60) };
+}
 function emailDomain(e) { return String(e).toLowerCase().split("@")[1] || ""; }
 function suppressed(addr, sup) {
   const e = addr.toLowerCase();
@@ -302,10 +365,43 @@ function applyRules(track, cfg) {
     if (suppressed(t.email, sup) && !DONE_STATUSES.includes(t.status)) set(t, "do-not-contact", "on do_not_contact.csv");
   }
   const doneDomains = new Set(track.filter((t) => ["replied", "unsubscribed"].includes(t.status) && !FREE_MAIL.test(emailDomain(t.email))).map((t) => emailDomain(t.email)));
+  if (assignCampaigns(track, cfg)) changed = true;
   for (const t of track) {
-    if (["new", "active"].includes(t.status) && doneDomains.has(emailDomain(t.email))) set(t, "do-not-contact", "colleague already replied / opted out");
+    if (["new", "active"].includes(t.status) && !t.referred_by && doneDomains.has(emailDomain(t.email))) set(t, "do-not-contact", "colleague already replied / opted out"); // a colleague named in a reply ("contact Sara") is allowed
   }
   return changed;
+}
+
+// ---------------------------------------------------------------- campaigns
+const wanted = (list, v, f = (x) => x) => !list.length || list.map(f).includes(f(v));
+/** Does this lead belong in the campaign? An empty filter means "any". Business types match as words inside category, niche, store name or website. */
+function leadMatches(t, c) {
+  if (!wanted(c.countries, normCountry(t.country), (x) => String(x).toUpperCase())) return false;
+  if (!wanted(c.states, normState(t.state))) return false;
+  if (!wanted(c.cities, t.city, (x) => String(x).trim().toLowerCase())) return false;
+  const hay = `${t.category} ${t.niche} ${t.store} ${t.domain}`.toLowerCase();
+  return !c.types.length || c.types.some((w) => hay.includes(w.toLowerCase()));
+}
+const campaignById = (cfg, id) => (cfg.campaigns || []).find((c) => String(c.id) === String(id));
+/** Leads still waiting are re-sorted into the first matching campaign every time (so editing a campaign takes effect at once);
+ *  leads already in a sequence keep theirs. A lead matching nothing has no campaign and, once any campaign exists, is not emailed. */
+function assignCampaigns(track, cfg) {
+  const camps = cfg.campaigns || [];
+  let changed = false;
+  for (const t of track) {
+    const first = camps.find((c) => leadMatches(t, c));
+    const want = first ? String(first.id) : "";
+    if (t.status !== "new" && t.campaign && campaignById(cfg, t.campaign)) continue; // already in a sequence: keeps its campaign
+    if (t.status !== "new" && !want) continue;
+    if (t.campaign !== want) { t.campaign = want; changed = true; }
+  }
+  return changed;
+}
+/** May this lead be emailed under the campaign rules? */
+function campaignAllows(t, cfg) {
+  if (!(cfg.campaigns || []).length) return true;
+  const c = campaignById(cfg, t.campaign);
+  return Boolean(c && c.enabled);
 }
 
 function loadState(cfg) {
@@ -330,7 +426,7 @@ function importLeads(rows, cfg) {
     const lead = {
       email, first_name: (pick(r, "first_name", "owner name").split(/\s+/)[0] || "").slice(0, 60), store: pick(r, "store", "business").slice(0, 150),
       domain: tpl.prettyDomain(pick(r, "domain", "website") || emailDomain(email)).slice(0, 150), country: normCountry(pick(r, "country") || guessCountry(r, pick)),
-      category: pick(r, "category").slice(0, 100), niche: pick(r, "niche").slice(0, 100),
+      category: pick(r, "category").slice(0, 100), niche: pick(r, "niche").slice(0, 100), ...placeOf(r, pick),
       psi: num(pick(r, "psi", "mobile pagespeed (0-100)")), lcp: /^\d+(\.\d+)?$/.test(lcp) ? lcp : "",
     };
     // A line you wrote yourself in the spreadsheet is trusted like an approved one (after the same safety checks).
@@ -339,7 +435,7 @@ function importLeads(rows, cfg) {
     const cur = have.get(key);
     if (cur) {
       res.existing++;
-      for (const k of ["first_name", "store", "category", "niche", "psi", "lcp"]) if (!cur[k] && lead[k]) cur[k] = lead[k];
+      for (const k of ["first_name", "store", "category", "niche", "psi", "lcp", "state", "city"]) if (!cur[k] && lead[k]) cur[k] = lead[k];
       if (lead.custom_line && !cur.custom_line && !cur.research_status) { cur.custom_line = lead.custom_line; cur.research_status = "approved"; }
       continue;
     }
@@ -408,14 +504,19 @@ function classify(messages, track, myAddrs) {
       continue;
     }
     if (DONE_STATUSES.includes(lead.status) || lead.status === "new") continue;
-    if (AUTO_REPLY.test(msg.subject) && !STOP_WORDS.test(fresh)) { lead.note = `auto-reply ${stamp}`; continue; }
     const snippet = fresh.replace(/\s+/g, " ").trim().slice(0, 300);
+    const prevStatus = lead.status;
+    if (AUTO_REPLY.test(msg.subject) && !STOP_WORDS.test(fresh)) {
+      lead.note = `auto-reply ${stamp}`;
+      changes.push({ kind: "AUTO-REPLY", lead, snippet, text: fresh || msg.body, subject: msg.subject, prevStatus }); // the sequence goes on; Gemini may read a return date
+      continue;
+    }
     if (wantsStop) {
       lead.status = "unsubscribed"; lead.note = `asked to stop ${stamp}`;
       changes.push({ kind: "OPT-OUT", lead, snippet });
     } else {
-      lead.status = "replied"; lead.note = `replied ${stamp} from ${frm}`; lead.replied_at = new Date().toISOString();
-      changes.push({ kind: "REPLIED", lead, snippet });
+      lead.status = "replied"; lead.note = `replied ${stamp} from ${frm}`; lead.replied_at = new Date().toISOString(); lead.replied_step = String(lead.step || "");
+      changes.push({ kind: "REPLIED", lead, snippet, text: fresh, subject: msg.subject, prevStatus });
     }
   }
   return changes;
@@ -438,10 +539,34 @@ function bounceCheck(track, box, cfg) {
   return { paused: mine.length >= 20 && rate >= cfg.sending.bounce_pause_percent, rate, sent: mine.length };
 }
 
+/** An out-of-office reply with a return date pauses the follow-ups until then. */
+const snoozed = (t, cfg, now = new Date()) => Boolean(t.snooze_until) && String(t.snooze_until) > today(cfg, now);
+
+/** New leads in the order they should start: best ICP score first (unscored last), skipping scores below the minimum you set. */
+function queueOrder(track, cfg) {
+  const a = cfg.ai || {}, min = Number(a.min_score) || 0;
+  let list = track.filter((x) => x.status === "new" && !x.sending && campaignAllows(x, cfg) && !(min && x.ai_score && Number(x.ai_score) < min));
+  if (a.prioritise_by_score !== false) list.sort((x, y) => (Number(y.ai_score) || 0) - (Number(x.ai_score) || 0));
+  if ((cfg.campaigns || []).length > 1) { // take turns between campaigns so one big list never starves the others
+    const lanes = new Map();
+    for (const t of list) { if (!lanes.has(t.campaign)) lanes.set(t.campaign, []); lanes.get(t.campaign).push(t); }
+    list = []; const q = [...lanes.values()];
+    for (let i = 0; q.some((l) => i < l.length); i++) for (const l of q) if (i < l.length) list.push(l[i]);
+  }
+  return list;
+}
+/** Settings for one mailbox's emails: a mailbox with its own name signs as that person (no borrowed job title). */
+function cfgFor(cfg, box) {
+  const m = box && (box.conf || box);
+  const name = String((m && (m.from_name || m.name)) || "").trim();
+  if (!name || name === cfg.signature.name) return cfg;
+  return { ...cfg, signature: { ...cfg.signature, name, title: String((m && m.title) || "").trim() } };
+}
+
 function dueFollowups(track, cfg, now = new Date()) {
   const gaps = cfg.sending.followup_gaps_days;
   return track.filter((t) => {
-    if (t.status !== "active" || t.sending) return false;
+    if (t.status !== "active" || t.sending || snoozed(t, cfg, now) || !campaignAllows(t, cfg)) return false;
     const step = Number(t.step || 0);
     return step >= 1 && step <= 3 && daysSince(t.last_sent, cfg, now) >= (gaps[step - 1] || gaps[gaps.length - 1]);
   });
@@ -515,7 +640,7 @@ async function runOnce(opts = {}, deps = {}) {
     // 1. inboxes. Every change is saved lead-by-lead (never the whole list), so edits made in the dashboard
     //    while this scan is running can't be overwritten. The same scan is repeated during a long run
     //    (see rescanIfDue) so a reply or "stop" is honoured within minutes, not at the next run.
-    let lastScan = 0;
+    let lastScan = 0, aiOff = false;
     const scanInboxes = async () => {
       const all = [];
       const sendKeys = new Set(boxes.map((b) => b.addr.toLowerCase()));
@@ -538,12 +663,25 @@ async function runOnce(opts = {}, deps = {}) {
         for (const c of changes) {
           if (c.kind === "UNMATCHED-STOP") { if (!dry) store.addSuppression(c.lead.email); } else store.saveRow(c.lead);
         }
+        for (const c of changes) {
+          if (aiOff || !["REPLIED", "AUTO-REPLY"].includes(c.kind)) continue;
+          const r = await ai.enrichReply(c, { cfg, dry, now: clock(), log });
+          if (r && r.quota) { aiOff = true; continue; }
+          if (!r) continue;
+          c.ai = r;
+          if (c.kind === "REPLIED" && c.lead.status === "unsubscribed") c.kind = "OPT-OUT"; // Gemini caught a stop request the word list missed
+          else if (c.kind === "REPLIED" && c.lead.status !== "replied") c.kind = "AUTO-REPLY"; // an out-of-office the sequence now continues past
+          if (!dry && c.kind === "REPLIED" && cfg.ai.webhook_url && ai.POSITIVE.includes(r.label)) {
+            webhook.post(cfg.ai.webhook_url, { event: "positive_reply", label: r.label, summary: r.summary, email: c.lead.email, store: c.lead.store, domain: c.lead.domain, mailbox: c.lead.mailbox, replied_at: c.lead.replied_at, reply: c.snippet })
+              .then((w) => { if (!w.ok) log(`  (webhook not delivered: ${w.error || w.status})`); });
+          }
+        }
         all.push(...changes);
         if (!Array.isArray(res) && res.maxUid) { mb.lastUid = res.maxUid; mb.uidValidity = res.uidValidity; store.writeJson("mailboxes.json", state); }
       }
       for (const c of all) {
         log(`  ${c.kind.padEnd(8)} ${c.lead.email}  (${c.lead.store})${c.snippet ? `  "${c.snippet.slice(0, 80)}"` : ""}${c.kind === "UNMATCHED-STOP" && !dry ? "  -> added to do-not-contact" : ""}`);
-        if (c.kind === "REPLIED") summary.replies++; else if (c.kind === "OPT-OUT" || c.kind === "UNMATCHED-STOP") summary.optOuts++; else summary.bounces++;
+        if (c.kind === "REPLIED") summary.replies++; else if (c.kind === "OPT-OUT" || c.kind === "UNMATCHED-STOP") summary.optOuts++; else if (c.kind === "BOUNCED") summary.bounces++;
       }
       if (all.length) await notify(cfg, boxes, all, dry);
       lastScan = clock().getTime();
@@ -590,6 +728,7 @@ async function runOnce(opts = {}, deps = {}) {
     // 3. plan: follow-ups first (from the mailbox that started the thread), then new leads spread over mailboxes
     const plan = new Map(boxes.map((b) => [b.addr.toLowerCase(), []]));
     const left = { ...budget };
+    const capLeft = campaignCapLeft(track, cfg, now);
     for (const t of dueFollowups(track, cfg, now)) {
       // Only an empty mailbox field may fall back to "the only mailbox": a thread that belongs to a switched-off
       // mailbox must not silently continue from another address.
@@ -597,14 +736,20 @@ async function runOnce(opts = {}, deps = {}) {
       if (!box) { log(`  ${t.email}: its mailbox ${JSON.stringify(t.mailbox)} is switched off or removed - follow-up skipped`); continue; }
       const key = box.addr.toLowerCase();
       if ((left[key] || 0) <= 0) continue;
+      const fc = campaignById(cfg, t.campaign);
+      if (fc && fc.id in capLeft && capLeft[fc.id] <= 0) continue;
       t.mailbox = t.mailbox || box.addr;
       plan.get(key).push({ t, step: Number(t.step) + 1 }); left[key]--;
+      if (fc && fc.id in capLeft) capLeft[fc.id]--;
     }
     let rr = 0;
-    for (const t of track.filter((x) => x.status === "new" && !x.sending)) {
+    for (const t of queueOrder(track, cfg)) {
       if (run.stop) break;
       const open = boxes.filter((b) => (left[b.addr.toLowerCase()] || 0) > 0);
       if (!open.length) break;
+      const camp = campaignById(cfg, t.campaign);
+      const mine = camp && camp.mailboxes.length ? open.filter((b) => camp.mailboxes.includes(Number(b.id))) : open; // a campaign may use only some mailboxes
+      if (!mine.length || (camp && camp.id in capLeft && capLeft[camp.id] <= 0)) continue;
       if (cfg.sending.check_mx && !t.mx) {
         t.mx = await mx(emailDomain(t.email));
         if (t.mx !== "no") store.saveRow(t);
@@ -615,8 +760,9 @@ async function runOnce(opts = {}, deps = {}) {
           continue;
         }
       }
-      const box = open[rr++ % open.length];
+      const box = mine[rr++ % mine.length];
       plan.get(box.addr.toLowerCase()).push({ t, step: 1 }); left[box.addr.toLowerCase()]--;
+      if (camp && camp.id in capLeft) capLeft[camp.id]--;
     }
 
     // 4. send. Returns "sent" | "skipped" | "stop" (stop = this mailbox is done for today).
@@ -628,6 +774,8 @@ async function runOnce(opts = {}, deps = {}) {
         : current.sending ? "on hold"
         : DONE_STATUSES.includes(current.status) ? `now ${current.status}`
         : suppressed(current.email, store.loadSuppression()) ? "on the do-not-contact list"
+        : !campaignAllows(current, opts.config ? cfg : { campaigns: loadConfig().campaigns }) ? "its campaign is switched off or was removed"
+        : snoozed(current, cfg, clock()) ? `snoozed until ${current.snooze_until} (out of office)`
         : step === 1 ? (current.status !== "new" ? `status is ${current.status}` : "")
         : (current.status !== "active" || Number(current.step) !== step - 1 ? `status changed (${current.status}, step ${current.step})` : "");
       if (why) { log(`  skipped ${t.email}: ${why}`); return "skipped"; }
@@ -637,7 +785,7 @@ async function runOnce(opts = {}, deps = {}) {
       t.mailbox = t.mailbox || mailboxHint;
 
       const variant = tpl.pickVariant(t, step);
-      const r = tpl.render(step, t, cfg, variant);
+      const r = tpl.render(step, t, cfgFor(cfg, box), variant);
       let html = cfg.sending.html_emails ? r.html : undefined;
       const subject = step > 1 ? (/^re:/i.test(t.subject) ? t.subject : "Re: " + t.subject) : r.subject;
       const refs = [...new Set([t.first_message_id, t.last_message_id].filter(Boolean))];
@@ -658,7 +806,7 @@ async function runOnce(opts = {}, deps = {}) {
       }
       let sent;
       try {
-        sent = await box.send({ to: t.email, subject, text: r.text, html, inReplyTo: step > 1 ? refs[refs.length - 1] : undefined, references: step > 1 ? refs : undefined });
+        sent = await box.send({ to: t.email, subject, text: r.text, html, unsubscribeUrl: unsub.urlFor(t.email, cfg), inReplyTo: step > 1 ? refs[refs.length - 1] : undefined, references: step > 1 ? refs : undefined });
       } catch (e) {
         if (e.code === "EENVELOPE" || (/recipient/i.test(e.message || "") && e.responseCode >= 500)) {
           const rc = Number(e.responseCode || (e.rejectedErrors && e.rejectedErrors[0] && e.rejectedErrors[0].responseCode) || 0);
@@ -752,6 +900,17 @@ function finalReason(sm, dry, noBudget, planned) {
   return `${what} ${sm.sent} email${sm.sent === 1 ? "" : "s"}.${sm.leftover ? ` The window closed with ${sm.leftover} still to go; they wait for the next window.` : ""}${errs}`;
 }
 
+/** What each campaign with a daily cap of its own may still send today. */
+function campaignCapLeft(track, cfg, now) {
+  const t0 = today(cfg, now), out = {};
+  for (const c of cfg.campaigns || []) {
+    if (!c.daily_limit) continue;
+    const used = track.filter((t) => String(t.campaign) === String(c.id) && t.last_sent && campaignDate(cfg, new Date(t.last_sent)) === t0).length;
+    out[c.id] = Math.max(0, c.daily_limit - used);
+  }
+  return out;
+}
+
 function sentTodayByBox(cfg, now) {
   const t0 = today(cfg, now), c = {};
   for (const r of store.readCsv("sent_log.csv")) {
@@ -767,7 +926,7 @@ async function notify(cfg, boxes, changes, dry) {
   const replied = hits.filter((c) => c.kind === "REPLIED").length;
   const text = "New activity from your outreach:\n\n" + hits.map((c) => c.kind === "UNMATCHED-STOP"
     ? `STOP REQUEST from ${c.lead.email} (not matched to a lead; added to your do-not-contact list)\n    "${c.snippet}"\n`
-    : `${c.kind}: ${c.lead.store} <${c.lead.email}>  (via ${c.lead.mailbox || "?"})\n    "${c.snippet}"\n`).join("\n") +
+    : `${c.kind}: ${c.lead.store} <${c.lead.email}>  (via ${c.lead.mailbox || "?"})${c.ai ? `  [${c.ai.label.replace(/_/g, " ")}]` : ""}\n    "${c.snippet}"\n${c.ai && c.ai.summary ? `    AI: ${c.ai.summary}\n` : ""}${c.lead.draft_reply ? "    A suggested reply is waiting in the dashboard (Replies tab).\n" : ""}`).join("\n") +
     (replied ? "\nSend the free video audit to people who replied within 24 hours - from the mailbox they wrote to.\n" : "");
   try {
     await boxes[0].send({ to, subject: replied ? `Outreach: ${replied} new repl${replied === 1 ? "y" : "ies"}` : "Outreach: opt-outs recorded", text, listUnsubscribe: false }, { saveCopy: false });
@@ -822,7 +981,7 @@ function previewNext(n, cfg = loadConfig(), boxes) {
       subject: step > 1 ? (/^re:/i.test(t.subject) ? t.subject : "Re: " + t.subject) : r.subject, text: r.text, html: r.html });
   };
   for (const t of dueFollowups(track, cfg)) { if (out.length >= n) break; add(t, Number(t.step) + 1); }
-  for (const t of track.filter((x) => x.status === "new" && !x.sending)) { if (out.length >= n) break; add(t, 1); }
+  for (const t of queueOrder(track, cfg)) { if (out.length >= n) break; add(t, 1); }
   return out;
 }
 
@@ -833,15 +992,22 @@ function status(cfg = loadConfig(), now = new Date()) {
   const started = track.filter((t) => Number(t.step || 0) >= 1 || ["replied", "unsubscribed"].includes(t.status));
   const group = (keyFn) => {
     const g = {};
-    for (const t of started) { const k = keyFn(t); (g[k] ||= { started: 0, replied: 0, bounced: 0 }); g[k].started++; if (t.status === "replied") g[k].replied++; if (t.status === "bounced") g[k].bounced++; }
+    for (const t of started) {
+      const k = keyFn(t); (g[k] ||= { started: 0, replied: 0, bounced: 0, positive: 0, meetings: 0 }); g[k].started++;
+      if (t.status === "replied") g[k].replied++; if (t.status === "bounced") g[k].bounced++;
+      if (ai.POSITIVE.includes(t.reply_label)) g[k].positive++; if (["meeting_booked", "won"].includes(t.outcome)) g[k].meetings++;
+    }
     return g;
   };
   const doneToday = sentTodayByBox(cfg, now);
+  const warmupState = warmup.status(now);
   const mailboxes = cfg.mailboxes.filter((m) => m.email).map((m) => {
     const key = m.email.toLowerCase(), box = { addr: m.email };
     const b = bounceCheck(track, box, cfg);
+    const spam = warmup.spamRate(m.email);
     return { id: m.id, email: m.email, enabled: m.enabled, passwordSet: Boolean(passwordFor(m)), firstLiveSend: (state.mailboxes[key] || {}).first_live_send || "",
-      todayLimit: dailyLimitFor(box, cfg, state, now), sentToday: doneToday[key] || 0, bounceRate: Math.round(b.rate * 10) / 10, paused: b.paused };
+      todayLimit: dailyLimitFor(box, cfg, state, now), sentToday: doneToday[key] || 0, bounceRate: Math.round(b.rate * 10) / 10, paused: b.paused,
+      health: healthScore({ bounceRate: b.rate, paused: b.paused, spamRate: spam }), spamRate: Math.round(spam * 1000) / 10, placement: (warmupState.placement || {})[key] || null };
   });
   const daily = mailboxes.filter((m) => m.enabled && !m.paused).reduce((a, m) => a + m.todayLimit, 0);
   const remaining = track.filter((t) => t.status === "new").length;
@@ -851,7 +1017,12 @@ function status(cfg = loadConfig(), now = new Date()) {
     furthestStep: count(started.filter((t) => Number(t.step)), (t) => `email ${t.step}`), mailboxes, remaining,
     daysLeft: remaining && daily ? Math.ceil(remaining / daily) : 0,
     replied: track.filter((t) => t.status === "replied").sort((a, b) => String(b.replied_at).localeCompare(String(a.replied_at))).map((t) => ({
-      email: t.email, store: t.store, mailbox: t.mailbox, note: t.note, repliedAt: t.replied_at, loomSent: t.loom_sent === "1", domain: t.domain, firstName: t.first_name, subject: t.subject, clicks: clicks.forLead(t.email) })),
+      email: t.email, store: t.store, mailbox: t.mailbox, note: t.note, repliedAt: t.replied_at, loomSent: t.loom_sent === "1", domain: t.domain, firstName: t.first_name, subject: t.subject, clicks: clicks.forLead(t.email),
+      label: t.reply_label, summary: t.reply_summary, snippet: t.reply_snippet, draft: t.draft_reply, outcome: t.outcome })),
+    analytics: analytics(track, started),
+    campaigns: campaignStats(track, cfg, now, mailboxes), unassigned: (cfg.campaigns || []).length ? track.filter((t) => t.status === "new" && !t.campaign).length : 0,
+    insights: insights(track, cfg, now, mailboxes),
+    ai: ai.status(), aiConfig: { icp: Boolean(cfg.ai.icp), booking: Boolean(cfg.ai.booking_link) }, warmup: { ...warmupState, enabled: cfg.warmup.enabled },
     clicks: (() => { const ls = Object.fromEntries(track.map((t) => [t.email.toLowerCase(), t])); return clicks.recent(40).map((c) => ({ ...c, store: (ls[c.email] || {}).store || "", status: (ls[c.email] || {}).status || "" })); })(),
     trackingBase: clicks.baseUrl(cfg), trackClicks: cfg.sending.track_clicks && cfg.sending.html_emails,
     scheduled: listScheduled(),
@@ -859,6 +1030,93 @@ function status(cfg = loadConfig(), now = new Date()) {
     problems: readiness(cfg, cfg.mailboxes.filter((m) => m.enabled && m.email).map((m) => new Mailbox(m)), { live: !cfg.sending.dry_run }),
     running: run.running, startedAt: run.startedAt, runMode: run.mode, last: run.last, lastRun: readLastRun(), log: run.lines.length ? run.lines.slice(-200) : logTail(200),
   };
+}
+
+/** One row per campaign for the dashboard: how many leads, how they are doing, and how long the waiting ones will take. */
+function campaignStats(track, cfg, now, mailboxes) {
+  const t0 = today(cfg, now);
+  return (cfg.campaigns || []).map((c) => {
+    const mine = track.filter((t) => String(t.campaign) === String(c.id));
+    const started = mine.filter((t) => Number(t.step || 0) >= 1 || ["replied", "unsubscribed"].includes(t.status));
+    const n = (f) => mine.filter(f).length, rate = (x) => (started.length ? Math.round((1000 * x) / started.length) / 10 : 0);
+    const boxes = mailboxes.filter((m) => m.enabled && !m.paused && (!c.mailboxes.length || c.mailboxes.includes(m.id)));
+    const cap = boxes.reduce((a, m) => a + m.todayLimit, 0), capacity = c.daily_limit ? Math.min(c.daily_limit, cap) : cap;
+    const waiting = n((t) => t.status === "new"), replied = n((t) => t.status === "replied"), positive = n((t) => ai.POSITIVE.includes(t.reply_label)), bounced = n((t) => t.status === "bounced");
+    return { id: c.id, name: c.name, enabled: c.enabled, countries: c.countries, states: c.states, cities: c.cities, types: c.types, mailboxes: c.mailboxes, daily_limit: c.daily_limit,
+      total: mine.length, waiting, active: n((t) => t.status === "active"), started: started.length, replied, positive, meetings: n((t) => ["meeting_booked", "won"].includes(t.outcome)), bounced,
+      sentToday: n((t) => t.last_sent && campaignDate(cfg, new Date(t.last_sent)) === t0), replyRate: rate(replied), positiveRate: rate(positive), bounceRate: rate(bounced),
+      capacity, mailboxCount: boxes.length, daysLeft: waiting && capacity ? Math.ceil(waiting / capacity) : 0 };
+  });
+}
+
+/** Plain-English things worth your attention, worst first. Computed from the data each time: nothing to configure. */
+function insights(track, cfg, now, mailboxes) {
+  const out = [], add = (level, text) => out.push({ level, text });
+  const camps = campaignStats(track, cfg, now, mailboxes), waiting = track.filter((t) => t.status === "new");
+  for (const m of mailboxes) if (m.enabled && m.paused) add("bad", `${m.email} is paused: its bounce rate is ${m.bounceRate}%. Remove dead addresses (Leads, Clean list) before it can send again.`);
+  for (const m of mailboxes) if (m.enabled && !m.paused && m.spamRate >= 30) add("bad", `${Math.round(m.spamRate)}% of warm-up mail to ${m.email} lands in spam. Slow down its sending and check its DNS (Settings, Check domain DNS).`);
+  if (camps.length) {
+    const none = waiting.filter((t) => !t.campaign).length;
+    if (none) add("warn", `${none} waiting lead${none === 1 ? " matches" : "s match"} no campaign and will not be emailed. Widen a campaign or add one.`);
+    const orphans = track.filter((t) => t.status === "active" && !campaignById(cfg, t.campaign)).length;
+    if (orphans) add("warn", `${orphans} lead${orphans === 1 ? " is" : "s are"} part-way through a sequence but not in any campaign (it was removed or its filters changed), so ${orphans === 1 ? "it is" : "they are"} paused. Add a campaign that fits them.`);
+    const overlap = waiting.filter((t) => cfg.campaigns.filter((c) => leadMatches(t, c)).length > 1).length;
+    if (overlap) add("info", `${overlap} waiting lead${overlap === 1 ? " fits" : "s fit"} more than one campaign; each goes to the first campaign in your list.`);
+    for (const c of camps) {
+      if (c.enabled && !c.mailboxCount) add("bad", `Campaign "${c.name}" has no mailbox that can send right now (switched off, paused or not chosen).`);
+      else if (c.enabled && !c.waiting && !c.active) add("info", `Campaign "${c.name}" has no leads waiting. Import leads for it or widen its filters.`);
+      if (!c.enabled && c.waiting) add("info", `Campaign "${c.name}" is paused with ${c.waiting} lead${c.waiting === 1 ? "" : "s"} waiting.`);
+      if (c.started >= 20 && c.bounceRate >= cfg.sending.bounce_pause_percent) add("bad", `Campaign "${c.name}" bounces ${c.bounceRate}%. Its list needs cleaning before you send more.`);
+    }
+    const ranked = camps.filter((c) => c.started >= 20).sort((a, b) => b.replyRate - a.replyRate);
+    if (ranked.length > 1 && ranked[0].replyRate > 0 && ranked[0].replyRate >= 2 * ranked[ranked.length - 1].replyRate) {
+      add("info", `"${ranked[0].name}" gets ${ranked[0].replyRate}% replies against ${ranked[ranked.length - 1].replyRate}% for "${ranked[ranked.length - 1].name}". Consider giving it more daily sends.`);
+    }
+  } else if (track.length >= 20 && new Set(track.map((t) => t.country).filter(Boolean)).size + new Set(track.map((t) => t.category).filter(Boolean)).size > 3) {
+    add("info", "Your leads span several places or business types. Campaigns let you email each group with its own copy, mailboxes and daily limit.");
+  }
+  const late = track.filter((t) => t.status === "replied" && t.loom_sent !== "1" && t.replied_at && now.getTime() - Date.parse(t.replied_at) > 24 * 36e5).length;
+  if (late) add("warn", `${late} repl${late === 1 ? "y has" : "ies have"} waited over 24 hours without the video. Answer them first (Replies).`);
+  const pos = track.filter((t) => ai.POSITIVE.includes(t.reply_label) && t.status === "replied" && !t.outcome).length;
+  if (pos) add("info", `${pos} interested repl${pos === 1 ? "y has" : "ies have"} no outcome yet. Mark meetings booked so the results stay accurate.`);
+  return out.sort((a, b) => ["bad", "warn", "info"].indexOf(a.level) - ["bad", "warn", "info"].indexOf(b.level));
+}
+
+/** The most common countries, states, cities and business types among your leads, to build campaigns from. */
+function campaignOptions() {
+  const track = store.loadTracking(), top = (f) => { const m = new Map(); for (const t of track) { const v = f(t); if (v) m.set(v, (m.get(v) || 0) + 1); } return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([value, count]) => ({ value, count })); };
+  return { countries: top((t) => normCountry(t.country)), states: top((t) => normState(t.state)), cities: top((t) => String(t.city || "").trim()), types: top((t) => String(t.category || t.niche || "").trim()), total: track.length };
+}
+/** How many leads a set of filters would catch, and how many of those another campaign already claims. */
+function campaignPreview(filters, cfg, id) {
+  const c = sanitizeCampaigns([{ ...filters, id: 99 }])[0];
+  const camps = cfg.campaigns || [], at = camps.findIndex((x) => String(x.id) === String(id));
+  const earlier = at < 0 ? camps : camps.slice(0, at);
+  const hit = store.loadTracking().filter((t) => leadMatches(t, c));
+  const waiting = hit.filter((t) => t.status === "new");
+  return { total: hit.length, waiting: waiting.length, claimed: waiting.filter((t) => earlier.some((x) => leadMatches(t, x))).length,
+    sample: hit.slice(0, 6).map((t) => ({ store: t.store || t.domain, place: [t.city, t.state, t.country].filter(Boolean).join(", "), type: t.category || t.niche })) };
+}
+
+/** 0-100 mailbox health: bounces hurt most, then a pause, then warm-up mail landing in spam. */
+function healthScore({ bounceRate = 0, paused = false, spamRate = 0 }) {
+  return Math.max(0, Math.round(100 - Math.min(60, bounceRate * 12) - (paused ? 25 : 0) - Math.min(30, spamRate * 60)));
+}
+
+/** Reply and meeting numbers for the dashboard: by AI label, by email step, and the totals that matter (positive replies, meetings). */
+function analytics(track, started) {
+  const labels = {}, byStep = {};
+  for (const t of track) if (t.reply_label) labels[t.reply_label] = (labels[t.reply_label] || 0) + 1;
+  for (const s of [1, 2, 3, 4]) byStep[s] = { reached: started.filter((t) => Number(t.step || 0) >= s).length, replied: 0, positive: 0 };
+  for (const t of started) {
+    const st = Number(t.replied_step || t.step || 0);
+    if (!byStep[st] || !(t.status === "replied" || t.reply_label)) continue; // someone who wrote back, counted at the email they answered
+    byStep[st].replied++;
+    if (ai.POSITIVE.includes(t.reply_label)) byStep[st].positive++;
+  }
+  return { labels, byStep, positive: track.filter((t) => ai.POSITIVE.includes(t.reply_label)).length,
+    meetings: track.filter((t) => ["meeting_booked", "won"].includes(t.outcome)).length, won: track.filter((t) => t.outcome === "won").length,
+    scored: track.filter((t) => t.ai_score).length, referrals: track.filter((t) => t.referred_by).length, snoozed: track.filter((t) => t.status === "active" && t.snooze_until && t.snooze_until >= today(loadConfig())).length };
 }
 
 // ---------------------------------------------------------------- go-live checks
@@ -874,8 +1132,8 @@ async function sendTest(to, cfg = loadConfig(), deps = {}) {
   for (const box of boxes) {
     try {
       const variant = tpl.pickVariant(sample, 1);
-      const r = tpl.render(1, sample, cfg, variant);
-      await box.send({ to, subject: "[TEST] " + r.subject, text: r.text, html: cfg.sending.html_emails ? r.html : undefined }, { saveCopy: false });
+      const r = tpl.render(1, sample, cfgFor(cfg, box), variant);
+      await box.send({ to, subject: "[TEST] " + r.subject, text: r.text, html: cfg.sending.html_emails ? r.html : undefined, unsubscribeUrl: unsub.urlFor(to, cfg) }, { saveCopy: false });
       results.push({ mailbox: box.addr, ok: true });
     } catch (e) { results.push({ mailbox: box.addr, ok: false, error: String(e.message).slice(0, 160) }); }
     finally { box.close && box.close(); }
@@ -1027,5 +1285,5 @@ async function processScheduled(cfg = loadConfig(), deps = {}, now = new Date())
   return sent;
 }
 
-module.exports = { sendReply, scheduleReply, cancelScheduled, listScheduled, processScheduled, autoRunDue, MAX_PER_MAILBOX_PER_DAY, RESCAN_MS, logTail, markInterrupted, readLastRun, windowState, inWindow, campaignDate, domainReceivesMail, nextEmail, sendTest, dnsHealth, resolveHeld, VERSION, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dailyLimitFor, bounceCheck, dueFollowups, runOnce,
-  startRun, requestStop, previewNext, status, readiness, applyRules, loadState, tzParts, isSendDay, today, daysSince, run, log };
+module.exports = { sendReply, scheduleReply, cancelScheduled, listScheduled, processScheduled, autoRunDue, MAX_PER_MAILBOX_PER_DAY, RESCAN_MS, logTail, markInterrupted, readLastRun, windowState, inWindow, campaignDate, domainReceivesMail, nextEmail, sendTest, dnsHealth, resolveHeld, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dueFollowups, runOnce,
+  startRun, requestStop, previewNext, status, campaignOptions, campaignPreview, assignCampaigns, leadMatches, queueOrder, cfgFor, healthScore, analytics, loadState, tzParts, isSendDay, today, run, log };

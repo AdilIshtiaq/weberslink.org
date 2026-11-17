@@ -17,9 +17,13 @@ const OPT_OUT_TEXT = 'Prefer not to hear from me? Reply "unsubscribe" and I\'ll 
 
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-function listTemplateFiles() {
+/** Folder holding one campaign's own email copy (campaign ids are small whole numbers), or null. */
+const campaignDir = (id) => (/^\d{1,2}$/.test(String(id == null ? "" : id)) ? path.join(OVERRIDE, "campaign-" + id) : null);
+
+/** Bundled emails, overridden by your edits, overridden by the campaign's own edits (when a campaign id is given). */
+function listTemplateFiles(campaign) {
   const files = new Map();
-  for (const dir of [BUNDLED, OVERRIDE]) {
+  for (const dir of [BUNDLED, OVERRIDE, campaignDir(campaign)].filter(Boolean)) {
     let names = [];
     try { names = fs.readdirSync(dir); } catch (e) { continue; }
     for (const n of names) if (FILE_RE.test(n)) files.set(n, path.join(dir, n));
@@ -38,15 +42,27 @@ function parseTemplate(raw, name = "template") {
   return { subject: first.slice(8).trim(), body: (nl < 0 ? "" : text.slice(nl + 1)).replace(/^\n+/, "") };
 }
 
-function loadTemplate(step, variant = "a") {
-  const list = listTemplateFiles().filter((t) => t.step === step);
+function loadTemplate(step, variant = "a", campaign) {
+  const list = listTemplateFiles(campaign).filter((t) => t.step === step);
   const t = list.find((x) => x.variant === variant) || list.find((x) => x.variant === "a");
   if (!t) throw new Error(`templates/email${step}.txt is missing`);
   return parseTemplate(fs.readFileSync(t.file, "utf8"), t.name);
 }
 
-function variantsFor(step) {
-  return listTemplateFiles().filter((t) => t.step === step).map((t) => t.variant);
+function variantsFor(step, campaign) {
+  return listTemplateFiles(campaign).filter((t) => t.step === step).map((t) => t.variant);
+}
+
+/**
+ * Spintax: "{Hi|Hey|Hello} there" becomes one of the options, chosen by a hash of `seed` (the lead's address and the step), so
+ * no two leads get identical wording but the same lead always gets the same text (previews and resends never change).
+ */
+function spin(text, seed) {
+  let n = 0;
+  return String(text).replace(/\{([^{}|]*\|[^{}]*)\}/g, (m, inner) => {
+    const opts = inner.split("|");
+    return opts[crypto.createHash("sha1").update(`${seed}:${n++}`).digest().readUInt32BE(0) % opts.length];
+  });
 }
 
 /** Fill {field} placeholders. Unknown fields throw so a typo can never reach a real email. */
@@ -137,7 +153,7 @@ function renderHtml(main, cfg) {
   const href = /^https?:/i.test(site) ? site : "https://" + site;
   let logoUrl = "";
   if (sig.logo !== false) { try { logoUrl = new URL(href).origin + "/assets/email-logo.png"; } catch (e) { /* no valid website: no logo */ } }
-  const logoRow = logoUrl ? `<tr><td style="padding:0 0 10px 0;"><a href="${esc(href)}"><img src="${esc(logoUrl)}" width="168" height="37" class="wl-logo" alt="${esc(sig.company)}" style="display:block;border:0;width:168px;max-width:100%;height:auto;"></a></td></tr>\n` : "";
+  const logoRow = logoUrl ? `<tr><td style="padding:0 0 10px 0;"><a href="${esc(href)}"><img src="${esc(logoUrl)}" width="168" height="28" class="wl-logo" alt="${esc(sig.company)}" style="display:block;border:0;width:168px;max-width:100%;height:auto;"></a></td></tr>\n` : "";
   const role = sig.title ? `${esc(sig.title)}, ${esc(sig.company)}` : esc(sig.company);
   // Responsive: fluid 100% width capped at 600px, viewport meta, and a small-screen media query (clients that
   // strip <style> still get the fluid inline layout). Table-based shell for Outlook.
@@ -180,17 +196,45 @@ ${esc(sig.postal_address)}<br>${esc(OPT_OUT_TEXT)}
 
 /** Returns { subject, text, html } for email `step` to `lead`. */
 function render(step, lead, cfg, variant = "a", rawTemplate = null) {
-  const { subject, body } = rawTemplate ? parseTemplate(rawTemplate) : loadTemplate(step, variant);
+  const { subject, body } = rawTemplate ? parseTemplate(rawTemplate) : loadTemplate(step, variant, lead.campaign);
   const fields = fieldsFor(lead, cfg);
   const sig = cfg.signature;
-  const main = fill(body, fields).trimEnd();
+  const seed = `${String(lead.email || "").toLowerCase()}|${step}`;
+  const main = fill(spin(body, seed), fields).trimEnd();
   const footer = `\n\n--\n${sig.company} | ${sig.website}\n${sig.postal_address}\n${OPT_OUT_TEXT}`;
-  return { subject: fill(subject, fields), text: main + footer, html: renderHtml(main, cfg) };
+  return { subject: fill(spin(subject, seed + "|s"), fields), text: main + footer, html: renderHtml(main, cfg) };
+}
+
+// ---------------------------------------------------------------- copy check (before launch, no AI needed)
+const SPAMMY = /\b(act now|buy now|order now|limited time|risk[- ]free|100% (free|guaranteed)|guarantee[ds]?|winner|congratulations|cash|make money|earn \$|urgent|click here|no obligation|special promotion|exclusive deal|lowest price|cheap|discount|amazing deal|incredible|once in a lifetime|dear friend)\b/gi;
+const PUSHY_CTA = /\b(reply now|call me (now|today)|book (now|today)|don'?t miss|last chance|asap|hurry)\b/gi;
+/** Deliverability and quality check of one email. Returns { score 1-10, issues: [{ level: "bad"|"warn", text }], stats }. */
+function copyCheck(subject, body, { first = true } = {}) {
+  const issues = [], b = String(body || ""), sub = String(subject || "");
+  const words = (b.match(/\S+/g) || []).length;
+  const links = (b.match(/https?:\/\/\S+|\bwww\.\S+/gi) || []).length;
+  const bad = (text) => issues.push({ level: "bad", text }), warn = (text) => issues.push({ level: "warn", text });
+  const hits = [...new Set([...(sub.match(SPAMMY) || []), ...(b.match(SPAMMY) || [])].map((x) => x.toLowerCase()))];
+  if (hits.length) (hits.length > 1 ? bad : warn)(`Spam-filter trigger words: ${hits.join(", ")}`);
+  const cta = [...new Set((b.match(PUSHY_CTA) || []).map((x) => x.toLowerCase()))];
+  if (cta.length) warn(`Pushy call to action: ${cta.join(", ")}. A soft question gets more replies.`);
+  if (sub.length > 60) warn(`Subject is ${sub.length} characters; under 50 shows fully on phones.`);
+  if (!sub.trim()) bad("The subject is empty.");
+  if (/[A-Z]{4,}/.test(sub.replace(/\b(US|UK|AI|SEO|CBD|PSI|LCP|FAQ)\b/g, ""))) warn("Subject has ALL-CAPS words.");
+  if ((sub.match(/!/g) || []).length) warn("Avoid exclamation marks in the subject.");
+  if ((b.match(/!/g) || []).length > 1) warn("More than one exclamation mark in the body.");
+  if (first && links > 1) (links > 2 ? bad : warn)(`${links} links in the first email; use none or one.`);
+  else if (!first && links > 2) warn(`${links} links; keep follow-ups to one.`);
+  if (first && words > 150) (words > 220 ? bad : warn)(`${words} words is long for a first cold email; under 120 reads best.`);
+  if (words < 25) warn("Very short; add one specific detail so it doesn't look automated.");
+  if (/<[a-z][\s\S]*>/i.test(b)) warn("Contains HTML-looking text; cold email works best as plain text.");
+  const score = Math.max(1, 10 - 3 * issues.filter((i) => i.level === "bad").length - issues.filter((i) => i.level === "warn").length);
+  return { score, issues, stats: { words, links, subjectLength: sub.length } };
 }
 
 /** Email 1 variants are shared out evenly, stably per address. */
 function pickVariant(lead, step) {
-  const vs = variantsFor(step).sort();
+  const vs = variantsFor(step, lead.campaign).sort();
   if (step > 1) return vs.includes(lead.variant) ? lead.variant : "a";
   const h = crypto.createHash("sha1").update(String(lead.email).toLowerCase()).digest().readUInt32BE(0);
   return vs[h % vs.length];
@@ -211,5 +255,4 @@ function templateProblems(cfg) {
   return problems;
 }
 
-module.exports = { OPT_OUT_TEXT, OVERRIDE, listTemplateFiles, parseTemplate, loadTemplate, variantsFor, fill, prettyDomain, shopperQuestions,
-  fieldsFor, render, renderHtml, pickVariant, templateProblems, SAMPLE_LEAD, FILE_RE };
+module.exports = { OPT_OUT_TEXT, OVERRIDE, campaignDir, listTemplateFiles, parseTemplate, loadTemplate, variantsFor, fill, prettyDomain, fieldsFor, render, renderHtml, pickVariant, spin, copyCheck, templateProblems, SAMPLE_LEAD, FILE_RE };

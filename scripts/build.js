@@ -109,7 +109,7 @@ ${list.map((pj) => projectCard(pj, loc)).join("\n")}
 function nav(cls = "nav scrolled", logoHref = "/") {
   return `<header class="${cls}" id="nav">
   <div class="wrap">
-    <a href="${logoHref}" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="187" height="33"></a>
+    <a href="${logoHref}" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="196" height="32"></a>
     <nav class="nav-links" id="navLinks" aria-label="Main">
       <div class="nav-dd"><a href="/#services" class="dd-t">Services <i aria-hidden="true"></i></a><div class="dd-menu dd-svc">${MAIN_SERVICES.map((m, i) => `<a href="${m.href}"><b>0${i + 1}</b><span>${esc(m.name)}<small>${esc(m.line)}</small></span></a>`).join("")}<a href="/services/" class="dd-all">All services →</a></div></div>
       <a href="/work/">Work</a>
@@ -123,6 +123,12 @@ function nav(cls = "nav scrolled", logoHref = "/") {
 </header>`;
 }
 
+const SOCIAL = [
+  { name: "LinkedIn", url: "https://www.linkedin.com/company/weberslinkk", icon: '<path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9.75h4V21H3V9.75zm6.5 0h3.83v1.54h.05c.53-1 1.84-2.04 3.78-2.04 4.04 0 4.79 2.66 4.79 6.12V21h-4v-4.94c0-1.18-.02-2.7-1.65-2.7-1.65 0-1.9 1.29-1.9 2.62V21h-4V9.75z"/>' },
+  { name: "Instagram", url: "https://www.instagram.com/weberslink/", icon: '<path d="M7.5 2h9A5.5 5.5 0 0 1 22 7.5v9a5.5 5.5 0 0 1-5.5 5.5h-9A5.5 5.5 0 0 1 2 16.5v-9A5.5 5.5 0 0 1 7.5 2zm0 2A3.5 3.5 0 0 0 4 7.5v9A3.5 3.5 0 0 0 7.5 20h9a3.5 3.5 0 0 0 3.5-3.5v-9A3.5 3.5 0 0 0 16.5 4h-9zM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm5.25-3.25a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5z"/>' },
+];
+const SAME_AS = SOCIAL.map((s) => s.url);
+
 function footer() {
   const col = (title, list) =>
     `<div class="fcol"><h2>${title}</h2>${list.map((p) => `<a href="${p.path}">${esc(p.card.title)}</a>`).join("")}</div>`;
@@ -130,9 +136,10 @@ function footer() {
   <div class="wrap">
     <div class="foot-cols">
       <div class="fcol fcol-brand">
-        <a href="/" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="187" height="33"></a>
+        <a href="/" class="logo"><img class="logo-img" src="/assets/logo.png" alt="WebersLink" width="196" height="32"></a>
         <p>Your in-house tech team: automation, AI voice and chat agents, websites, software and CMS. For businesses in the US, UK &amp; Europe.</p>
         <a href="/#book" class="btn btn-light" data-track="Book CTA" data-loc="footer">Book a free call</a>
+        <div class="social">${SOCIAL.map((s) => `<a href="${s.url}" target="_blank" rel="noopener me" aria-label="WebersLink on ${s.name}" title="${s.name}" data-track="Social" data-loc="${s.name}"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">${s.icon}</svg></a>`).join("")}</div>
       </div>
       ${col("Offers", OFFERS)}
       ${col("Services", SERVICES)}
@@ -164,7 +171,7 @@ function schema(p) {
       itemListElement: crumbs.map(([name, href], i) => ({ "@type": "ListItem", position: i + 1, name, item: SITE + href })),
     },
   ];
-  const org = { "@type": "Organization", name: "WebersLink", url: SITE + "/", logo: SITE + "/apple-touch-icon.png" };
+  const org = { "@type": "Organization", name: "WebersLink", url: SITE + "/", logo: SITE + "/apple-touch-icon.png", sameAs: SAME_AS };
   if (p.type === "service" || p.type === "industry") {
     graph.push({
       "@type": "Service",
@@ -1228,7 +1235,7 @@ function enhanceHome(html) {
     const faqSec = (html.match(/<section class="white pad" id="faq">[\s\S]*?<\/section>/) || [""])[0];
     const faqs = [...faqSec.matchAll(/<details[^>]*><summary>([\s\S]*?)<\/summary><p>([\s\S]*?)<\/p><\/details>/g)].map((x) => [decode(strip(x[1])), decode(strip(x[2]))]);
     const graph = [
-      { "@type": "Organization", "@id": SITE + "/#org", name: "WebersLink", url: SITE + "/", description: biz.description, logo: SITE + "/apple-touch-icon.png", email: "hassan@weberslink.org", address: biz.address, areaServed: biz.areaServed },
+      { "@type": "Organization", "@id": SITE + "/#org", name: "WebersLink", url: SITE + "/", description: biz.description, logo: SITE + "/apple-touch-icon.png", sameAs: SAME_AS, email: "hassan@weberslink.org", address: biz.address, areaServed: biz.areaServed },
       { "@type": "WebSite", "@id": SITE + "/#website", url: SITE + "/", name: "WebersLink", inLanguage: "en", publisher: { "@id": SITE + "/#org" } },
       biz,
     ];

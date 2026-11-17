@@ -141,4 +141,4 @@ const wrapEmail = (html) => `<div style="font-family:Arial,Helvetica,sans-serif;
 /** nodemailer attachment objects. */
 const forMail = (attachments = []) => attachments.map((a) => ({ filename: a.filename, contentType: a.contentType, content: Buffer.from(a.content, "base64"), ...(a.cid ? { cid: a.cid, contentDisposition: "inline" } : {}) }));
 
-module.exports = { sanitize, htmlToText, prepare, wrapEmail, forMail, MAX_TOTAL_BYTES, MAX_FILES };
+module.exports = { sanitize, htmlToText, prepare, wrapEmail, forMail, MAX_TOTAL_BYTES };

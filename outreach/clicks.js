@@ -117,4 +117,4 @@ function handle(req, res) {
   return true;
 }
 
-module.exports = { baseUrl, trackHtml, record, forLead, allLeads, recent, handle, BOT_UA, SCANNER_WINDOW_MS };
+module.exports = { baseUrl, trackHtml, record, forLead, allLeads, recent, handle };

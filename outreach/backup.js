@@ -15,7 +15,7 @@ const eng = require("./engine");
 const FORMAT = "weberslink-outreach-backup";
 const FILES = ["config.json", "tracking.csv", "sent_log.csv", "do_not_contact.csv", "mailboxes.json", "research_state.json", "backup_state.json", "scheduled.json", "links.json", "clicks.json"];
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
-const TEMPLATE = /^templates\/(email[1-4][b-z]?\.txt)$/;
+const TEMPLATE = /^templates\/((?:campaign-\d{1,2}\/)?email[1-4][b-z]?\.txt)$/;
 
 const readText = (p) => { try { return fs.readFileSync(p, "utf8"); } catch (e) { return null; } };
 
@@ -24,7 +24,13 @@ function create({ markDone = true } = {}) {
   if (markDone) store.writeJson("backup_state.json", { lastBackup: new Date().toISOString() }); // first, so the file carries its own date
   const files = {};
   for (const name of FILES) { const t = readText(store.P(name)); if (t != null) files[name] = t; }
-  try { for (const n of fs.readdirSync(tpl.OVERRIDE)) if (tpl.FILE_RE.test(n)) files["templates/" + n] = fs.readFileSync(path.join(tpl.OVERRIDE, n), "utf8"); } catch (e) { /* no edited templates */ }
+  try {
+    for (const n of fs.readdirSync(tpl.OVERRIDE)) {
+      const full = path.join(tpl.OVERRIDE, n);
+      if (tpl.FILE_RE.test(n)) files["templates/" + n] = fs.readFileSync(full, "utf8");
+      else if (/^campaign-\d{1,2}$/.test(n)) for (const m of fs.readdirSync(full)) if (tpl.FILE_RE.test(m)) files[`templates/${n}/${m}`] = fs.readFileSync(path.join(full, m), "utf8");
+    }
+  } catch (e) { /* no edited templates */ }
   return { format: FORMAT, version: 1, createdAt: new Date().toISOString(), files };
 }
 
@@ -71,7 +77,7 @@ function restore(bundle) {
   } catch (e) { safetyCopy = ""; }
   for (const [name, text] of entries) {
     const t = TEMPLATE.exec(name);
-    if (t) { fs.mkdirSync(tpl.OVERRIDE, { recursive: true }); store.atomicWrite(path.join(tpl.OVERRIDE, t[1]), text); }
+    if (t) { fs.mkdirSync(path.dirname(path.join(tpl.OVERRIDE, t[1])), { recursive: true }); store.atomicWrite(path.join(tpl.OVERRIDE, t[1]), text); }
     else store.atomicWrite(store.P(name), text);
   }
   return { restored: entries.map(([n]) => n), safetyCopy };

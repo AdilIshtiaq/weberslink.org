@@ -18,6 +18,11 @@ const cleaner = require("./cleaner");
 const research = require("./research");
 const clicks = require("./clicks");
 const backup = require("./backup");
+const ai = require("./ai");
+const unsub = require("./unsub");
+const warmup = require("./warmup");
+const verify = require("./verify");
+const { Mailbox } = require("./mail");
 
 const PASSWORD = process.env.ADMIN_PASSWORD || "";
 const USERNAME = (process.env.ADMIN_USERNAME || "").trim().toLowerCase();
@@ -110,7 +115,7 @@ const clientIp = (req) => {
   return xff.length ? xff[xff.length - 1] : String(req.socket.remoteAddress || "");
 };
 
-const LEAD_VIEW = ["email", "first_name", "store", "domain", "country", "category", "step", "status", "mailbox", "variant", "last_sent", "psi", "note", "loom_sent"];
+const LEAD_VIEW = ["email", "first_name", "store", "domain", "country", "category", "step", "status", "mailbox", "variant", "last_sent", "psi", "note", "loom_sent", "ai_score", "ai_score_reason", "reply_label", "snooze_until", "outcome", "smtp", "state", "city", "campaign"];
 
 async function route(req, res, url, method) {
   const p = url.pathname.replace(/^\/api\/outreach/, "") || "/";
@@ -171,12 +176,28 @@ async function route(req, res, url, method) {
     if (eng.run.running) return send(res, 409, { ok: false, error: "A run is in progress. Stop it before changing settings." });
     const body = await readJson(req);
     try {
+      if (body.campaigns === undefined) body.campaigns = eng.loadConfig().campaigns; // the Settings form doesn't edit campaigns: keep them
       const cfg = eng.sanitizeConfig(body);
       eng.saveConfig(cfg);
       return send(res, 200, { ok: true, config: cfg });
     } catch (e) { return send(res, 400, { ok: false, error: e.message }); }
   }
 
+  // --- campaigns (groups of leads by place and business type) ---
+  if (p === "/campaigns" && method === "GET") return send(res, 200, { ok: true, campaigns: eng.loadConfig().campaigns, options: eng.campaignOptions(), mailboxes: eng.loadConfig().mailboxes.filter((m) => m.email).map((m) => ({ id: m.id, email: m.email })) });
+  if (p === "/campaigns" && method === "PUT") {
+    const body = await readJson(req);
+    try {
+      const cfg = eng.sanitizeConfig({ ...eng.loadConfig(), campaigns: body.campaigns });
+      eng.saveConfig(cfg);
+      eng.loadState(cfg); // waiting leads move into their new campaigns straight away
+      return send(res, 200, { ok: true, campaigns: cfg.campaigns });
+    } catch (e) { return send(res, 400, { ok: false, error: e.message }); }
+  }
+  if (p === "/campaigns/preview" && method === "POST") {
+    const body = await readJson(req);
+    return send(res, 200, { ok: true, ...eng.campaignPreview(body.filters || {}, eng.loadConfig(), body.id) });
+  }
   if (p === "/run" && method === "POST") {
     const body = await readJson(req);
     const r = eng.startRun({ source: "dashboard", forceDry: body.dry === true });
@@ -201,6 +222,32 @@ async function route(req, res, url, method) {
     testSends.push(Date.now());
     try { return send(res, 200, { ok: true, ...(await eng.sendTest(String(body.to || "").trim())) }); } catch (e) { return send(res, 400, { ok: false, error: e.message }); }
   }
+  // --- Gemini: scoring, drafts, objections ---
+  if (p === "/ai/status" && method === "GET") return send(res, 200, { ok: true, ...ai.status() });
+  if (p === "/ai/score/start" && method === "POST") {
+    const body = await readJson(req);
+    const r = ai.startScoring({ limit: Math.max(1, Math.min(200, parseInt(body.limit, 10) || 25)), cfg: eng.loadConfig() });
+    return send(res, r.started ? 202 : 400, { ok: r.started, ...(r.started ? {} : { error: r.reason }) });
+  }
+  if (p === "/ai/stop" && method === "POST") { ai.stopJob(); return send(res, 200, { ok: true }); }
+  if (p === "/ai/draft" && method === "POST") {
+    const body = await readJson(req);
+    const lead = store.loadTracking().find((t) => t.email.toLowerCase() === String(body.email || "").toLowerCase());
+    if (!lead) return send(res, 404, { ok: false, error: "Lead not found." });
+    try {
+      const draft = await ai.draftReply(lead, eng.loadConfig(), { text: lead.reply_snippet, label: lead.reply_label });
+      if (!draft) return send(res, 422, { ok: false, error: "Gemini's draft didn't pass the safety checks (length or links). Try again." });
+      store.updateLead(lead.email, { draft_reply: draft });
+      return send(res, 200, { ok: true, draft });
+    } catch (e) { return send(res, 400, { ok: false, error: String(e.message).slice(0, 200) }); }
+  }
+  if (p === "/ai/objections" && method === "POST") {
+    try { const r = await ai.mineObjections(); return send(res, r.ok ? 200 : 400, r); } catch (e) { return send(res, 400, { ok: false, error: String(e.message).slice(0, 200) }); }
+  }
+  if (p === "/warmup/run" && method === "POST") {
+    if (eng.run.running) return send(res, 409, { ok: false, error: "A run is in progress. Try again when it finishes." });
+    try { return send(res, 200, { ok: true, ...(await runWarmup({ force: true })) }); } catch (e) { return send(res, 400, { ok: false, error: String(e.message).slice(0, 200) }); }
+  }
   if (p === "/dns" && method === "GET") return send(res, 200, { ok: true, domains: await eng.dnsHealth() });
 
   if (p === "/preview" && method === "GET") {
@@ -214,7 +261,8 @@ async function route(req, res, url, method) {
     const limit = Math.min(500, Math.max(1, parseInt(url.searchParams.get("limit"), 10) || 100));
     const offset = Math.max(0, parseInt(url.searchParams.get("offset"), 10) || 0);
     const cl = clicks.allLeads();
-    const all = store.loadTracking().filter((t) => (!st || (st === "clicked" ? ((cl[t.email.toLowerCase()] || {}).clicks || 0) > 0 : t.status === st)) && (!q || `${t.email} ${t.store} ${t.domain}`.toLowerCase().includes(q)));
+    const camp = url.searchParams.get("campaign") || "";
+    const all = store.loadTracking().filter((t) => (!camp || (camp === "none" ? !t.campaign : t.campaign === camp)) && (!st || (st === "clicked" ? ((cl[t.email.toLowerCase()] || {}).clicks || 0) > 0 : t.status === st)) && (!q || `${t.email} ${t.store} ${t.domain}`.toLowerCase().includes(q)));
     const cfg = eng.loadConfig();
     return send(res, 200, { ok: true, total: all.length, rows: all.slice(offset, offset + limit).map((t) => ({ ...Object.fromEntries(LEAD_VIEW.map((f) => [f, t[f]])), next: eng.nextEmail(t, cfg), clicks: (cl[t.email.toLowerCase()] || {}).clicks || 0 })) });
   }
@@ -254,7 +302,9 @@ async function route(req, res, url, method) {
     return send(res, 200, { ok: true, approved: research.approveShown(body.items) });
   }
   if (p === "/leads/clean/start" && method === "POST") {
-    const r = cleaner.startScan({ mx: eng.domainReceivesMail });
+    const body = await readJson(req);
+    const fromDomain = (eng.loadConfig().mailboxes.find((m) => m.email) || { email: "@example.com" }).email.split("@")[1];
+    const r = cleaner.startScan({ mx: eng.domainReceivesMail, smtp: body.smtp === true ? (e) => verify.probe(e, { fromDomain }) : undefined });
     return send(res, r.started ? 202 : 409, { ok: r.started, ...(r.started ? {} : { error: r.reason }) });
   }
   if (p === "/leads/clean/status" && method === "GET") return send(res, 200, { ok: true, ...cleaner.jobStatus() });
@@ -273,6 +323,9 @@ async function route(req, res, url, method) {
     let r = null;
     if (body.action === "restore") r = cleaner.restore(email);
     else if (body.action === "retry_held" || body.action === "skip_held") r = eng.resolveHeld(email, body.action === "retry_held" ? "retry" : "skip");
+    else if (["meeting_booked", "won", "lost"].includes(body.action)) r = store.updateLead(email, { outcome: body.action });
+    else if (body.action === "clear_outcome") r = store.updateLead(email, { outcome: "" });
+    else if (body.action === "clear_snooze") r = store.updateLead(email, { snooze_until: "" });
     else if (body.action === "loom_sent") r = store.updateLead(email, { loom_sent: "1" });
     else if (body.action === "loom_unsent") r = store.updateLead(email, { loom_sent: "" });
     else if (body.action === "dnc") {
@@ -291,9 +344,24 @@ async function route(req, res, url, method) {
 
   if (p === "/templates" && method === "GET") {
     const bundled = new Set(fs.existsSync(path.join(__dirname, "templates")) ? fs.readdirSync(path.join(__dirname, "templates")) : []);
-    const edited = new Set(fs.existsSync(tpl.OVERRIDE) ? fs.readdirSync(tpl.OVERRIDE) : []);
-    return send(res, 200, { ok: true, templates: tpl.listTemplateFiles().map((t) => ({ name: t.name, step: t.step, variant: t.variant, text: fs.readFileSync(t.file, "utf8"), edited: edited.has(t.name), bundled: bundled.has(t.name) })),
+    const camp = url.searchParams.get("campaign") || "", cdir = tpl.campaignDir(camp);
+    const dir = cdir || tpl.OVERRIDE; // "edited" means edited for the campaign being viewed, or for everyone when none is chosen
+    const edited = new Set(fs.existsSync(dir) ? fs.readdirSync(dir) : []);
+    return send(res, 200, { ok: true, templates: tpl.listTemplateFiles(camp).map((t) => ({ name: t.name, step: t.step, variant: t.variant, text: fs.readFileSync(t.file, "utf8"), edited: edited.has(t.name), bundled: bundled.has(t.name) })),
       fields: Object.keys(tpl.fieldsFor(tpl.SAMPLE_LEAD, eng.loadConfig())) });
+  }
+  if (p === "/templates/check" && method === "POST") {
+    const body = await readJson(req);
+    try {
+      const step = Math.min(4, Math.max(1, parseInt(body.step, 10) || 1));
+      const r = tpl.render(step, tpl.SAMPLE_LEAD, eng.loadConfig(), "a", String(body.text || ""));
+      const main = r.text.split("\n\n--\n")[0];
+      const out = { ok: true, ...tpl.copyCheck(r.subject, main, { first: step === 1 }) };
+      if (body.ai === true) {
+        try { out.ai = await ai.reviewCopy(r.subject, main); } catch (e) { out.aiError = String(e.message).slice(0, 160); }
+      }
+      return send(res, 200, out);
+    } catch (e) { return send(res, 400, { ok: false, error: e.message }); }
   }
   if (p === "/templates/preview" && method === "POST") {
     const body = await readJson(req);
@@ -307,6 +375,7 @@ async function route(req, res, url, method) {
     const body = await readJson(req);
     const name = String(body.name || "");
     if (!tpl.FILE_RE.test(name)) return send(res, 400, { ok: false, error: "Template names look like email1.txt, email1b.txt ... email4.txt" });
+    const saveDir = tpl.campaignDir(body.campaign) || tpl.OVERRIDE;
     const text = String(body.text || "").replace(/\r\n/g, "\n");
     try {
       const { subject, body: b } = tpl.parseTemplate(text, name);
@@ -315,14 +384,14 @@ async function route(req, res, url, method) {
       if (left) throw new Error(`Still contains the placeholder ${left[0]}`);
       tpl.render(Number(name[5]), tpl.SAMPLE_LEAD, eng.loadConfig(), "a", text);
     } catch (e) { return send(res, 400, { ok: false, error: e.message }); }
-    fs.mkdirSync(tpl.OVERRIDE, { recursive: true });
-    store.atomicWrite(path.join(tpl.OVERRIDE, name), text.endsWith("\n") ? text : text + "\n");
+    fs.mkdirSync(saveDir, { recursive: true });
+    store.atomicWrite(path.join(saveDir, name), text.endsWith("\n") ? text : text + "\n");
     return send(res, 200, { ok: true });
   }
   if (p === "/templates" && method === "DELETE") {
     const name = String(url.searchParams.get("name") || "");
     if (!tpl.FILE_RE.test(name)) return send(res, 400, { ok: false, error: "Bad template name." });
-    try { fs.unlinkSync(path.join(tpl.OVERRIDE, name)); } catch (e) { return send(res, 404, { ok: false, error: "No edited copy to reset." }); }
+    try { fs.unlinkSync(path.join(tpl.campaignDir(url.searchParams.get("campaign")) || tpl.OVERRIDE, name)); } catch (e) { return send(res, 404, { ok: false, error: "No edited copy to reset." }); }
     return send(res, 200, { ok: true });
   }
 
@@ -338,11 +407,22 @@ async function route(req, res, url, method) {
   return send(res, 404, { ok: false, error: "Not found." });
 }
 
+let warming = false;
+/** One warm-up pass between the enabled mailboxes that have a password. */
+async function runWarmup({ force = false } = {}) {
+  if (warming) return { skipped: "already running" };
+  warming = true;
+  const cfg = eng.loadConfig();
+  const boxes = cfg.mailboxes.filter((m) => m.enabled && m.email).map((m) => new Mailbox(m)).filter((b) => b.hasPassword());
+  try { return await warmup.tick({ cfg, boxes, force, log: eng.log }); } finally { for (const b of boxes) b.close(); warming = false; }
+}
+
 /** Returns true if the request was for the outreach API (and has been answered). */
 function handle(req, res) {
   let url;
   try { url = new URL(req.url, "http://x"); } catch (e) { return false; }
   if (url.pathname.startsWith("/r/") && (req.method === "GET" || req.method === "HEAD")) return clicks.handle(req, res); // tracked email links
+  if (url.pathname.startsWith("/u/") && ["GET", "HEAD", "POST"].includes(req.method)) { try { unsub.handle(req, res, url); } catch (e) { if (!res.headersSent) { res.writeHead(404); res.end(); } } return true; } // one-click unsubscribe
   if (url.pathname !== "/api/outreach" && !url.pathname.startsWith("/api/outreach/")) return false;
   if (!enabled) { send(res, 503, { ok: false, error: "Outreach is off. Set ADMIN_PASSWORD (10+ characters) on the server to turn it on." }); return true; }
   route(req, res, url, req.method).catch((e) => {
@@ -352,11 +432,7 @@ function handle(req, res) {
   return true;
 }
 
-/**
- * Optional in-process daily trigger (Hostinger cron is the reliable one; this is a bonus while the app is awake).
- * Set OUTREACH_AUTO_RUN_HOUR=0-23 (hour in the Settings time zone). Only runs when Settings is on Live.
- * Restarts can't cause extra sends: the per-mailbox daily budget counts what was already sent today.
- */
+/** In-process timers: automatic runs, scheduled replies and warm-up (Hostinger cron stays the reliable wake-up call). */
 function startScheduler() {
   if (enabled) {
     const d = store.info();
@@ -384,23 +460,12 @@ function startScheduler() {
     setInterval(due, 60 * 1000).unref();
     setTimeout(due, 20 * 1000).unref();
   }
-  const raw = process.env.OUTREACH_AUTO_RUN_HOUR;
-  if (!enabled || raw === undefined || raw === "") return;
-  const hour = Number(raw);
-  if (!Number.isInteger(hour) || hour < 0 || hour > 23) return console.warn("OUTREACH_AUTO_RUN_HOUR must be 0-23 - auto-run disabled.");
-  let lastDate = "";
-  setInterval(() => {
-    try {
-      const cfg = eng.loadConfig();
-      if (cfg.sending.dry_run) return;
-      const t = eng.tzParts(new Date(), cfg.sending.timezone);
-      if (t.date === lastDate || t.hour < hour) return;
-      lastDate = t.date;
-      const r = eng.startRun({ source: "auto" });
-      if (!r.started) lastDate = ""; // try again next tick
-    } catch (e) { console.error("outreach scheduler:", e.message); }
-  }, 10 * 60 * 1000).unref();
-  console.log(`Outreach auto-run on: daily after ${hour}:00.`);
+  // Warm-up between your own mailboxes: every 30 minutes, daytime only, only when switched on in Settings.
+  if (enabled) {
+    const wu = () => { try { if (eng.loadConfig().warmup.enabled && !eng.run.running) runWarmup().catch((e) => console.error("outreach warm-up:", e.message)); } catch (e) { console.error("outreach warm-up:", e.message); } };
+    setInterval(wu, 30 * 60 * 1000).unref();
+    setTimeout(wu, 2 * 60 * 1000).unref();
+  }
 }
 
 module.exports = { handle, enabled, startScheduler, authed: (req) => enabled && authed(req) };
