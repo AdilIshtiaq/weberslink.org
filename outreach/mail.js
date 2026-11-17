@@ -30,7 +30,6 @@ class Mailbox {
       const port = Number(this.conf.smtp_port || 465);
       this.transport = nodemailer.createTransport({
         host: this.conf.smtp_host || "smtp.hostinger.com", port, secure: port === 465, requireTLS: port !== 465, // never fall back to plain text
-        
         auth: { user: this.addr, pass: this.pw }, connectionTimeout: 30000, socketTimeout: 60000,
       });
     }

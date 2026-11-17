@@ -73,7 +73,7 @@
     var nr = s.replied.filter(function (r) { return !r.loomSent; }).length;
     $("replyBadge").hidden = !nr; $("replyBadge").textContent = nr;
 
-    var c = s.byStatus || {}, started = (s.total || 0) - (c["new"] || 0) - (c["skipped-country"] || 0) - (c["skipped-no-mailserver"] || 0) - (c["do-not-contact"] || 0) - (c["skipped-bad-address"] || 0);
+    var c = s.byStatus || {};
     $("cards").innerHTML = [
       ["Leads", s.total], ["Not yet contacted", s.remaining], ["In sequence", c.active || 0], ["Replied", c.replied || 0],
       ["Bounced", c.bounced || 0], ["Days to finish", s.daysLeft || "–"]

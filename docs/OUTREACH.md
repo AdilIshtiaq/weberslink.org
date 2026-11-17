@@ -64,13 +64,12 @@ Safety behaviour worth knowing:
 | `OUTREACH_CRON_TOKEN` | for cron | 16+ random characters; lets a cron job start a run. |
 | `OUTREACH_DATA_DIR` | **strongly recommended** | Absolute path to a folder OUTSIDE the app folder, e.g. `/home/USER/outreach-data` (your home folder is shown in Hostinger's File Manager). This is where your settings, leads, history and login key live. Default if unset: `outreach-data` in the account's home folder. The dashboard shows the folder in use and warns if it is inside the app. |
 | `OUTREACH_ALLOWED_HOSTS` | optional | Comma-separated mail servers allowed besides Hostinger's. Mailbox passwords are only ever sent to allowed servers. |
-| `OUTREACH_AUTO_RUN_HOUR` | optional | 0-23, hour (Settings time zone) after which the app starts the daily run itself while awake. |
 | `GEMINI_OUTREACH_KEY` | for Gemini | Free key from Google AI Studio, used only by "Personalise (Gemini)". Falls back to the website chat key (`GEMINI_API_KEY`), but then research shares the chat widget's quota, so use a separate key. |
 | `GEMINI_OUTREACH_DAILY_MAX` | optional | Most Gemini lookups per day (default 150). |
 | `GEMINI_OUTREACH_GAP_SECONDS` | optional | Pause between lookups (default 7), to stay inside free-tier rate limits. |
 | `GEMINI_OUTREACH_MODEL` | optional | Model name (default `gemini-flash-latest`). |
 | `OUTREACH_NOTIFY_EMAIL` | optional | Default address for reply notifications (so a private address never has to be written in the code). A value saved in Settings wins. |
-| `OUTREACH_AUTO_RUN` | optional | Automatic running is on by default (see "Runs by itself"). Set to `off` to disable it on the server. The old values `window` and `always` are accepted and mean the same as the default. |
+| `OUTREACH_AUTO_RUN` | optional | Automatic running is on by default (see "Runs by itself"). Set to `off` to disable it on the server. |
 | `ADMIN_SESSION_SECRET` | optional | Login-cookie signing key. Default: a random key stored in the data folder. |
 
 Passwords are never stored in files or in the dashboard, and `outreach-data/` is git-ignored (this repo is public).

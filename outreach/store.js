@@ -182,5 +182,5 @@ function addSuppression(value) {
   fs.appendFileSync(P("do_not_contact.csv"), value.trim().toLowerCase() + "\n");
 }
 
-module.exports = { info, isInside, EXPLICIT_DIR, DASHBOARD_FIELDS, exportCsv, isEmail, sessionKey, DATA_DIR, P, ensureDir, TRACK_FIELDS, ENGINE_FIELDS, SENT_FIELDS, parseCsv, toCsv, readCsv, writeCsv, readJson, writeJson,
+module.exports = { info, isInside, exportCsv, isEmail, sessionKey, P, ensureDir, TRACK_FIELDS, ENGINE_FIELDS, parseCsv, toCsv, readCsv, readJson, writeJson,
   loadTracking, saveTracking, saveRow, updateLead, appendSentLog, appendLog, loadSuppression, addSuppression, atomicWrite };

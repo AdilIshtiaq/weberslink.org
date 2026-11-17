@@ -412,11 +412,7 @@ function handle(req, res) {
   return true;
 }
 
-/**
- * Optional in-process daily trigger (Hostinger cron is the reliable one; this is a bonus while the app is awake).
- * Set OUTREACH_AUTO_RUN_HOUR=0-23 (hour in the Settings time zone). Only runs when Settings is on Live.
- * Restarts can't cause extra sends: the per-mailbox daily budget counts what was already sent today.
- */
+/** In-process timers: automatic runs, scheduled replies and warm-up (Hostinger cron stays the reliable wake-up call). */
 function startScheduler() {
   if (enabled) {
     const d = store.info();
@@ -450,23 +446,6 @@ function startScheduler() {
     setInterval(wu, 30 * 60 * 1000).unref();
     setTimeout(wu, 2 * 60 * 1000).unref();
   }
-  const raw = process.env.OUTREACH_AUTO_RUN_HOUR;
-  if (!enabled || raw === undefined || raw === "") return;
-  const hour = Number(raw);
-  if (!Number.isInteger(hour) || hour < 0 || hour > 23) return console.warn("OUTREACH_AUTO_RUN_HOUR must be 0-23 - auto-run disabled.");
-  let lastDate = "";
-  setInterval(() => {
-    try {
-      const cfg = eng.loadConfig();
-      if (cfg.sending.dry_run) return;
-      const t = eng.tzParts(new Date(), cfg.sending.timezone);
-      if (t.date === lastDate || t.hour < hour) return;
-      lastDate = t.date;
-      const r = eng.startRun({ source: "auto" });
-      if (!r.started) lastDate = ""; // try again next tick
-    } catch (e) { console.error("outreach scheduler:", e.message); }
-  }, 10 * 60 * 1000).unref();
-  console.log(`Outreach auto-run on: daily after ${hour}:00.`);
 }
 
-module.exports = { handle, enabled, startScheduler, runWarmup, authed: (req) => enabled && authed(req) };
+module.exports = { handle, enabled, startScheduler, authed: (req) => enabled && authed(req) };

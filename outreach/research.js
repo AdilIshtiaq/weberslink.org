@@ -267,4 +267,4 @@ function approveShown(shown) {
   return n;
 }
 
-module.exports = { keyInfo, modelName, redact, isQuota, bareDomain, validateLine, parseModelJson, checkedSource, researchLead, startJob, stopJob, status, pending, review, approveShown, setGenerator, QuotaError, needsResearch };
+module.exports = { keyInfo, modelName, redact, isQuota, validateLine, parseModelJson, checkedSource, researchLead, startJob, stopJob, status, pending, review, approveShown, setGenerator, QuotaError };

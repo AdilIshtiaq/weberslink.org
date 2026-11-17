@@ -1123,5 +1123,5 @@ async function processScheduled(cfg = loadConfig(), deps = {}, now = new Date())
   return sent;
 }
 
-module.exports = { sendReply, scheduleReply, cancelScheduled, listScheduled, processScheduled, autoRunDue, MAX_PER_MAILBOX_PER_DAY, RESCAN_MS, logTail, markInterrupted, readLastRun, windowState, inWindow, campaignDate, domainReceivesMail, nextEmail, sendTest, dnsHealth, resolveHeld, VERSION, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dailyLimitFor, bounceCheck, dueFollowups, runOnce,
-  startRun, requestStop, previewNext, status, queueOrder, cfgFor, healthScore, analytics, readiness, applyRules, loadState, tzParts, isSendDay, today, daysSince, run, log };
+module.exports = { sendReply, scheduleReply, cancelScheduled, listScheduled, processScheduled, autoRunDue, MAX_PER_MAILBOX_PER_DAY, RESCAN_MS, logTail, markInterrupted, readLastRun, windowState, inWindow, campaignDate, domainReceivesMail, nextEmail, sendTest, dnsHealth, resolveHeld, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dueFollowups, runOnce,
+  startRun, requestStop, previewNext, status, queueOrder, cfgFor, healthScore, analytics, loadState, tzParts, isSendDay, today, run, log };

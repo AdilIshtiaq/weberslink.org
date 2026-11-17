@@ -25,4 +25,4 @@ function post(urlStr, payload, timeoutMs = 8000) {
   });
 }
 
-module.exports = { post, setSender, PRIVATE_HOST };
+module.exports = { post, setSender };

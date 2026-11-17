@@ -251,5 +251,4 @@ function templateProblems(cfg) {
   return problems;
 }
 
-module.exports = { OPT_OUT_TEXT, OVERRIDE, listTemplateFiles, parseTemplate, loadTemplate, variantsFor, fill, prettyDomain, shopperQuestions,
-  fieldsFor, render, renderHtml, pickVariant, spin, copyCheck, templateProblems, SAMPLE_LEAD, FILE_RE };
+module.exports = { OPT_OUT_TEXT, OVERRIDE, listTemplateFiles, parseTemplate, loadTemplate, variantsFor, fill, prettyDomain, fieldsFor, render, renderHtml, pickVariant, spin, copyCheck, templateProblems, SAMPLE_LEAD, FILE_RE };

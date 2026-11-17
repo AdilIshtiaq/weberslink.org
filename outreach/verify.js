@@ -70,4 +70,4 @@ async function probe(email, { fromDomain = "example.com", timeoutMs = 8000, mxLo
   return "unknown";
 }
 
-module.exports = { probe, NO_SUCH_USER };
+module.exports = { probe };

@@ -100,4 +100,4 @@ function status(now = new Date()) {
 }
 const spamRate = (addr) => { const p = read().placement[String(addr).toLowerCase()]; const n = p ? p.inbox + p.spam : 0; return n >= 5 ? p.spam / n : 0; };
 
-module.exports = { tick, status, spamRate, inDaytime, SUBJECTS, BODIES, REPLIES };
+module.exports = { tick, status, spamRate };

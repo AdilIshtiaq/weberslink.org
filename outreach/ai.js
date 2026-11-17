@@ -259,5 +259,5 @@ function status() {
   return { configured: configured(), usedToday: usageToday(), dailyMax: aiDailyCap(), job: { ...job }, objections: store.readJson("objections.json", null) };
 }
 
-module.exports = { LABELS, POSITIVE, setGenerator, classifyReply, enrichReply, addReferral, draftReply, validDraft, scoreLead, mineObjections, reviewCopy, startScoring, stopJob, status,
+module.exports = { POSITIVE, setGenerator, classifyReply, enrichReply, addReferral, draftReply, validDraft, scoreLead, mineObjections, reviewCopy, startScoring, stopJob, status,
   localReturnDate, validReturnDate, QuotaError, configured };
