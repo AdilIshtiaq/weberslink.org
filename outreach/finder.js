@@ -190,10 +190,34 @@ function stateOn() { const s = store.readJson(STATE, {}); const d = new Date().t
 const bump = (k, n = 1) => { const s = stateOn(); s[k] = (s[k] || 0) + n; store.writeJson(STATE, s); return s; };
 const usage = () => { const s = stateOn(); return { sites: s.sites || 0, sitesMax: capSites(), searches: s.searches || 0, searchesMax: capQueries() }; };
 
+/** Turns a network failure into something a person can act on. */
+function explain(e, host) {
+  const code = e && e.code, msg = String((e && e.message) || e);
+  if (code === "ENOTFOUND" || code === "EAI_AGAIN") return `could not look up ${host} (DNS). Check that your hosting allows outgoing connections`;
+  if (["ECONNREFUSED", "ETIMEDOUT", "ENETUNREACH", "EHOSTUNREACH", "ECONNRESET", "EPIPE"].includes(code) || /timeout|closed/i.test(msg)) return `could not connect to ${host} (${code || msg}). Your hosting may block outgoing connections, or the service is down`;
+  if (code === "EBLOCKED" || /not allowed/.test(msg)) return `${host} resolved to a private address`;
+  return `${host}: ${msg.slice(0, 120)}`;
+}
+const NOMINATIM = () => (env().FINDER_NOMINATIM_URL || "https://nominatim.openstreetmap.org/search").split(",")[0].trim();
+async function nominatim(q) {
+  if (transport) return transport.nominatim(q);
+  const url = NOMINATIM() + "?format=jsonv2&limit=1&addressdetails=1&q=" + encodeURIComponent(q), host = new URL(url).hostname;
+  let last = null;
+  for (let i = 0; i < 2; i++) { // one polite retry: the free service sometimes drops a request
+    try {
+      const r = await fetchText(url, { headers: { Accept: "application/json" } });
+      if (r.status === 429) throw new Error("the map search service is rate-limiting this server, try again in a minute");
+      if (r.status === 403) throw new Error("the map search service refused this server (HTTP 403). Set FINDER_NOMINATIM_URL to another Nominatim server");
+      if (r.status !== 200) throw new Error("HTTP " + r.status);
+      try { return JSON.parse(r.body); } catch (e) { throw new Error("it did not answer with map data"); }
+    } catch (e) { last = e; if (!/rate-limiting|refused/.test(String(e.message))) await sleep(1200); else break; }
+  }
+  throw new Error("Could not look up the place: " + (/rate-limiting|refused|map data|HTTP/.test(String(last.message)) ? last.message : explain(last, host)) + ".");
+}
 async function geocode(place) {
   const q = String(place || "").trim();
   if (q.length < 2) throw new Error("Enter a city, county or region, for example Austin, TX.");
-  const r = transport ? await transport.nominatim(q) : await fetchText("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&q=" + encodeURIComponent(q), { headers: { Accept: "application/json" } }).then((x) => JSON.parse(x.body));
+  const r = await nominatim(q);
   const hit = Array.isArray(r) ? r[0] : null;
   if (!hit || !hit.boundingbox) throw new Error(`Could not find "${q}" on the map. Try a city name with its state or country.`);
   const [s, n, w, e] = hit.boundingbox.map(Number);
@@ -203,12 +227,26 @@ async function geocode(place) {
   return { name: String(hit.display_name || q).slice(0, 120), bbox: [s, w, n, e], country: String(a.country_code || "").toUpperCase().replace(/^GB$/, "UK"), state: a["ISO3166-2-lvl4"] ? String(a["ISO3166-2-lvl4"]).split("-").pop() : "" };
 }
 const overpassQuery = (tags, bbox, limit) => `[out:json][timeout:45];(${tags.map(([k, v]) => `nwr["${k}"="${v}"]["name"](${bbox.join(",")});`).join("")});out tags center ${Math.min(limit * 4, 400)};`;
+// The free public Overpass servers are often busy, so several are tried in turn. FINDER_OVERPASS_URL may list your own (comma separated).
+const overpassUrls = () => [...new Set([...(env().FINDER_OVERPASS_URL || "").split(",").map((x) => x.trim()).filter(Boolean), "https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://overpass.private.coffee/api/interpreter"])];
 async function overpass(query) {
   if (transport) return transport.overpass(query);
-  const r = await fetchText(env().FINDER_OVERPASS_URL || "https://overpass-api.de/api/interpreter", { method: "POST", body: "data=" + encodeURIComponent(query), headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" }, timeoutMs: 60000, maxBytes: 4 * 1024 * 1024 });
-  if (r.status === 429 || r.status === 504) throw new Error("The free map server is busy. Try again in a minute.");
-  if (r.status !== 200) throw new Error("The map server returned an error (" + r.status + ").");
-  return JSON.parse(r.body);
+  const problems = [];
+  for (const url of overpassUrls()) {
+    const host = new URL(url).hostname;
+    try {
+      const r = await fetchText(url, { method: "POST", body: "data=" + encodeURIComponent(query), headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" }, timeoutMs: 60000, maxBytes: 4 * 1024 * 1024 });
+      if (r.status === 400) throw Object.assign(new Error("the map server rejected the search (HTTP 400)"), { fatal: true });
+      if (r.status !== 200) { problems.push(`${host}: ${r.status === 429 || r.status === 504 || r.status === 503 ? "busy" : "HTTP " + r.status}`); continue; }
+      let data; try { data = JSON.parse(r.body); } catch (e) { problems.push(`${host}: unreadable answer (probably overloaded)`); continue; }
+      if (data && data.remark && /runtime error|timed out/i.test(data.remark) && !(data.elements || []).length) { problems.push(`${host}: timed out`); continue; }
+      return data;
+    } catch (e) {
+      if (e.fatal) throw e;
+      problems.push(`${host}: ${explain(e, host).replace(/^could not (connect to|look up) [^ ]+ /, "unreachable ")}`);
+    }
+  }
+  throw new Error(`The free map servers did not answer (${problems.join("; ")}). Try again in a few minutes, or set FINDER_OVERPASS_URL to your own Overpass server.`);
 }
 const cleanText = (s, n) => String(s == null ? "" : s).replace(/[\u0000-\u001f\u007f<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, n);
 function candidateFrom(el, area, label) {
@@ -298,6 +336,16 @@ function startSearch({ type, place, limit = 40 }, deps = {}) {
   return { started: true, done };
 }
 const stopSearch = () => { job.stop = true; };
+
+/** Tests every link of the chain from this server and says exactly where it breaks. Returns [{ step, ok, ms, detail }]. */
+async function diagnose() {
+  const out = [], step = async (name, fn) => { const t0 = Date.now(); try { out.push({ step: name, ok: true, ms: Date.now() - t0, detail: String(await fn()) }); } catch (e) { out.push({ step: name, ok: false, ms: Date.now() - t0, detail: String(e.message || e).slice(0, 220) }); } };
+  await step("Reach the internet (DNS)", async () => { if (transport) return "skipped"; const a = await dns.lookup("nominatim.openstreetmap.org"); return `nominatim.openstreetmap.org is ${a.address}`; });
+  await step("Look up a place on the map", async () => { const a = await geocode("Leeds, UK"); return `found ${a.name.slice(0, 40)}`; });
+  await step("Search for businesses", async () => { const d = await overpass(overpassQuery([["amenity", "dentist"]], [53.79, -1.56, 53.81, -1.53], 5)); return `${((d && d.elements) || []).length} businesses in a small test area`; });
+  await step("Read a public website", async () => { const r = await getPage("https://example.com/"); if (r.status !== 200) throw new Error("HTTP " + r.status); return "example.com answered"; });
+  return out;
+}
 const results = () => store.readJson(RESULTS, null);
 const status = () => ({ job: { ...job }, usage: usage(), types: typeNames(), results: (() => { const r = results(); return r ? { at: r.at, query: r.query, total: r.items.length, usable: r.items.filter((c) => c.usable && !c.imported).length, imported: r.items.filter((c) => c.imported).length } : null; })() });
 /** The chosen candidates as spreadsheet-style rows for importLeads(); marks nothing until markImported() is called. */
@@ -315,5 +363,5 @@ function markImported(ids) {
 }
 const clearResults = () => store.writeJson(RESULTS, null);
 
-module.exports = { startSearch, stopSearch, status, results, rowsFor, markImported, clearResults, tagsForType, safeTags, typeNames, emailsFromHtml, robotsRules, findEmailOnSite,
+module.exports = { overpass, diagnose, explain, startSearch, stopSearch, status, results, rowsFor, markImported, clearResults, tagsForType, safeTags, typeNames, emailsFromHtml, robotsRules, findEmailOnSite,
   isPrivateIp, publicLookup, fetchText, _test: testHooks, overpassQuery, candidateFrom, geocode, setTransport, setSleep, usage };

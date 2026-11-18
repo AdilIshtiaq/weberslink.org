@@ -850,6 +850,16 @@
     $("fBody").innerHTML = ""; $("fGo").disabled = true;
     api("POST", "/api/outreach/finder/search", { type: type, place: place, limit: Number($("fLimit").value) }).then(function () { pollFinder(); }).catch(function (e) { fail(e); $("fGo").disabled = false; });
   });
+  $("fTest").addEventListener("click", function () {
+    var b = this; b.disabled = true; $("fMsg").textContent = "Testing the connection from your server…";
+    api("GET", "/api/outreach/finder/diagnose").then(function (r) {
+      $("fBody").innerHTML = '<div class="panel" style="margin:10px 0 0"><h3>Connection test</h3><table>' + r.steps.map(function (s) {
+        return "<tr><td style='width:28px'>" + (s.ok ? '<span class="ok">✓</span>' : '<span class="bad">✗</span>') + "</td><td>" + esc(s.step) + '</td><td class="' + (s.ok ? "hint" : "bad") + '">' + esc(s.detail) + "</td><td class='hint'>" + s.ms + " ms</td></tr>";
+      }).join("") + "</table></div>";
+      var bad = r.steps.filter(function (s) { return !s.ok; })[0];
+      $("fMsg").textContent = bad ? "Problem found at: " + bad.step : "Everything works. You can search.";
+    }).catch(fail).then(function () { b.disabled = false; });
+  });
   $("fStop").addEventListener("click", function () { api("POST", "/api/outreach/finder/stop", {}).then(function () { toast("Stopping…"); pollFinder(); }).catch(fail); });
   function loadFinderResults() {
     api("GET", "/api/outreach/finder/results").then(function (r) {

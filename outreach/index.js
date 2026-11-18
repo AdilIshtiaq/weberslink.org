@@ -240,6 +240,7 @@ async function route(req, res, url, method) {
     });
     return send(res, r.started ? 202 : 400, { ok: r.started, ...(r.started ? {} : { error: r.reason }) });
   }
+  if (p === "/finder/diagnose" && method === "GET") return send(res, 200, { ok: true, steps: await finder.diagnose() });
   if (p === "/finder/stop" && method === "POST") { finder.stopSearch(); return send(res, 200, { ok: true }); }
   if (p === "/finder/results" && method === "GET") return send(res, 200, { ok: true, results: finder.results() });
   if (p === "/finder/import" && method === "POST") {

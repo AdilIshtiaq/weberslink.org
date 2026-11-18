@@ -96,3 +96,62 @@ test("a complete search that reads real (local) websites over HTTP, honours robo
   assert.strictEqual(finder.status().results.usable, 3);
   finder.setTransport(null); delete process.env.ROBOTS;
 });
+
+function server(handler) { return new Promise((resolve) => { const s = http.createServer(handler); s.listen(0, "127.0.0.1", () => resolve(s)); }); }
+const urlOf = (s, p = "/") => `http://127.0.0.1:${s.address().port}${p}`;
+
+test("map search service errors are explained: rate limit, refusal, HTML instead of data, and a good answer", async () => {
+  finder._test.allowPrivate = true; finder.setTransport(null); finder.setSleep(async () => {});
+  const answers = { "/ok": [200, JSON.stringify([{ display_name: "Leeds", boundingbox: ["53.7", "53.9", "-1.7", "-1.4"], address: { country_code: "gb" } }])], "/429": [429, "slow down"], "/403": [403, "blocked"], "/html": [200, "<html>Welcome</html>"] };
+  const s = await server((req, res) => { const a = answers[new URL(req.url, "http://x").pathname] || [404, ""]; res.writeHead(a[0]); res.end(a[1]); });
+  try {
+    process.env.FINDER_NOMINATIM_URL = urlOf(s, "/ok");
+    assert.strictEqual((await finder.geocode("Leeds")).country, "UK");
+    process.env.FINDER_NOMINATIM_URL = urlOf(s, "/429"); await assert.rejects(finder.geocode("Leeds"), /rate-limiting/);
+    process.env.FINDER_NOMINATIM_URL = urlOf(s, "/403"); await assert.rejects(finder.geocode("Leeds"), /refused this server/);
+    process.env.FINDER_NOMINATIM_URL = urlOf(s, "/html"); await assert.rejects(finder.geocode("Leeds"), /did not answer with map data/);
+    process.env.FINDER_NOMINATIM_URL = "http://127.0.0.1:1/search"; await assert.rejects(finder.geocode("Leeds"), /Could not look up the place.*could not connect/);
+  } finally { delete process.env.FINDER_NOMINATIM_URL; s.close(); }
+});
+
+test("if the first Overpass server is busy or broken, the next one is used, in order", async () => {
+  finder._test.allowPrivate = true; finder.setTransport(null);
+  const hits = [];
+  const busy = await server((req, res) => { hits.push("busy"); req.resume(); res.writeHead(429); res.end("busy"); });
+  const junk = await server((req, res) => { hits.push("junk"); req.resume(); res.writeHead(200); res.end("<html>overloaded</html>"); });
+  const slowMsg = await server((req, res) => { hits.push("timeout-remark"); req.resume(); res.writeHead(200); res.end(JSON.stringify({ remark: "runtime error: Query timed out", elements: [] })); });
+  const good = await server((req, res) => { hits.push("good"); req.resume(); res.writeHead(200, { "Content-Type": "application/json" }); res.end(JSON.stringify({ elements: [{ id: 1, tags: { name: "Test Dental" } }] })); });
+  try {
+    process.env.FINDER_OVERPASS_URL = [busy, junk, slowMsg, good].map((x) => urlOf(x)).join(",");
+    const data = await finder.overpass("[out:json];out;");
+    assert.deepStrictEqual(hits, ["busy", "junk", "timeout-remark", "good"]);
+    assert.strictEqual(data.elements[0].tags.name, "Test Dental");
+    hits.length = 0;
+    const bad = await server((req, res) => { hits.push("syntax"); req.resume(); res.writeHead(400); res.end("parse error"); });
+    process.env.FINDER_OVERPASS_URL = [bad, good].map((x) => urlOf(x)).join(",");
+    await assert.rejects(finder.overpass("broken"), /rejected the search/);
+    assert.deepStrictEqual(hits, ["syntax"], "a rejected query is not retried elsewhere");
+    bad.close();
+  } finally { delete process.env.FINDER_OVERPASS_URL; for (const x of [busy, junk, slowMsg, good]) x.close(); }
+});
+
+test("network failures are put in words a person can act on", () => {
+  const e = (code, message) => Object.assign(new Error(message || code), { code });
+  assert.match(finder.explain(e("ENOTFOUND"), "overpass-api.de"), /look up overpass-api\.de.*outgoing connections/);
+  assert.match(finder.explain(e("ETIMEDOUT"), "x.org"), /could not connect to x\.org.*may block outgoing/);
+  assert.match(finder.explain(new Error("timeout"), "x.org"), /could not connect/);
+  assert.match(finder.explain(e("EBLOCKED", "address not allowed"), "x.org"), /private address/);
+  assert.match(finder.explain(new Error("weird"), "x.org"), /x\.org: weird/);
+});
+
+test("the connection test checks each step and names the one that fails", async () => {
+  finder.setTransport({ nominatim: async () => [{ display_name: "Leeds", boundingbox: ["53.7", "53.9", "-1.7", "-1.4"], address: { country_code: "gb" } }], overpass: async () => ({ elements: [{ id: 1 }, { id: 2 }] }), page: async () => ({ status: 200, body: "ok" }) });
+  let steps = await finder.diagnose();
+  assert.deepStrictEqual(steps.map((s) => s.ok), [true, true, true, true]);
+  assert.match(steps[2].detail, /2 businesses/);
+  finder.setTransport({ nominatim: async () => { throw new Error("Could not look up the place: could not connect to nominatim.openstreetmap.org (ETIMEDOUT)."); }, overpass: async () => ({ elements: [] }), page: async () => ({ status: 503, body: "" }) });
+  steps = await finder.diagnose();
+  assert.deepStrictEqual(steps.map((s) => s.ok), [true, false, true, false]);
+  assert.match(steps[1].detail, /ETIMEDOUT/); assert.match(steps[3].detail, /HTTP 503/);
+  finder.setTransport(null);
+});
