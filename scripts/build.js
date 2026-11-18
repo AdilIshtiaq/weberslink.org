@@ -113,6 +113,7 @@ function nav(cls = "nav scrolled", logoHref = "/") {
     <nav class="nav-links" id="navLinks" aria-label="Main">
       <div class="nav-dd"><a href="/#services" class="dd-t">Services <i aria-hidden="true"></i></a><div class="dd-menu dd-svc">${MAIN_SERVICES.map((m, i) => `<a href="${m.href}"><b>0${i + 1}</b><span>${esc(m.name)}<small>${esc(m.line)}</small></span></a>`).join("")}<a href="/services/" class="dd-all">All services →</a></div></div>
       <a href="/work/">Work</a>
+      <a href="https://clip.weberslink.org/">Video clips</a>
       <a href="/plugins/">Free plugins</a>
       <a href="/blog/">Guides</a>
       <a href="/contact">Contact</a>
