@@ -133,12 +133,12 @@ function emailsFromHtml(html, domain = "") {
 }
 /** robots.txt for "*": returns a function path -> allowed? (a missing or unreadable file allows everything). */
 function robotsRules(text) {
-  const rules = []; let active = false, any = false;
+  const rules = []; let active = false;
   for (const raw of String(text || "").split(/\r?\n/)) {
     const line = raw.replace(/#.*/, "").trim(), m = /^([a-z-]+)\s*:\s*(.*)$/i.exec(line);
-    if (!m) { if (!line) any = false; continue; }
+    if (!m) continue;
     const k = m[1].toLowerCase();
-    if (k === "user-agent") { active = m[2].trim() === "*" || /webers/i.test(m[2]); any = true; }
+    if (k === "user-agent") { active = m[2].trim() === "*" || /webers/i.test(m[2]); }
     else if (active && k === "disallow" && m[2].trim()) rules.push(m[2].trim());
   }
   return (p) => !rules.some((r) => r === "/" || p.startsWith(r.replace(/\*.*$/, "")));
