@@ -27,6 +27,23 @@ emails would send the default ones (which are written for roofing companies).
 address and a real **unsubscribe here** link next to "reply unsubscribe". The default accent colour is the brand red (`#ef1421`); a colour you already saved is kept. The editor
 shows each email with its timing ("Email 2 · 3 days later"), offers only the placeholders that make sense, and previews on desktop or phone width.
 
+## Finding new leads (free)
+**Leads -> Find new leads.** Pick a business type (roofing contractor, dentist, restaurant … or type your own when Gemini is connected) and a place
+(a city or county, for example Austin, TX), and how many businesses. It then:
+1. looks the place up on **OpenStreetMap** (Nominatim) and finds matching businesses (Overpass API), free and without a key;
+2. reads each business's **own public website** (the homepage and a few contact pages, `robots.txt` respected) for a contact email, including emails hidden
+   behind `mailto:` links, "name [at] site [dot] com" and Cloudflare's email protection;
+3. verifies the result with the same list cleaner as imports (junk and system addresses removed, shared mailboxes like `info@` flagged), checks the domain has a mail server,
+   and removes duplicates against your leads, your never-contact list and the rest of the search;
+4. leaves the results in a **review table**. Usable ones are ticked; the rest say why not (no website, robots.txt asked not to be read, no mail server, already yours).
+   **Import selected** adds them as normal leads with their place, business type and country, and they join the campaign that fits.
+
+Limits and safety: free map data covers small businesses unevenly (many list no website or email), so expect a share of results to be unusable; UK and Europe are usually
+better covered than the US. The reader only follows public web addresses (private, local and link-local addresses are refused, including through redirects), reads at most four pages per site, and
+one search runs at a time. Daily caps: 400 websites (`FINDER_DAILY_SITES_MAX`) and 30 searches (`FINDER_DAILY_SEARCHES_MAX`). `FINDER_OVERPASS_URL` can point at another Overpass server.
+Map data (c) OpenStreetMap contributors (ODbL). You remain responsible for emailing lawfully: honour opt-outs and include a postal address (both are built into every email).
+Other sources (Google Places, Overture Maps, Apollo) can be added behind the same screen later.
+
 ## Using the dashboard
 Six sections, left to right in the menu:
 - **Overview:** what needs you right now. A **Get ready to send** checklist (sender details, mailbox, leads, optional campaigns, test email, domain check, go live)
@@ -290,7 +307,7 @@ Every email carries the postal address and an opt-out line. A mailbox pauses its
 A/B versions share one body and differ only in subject; judge after about 100 leads each.
 
 ## Tests
-`npm test` (about 167 tests: engine, API, auth, regression tests for an independent code review; no network or real
+`npm test` (about 178 tests: engine, API, auth, regression tests for an independent code review; no network or real
 mailboxes needed).
 
 ## Not covered by tests
