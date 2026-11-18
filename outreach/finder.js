@@ -54,7 +54,9 @@ const TAG_KEYS = new Set(["craft", "shop", "amenity", "office", "healthcare", "l
 const safeTags = (list) => (Array.isArray(list) ? list : []).map((x) => [String(x && x.key), String(x && x.value)]).filter(([k, v]) => TAG_KEYS.has(k) && /^[a-z0-9_]{2,40}$/.test(v)).slice(0, 6);
 
 // ---------------------------------------------------------------- safe HTTP
+const testHooks = { allowPrivate: false }; // tests only: lets the HTTP code talk to a local fixture server. Never set by the app.
 function isPrivateIp(ip) {
+  if (testHooks.allowPrivate) return false;
   const v = net.isIP(ip);
   if (v === 4) {
     const [a, b, c] = ip.split(".").map(Number);
@@ -83,12 +85,15 @@ function publicLookup(hostname, opts, cb) {
 let transport = null; // tests replace the network: { overpass(query), nominatim(q), page(url) -> { status, body } }
 const setTransport = (t) => { transport = t; };
 
-function fetchText(urlStr, { method = "GET", body, headers = {}, timeoutMs = 9000, maxBytes = 400 * 1024, redirects = 3 } = {}) {
-  return new Promise((resolve, reject) => {
+function fetchText(urlStr, { method = "GET", body, headers = {}, timeoutMs = 9000, maxBytes = 400 * 1024, redirects = 3, deadlineMs = 20000 } = {}) {
+  return new Promise((resolveRaw, rejectRaw) => {
+    let settled = false, deadline = null;
+    const resolve = (v) => { if (!settled) { settled = true; clearTimeout(deadline); resolveRaw(v); } };
+    const reject = (e) => { if (!settled) { settled = true; clearTimeout(deadline); rejectRaw(e); } };
     let u;
     try { u = new URL(urlStr); } catch (e) { return reject(new Error("bad address")); }
     if (!/^https?:$/.test(u.protocol) || u.username || u.password) return reject(new Error("address not allowed"));
-    if (u.port && !["80", "443", ""].includes(u.port)) return reject(new Error("address not allowed"));
+    if (u.port && !testHooks.allowPrivate && !["80", "443", ""].includes(u.port)) return reject(new Error("address not allowed"));
     // Node does not call a custom lookup for a literal IP address, so a literal is vetted here (names are vetted in publicLookup).
     const literal = u.hostname.replace(/^\[|\]$/g, "");
     if (net.isIP(literal) && isPrivateIp(literal)) return reject(new Error("address not allowed"));
@@ -101,11 +106,15 @@ function fetchText(urlStr, { method = "GET", body, headers = {}, timeoutMs = 900
         return resolve(fetchText(next, { method: "GET", headers, timeoutMs, maxBytes, redirects: redirects - 1 }));
       }
       const chunks = []; let n = 0;
-      res.on("data", (d) => { n += d.length; if (n <= maxBytes) chunks.push(d); else req.destroy(); });
-      res.on("end", () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString("utf8") }));
-      res.on("error", reject);
+      const finish = () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString("utf8") });
+      // A very large page is cut off at maxBytes and what we have is used (the contact details are almost always near the top).
+      res.on("data", (d) => { n += d.length; chunks.push(d); if (n >= maxBytes) { finish(); res.destroy(); } });
+      res.on("end", finish);
+      res.on("error", (e) => (n ? finish() : reject(e)));
+      res.on("close", () => { if (!settled) (n ? finish() : reject(new Error("connection closed"))); });
     });
     req.on("timeout", () => req.destroy(new Error("timeout")));
+    deadline = setTimeout(() => req.destroy(new Error("timeout")), deadlineMs); // a server that trickles data forever can't hold us either
     req.on("error", reject);
     if (body) req.write(body);
     req.end();
@@ -121,8 +130,10 @@ const ROLE = /^(info|contact|hello|hi|office|admin|sales|support|enquiries|inqui
 const decodeCf = (hex) => { try { const k = parseInt(hex.slice(0, 2), 16); let out = ""; for (let i = 2; i < hex.length; i += 2) out += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16) ^ k); return out; } catch (e) { return ""; } };
 /** Every plausible email on a page, best first. domain: the business's own domain, used to rank. */
 function emailsFromHtml(html, domain = "") {
-  const found = new Set(), src = String(html || "");
+  const found = new Set();
+  const src = String(html || "").replace(/&#x([0-9a-f]{1,6});/gi, (m, h) => String.fromCodePoint(Math.min(parseInt(h, 16), 0x10ffff))).replace(/&#(\d{1,7});/g, (m, d) => String.fromCodePoint(Math.min(Number(d), 0x10ffff))).replace(/&(commat|period);/gi, (m, n) => (n.toLowerCase() === "commat" ? "@" : ".")); // entity-hidden addresses
   for (const m of src.matchAll(/data-cfemail="([0-9a-f]{6,})"/gi)) found.add(decodeCf(m[1]));
+  for (const m of src.matchAll(/"(?:email|contactEmail|e-mail)"\s*:\s*"(?:mailto:)?([^"\s]{3,120})"/gi)) found.add(m[1]); // JSON-LD / structured data
   for (const m of src.matchAll(/mailto:([^"'?\s<>#]+)/gi)) { try { found.add(decodeURIComponent(m[1])); } catch (e) { found.add(m[1]); } }
   const text = src.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&#64;|&commat;/gi, "@").replace(/\s*[\[(]\s*at\s*[\])]\s*/gi, "@").replace(/\s*[\[(]\s*dot\s*[\])]\s*/gi, ".");
   for (const m of text.matchAll(/[A-Za-z0-9._%+\-]{1,64}@[A-Za-z0-9.\-]{1,190}\.[A-Za-z]{2,24}/g)) found.add(m[0]);
@@ -305,4 +316,4 @@ function markImported(ids) {
 const clearResults = () => store.writeJson(RESULTS, null);
 
 module.exports = { startSearch, stopSearch, status, results, rowsFor, markImported, clearResults, tagsForType, safeTags, typeNames, emailsFromHtml, robotsRules, findEmailOnSite,
-  isPrivateIp, publicLookup, fetchText, overpassQuery, candidateFrom, geocode, setTransport, setSleep, usage };
+  isPrivateIp, publicLookup, fetchText, _test: testHooks, overpassQuery, candidateFrom, geocode, setTransport, setSleep, usage };
