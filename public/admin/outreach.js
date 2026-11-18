@@ -825,6 +825,61 @@
     api("PUT", "/api/outreach/config", body).then(function (r) { state.config = r.config; toast("Settings saved"); state.dirty = false; loadSettings(); refresh(); }).catch(fail);
   });
 
+  // ---------------------------------------------------------------- lead finder (free map data + public websites)
+  var fTimer;
+  var safeHref = function (u) { return /^https?:\/\//i.test(u) ? u : /^[a-z0-9.-]+\.[a-z]{2,}/i.test(u) ? "https://" + u : ""; };
+  $("findBtn").addEventListener("click", function () { $("finderBox").hidden = !$("finderBox").hidden; if (!$("finderBox").hidden) pollFinder(true); else clearTimeout(fTimer); });
+  function pollFinder(first) {
+    clearTimeout(fTimer);
+    api("GET", "/api/outreach/finder/status").then(function (s) {
+      if (first && !$("fTypes").children.length) $("fTypes").innerHTML = s.types.map(function (t) { return '<option value="' + esc(t) + '">'; }).join("") + (s.gemini ? "" : "");
+      var j = s.job, u = s.usage;
+      $("fGo").disabled = j.running; $("fStop").hidden = !j.running; $("fBar").hidden = !j.running;
+      if (j.running) {
+        $("fBarIn").style.width = (j.total ? Math.round(100 * j.done / j.total) : 8) + "%";
+        $("fMsg").textContent = (j.phase || "Working") + (j.total ? " (" + j.done + " of " + j.total + ", " + j.withEmail + " emails so far)" : "…");
+        fTimer = setTimeout(pollFinder, 1500); return;
+      }
+      $("fMsg").innerHTML = esc(j.message || "") + ' <span class="hint">Websites read today: ' + u.sites + " of " + u.sitesMax + " · searches: " + u.searches + " of " + u.searchesMax + (s.gemini ? "" : " · connect Gemini to search business types that are not in the list") + "</span>";
+      if (s.results) loadFinderResults(); else if (first) $("fBody").innerHTML = "";
+    }).catch(fail);
+  }
+  $("fGo").addEventListener("click", function () {
+    var type = $("fType").value.trim(), place = $("fPlace").value.trim();
+    if (!type || !place) return fail(new Error("Enter a business type and a place, for example roofing contractor in Austin, TX."));
+    $("fBody").innerHTML = ""; $("fGo").disabled = true;
+    api("POST", "/api/outreach/finder/search", { type: type, place: place, limit: Number($("fLimit").value) }).then(function () { pollFinder(); }).catch(function (e) { fail(e); $("fGo").disabled = false; });
+  });
+  $("fStop").addEventListener("click", function () { api("POST", "/api/outreach/finder/stop", {}).then(function () { toast("Stopping…"); pollFinder(); }).catch(fail); });
+  function loadFinderResults() {
+    api("GET", "/api/outreach/finder/results").then(function (r) {
+      var res = r.results; if (!res) { $("fBody").innerHTML = ""; return; }
+      var items = res.items, usable = items.filter(function (c) { return c.usable && !c.imported; });
+      var rows = items.map(function (c) {
+        var can = c.usable && !c.imported, site = safeHref(c.website);
+        return "<tr" + (can ? "" : ' style="opacity:.6"') + '><td><input type="checkbox" data-fid="' + esc(c.id) + '"' + (can ? " checked" : " disabled") + '></td><td><div style="font-weight:600">' + esc(c.name) + '</div><div class="hint">' + esc(c.address || [c.city, c.state].filter(Boolean).join(", ")) + "</div></td><td>" +
+          (c.email ? esc(c.email) + '<div class="hint">' + (c.emailSource === "website" ? "found on their website" : "listed on the map") + (c.role ? " · shared mailbox" : "") + (c.free ? " · free mail" : "") + "</div>" : '<span class="hint">no email</span>') + "</td><td>" +
+          (site ? '<a href="' + esc(site) + '" target="_blank" rel="noopener noreferrer">' + esc(c.domain || "site") + "</a>" : "–") + '</td><td class="hint">' + (c.imported ? '<span class="ok">imported</span>' : esc(can ? "" : c.reason || "")) + "</td></tr>";
+      }).join("");
+      $("fBody").innerHTML = '<div class="hint" style="margin:8px 0">' + esc(res.query.type) + " in " + esc(res.query.place) + ": <b>" + items.length + "</b> businesses, <b>" + usable.length + "</b> with a usable email to import.</div>" +
+        '<div class="scroll" style="max-height:420px;overflow:auto"><table><tr><th></th><th>Business</th><th>Email</th><th>Website</th><th>Note</th></tr>' + rows + "</table></div>" +
+        '<div class="toolbar" style="margin:12px 0 0"><button class="btn primary sm" id="fImport"' + (usable.length ? "" : " disabled") + '>Import selected</button><button class="btn sm" id="fAll" type="button">Select all usable</button><button class="btn ghost sm" id="fNone" type="button">Select none</button><button class="btn ghost sm" id="fClear" type="button">Clear results</button><span class="hint">Imported leads go through the list cleaner and your country rules, then into the campaign that fits them.</span></div>';
+    }).catch(fail);
+  }
+  $("fBody").addEventListener("click", function (e) {
+    var boxes = function () { return $("fBody").querySelectorAll("input[data-fid]:not(:disabled)"); };
+    if (e.target.id === "fAll") boxes().forEach(function (b) { b.checked = true; });
+    if (e.target.id === "fNone") boxes().forEach(function (b) { b.checked = false; });
+    if (e.target.id === "fClear") api("POST", "/api/outreach/finder/clear", {}).then(function () { $("fBody").innerHTML = ""; $("fMsg").textContent = ""; }).catch(fail);
+    if (e.target.id === "fImport") {
+      var ids = [].map.call($("fBody").querySelectorAll("input[data-fid]:checked"), function (b) { return b.dataset.fid; });
+      if (!ids.length) return fail(new Error("Tick at least one business."));
+      e.target.disabled = true;
+      api("POST", "/api/outreach/finder/import", { ids: ids }).then(function (r) { toast("Added " + r.added + " lead" + (r.added === 1 ? "" : "s") + (r.cleaned ? " (" + r.cleaned + " set aside by the cleaner)" : "")); state.leadPage = 0; return loadFacets(); })
+        .then(function () { loadLeads(); loadFinderResults(); refresh(); }).catch(function (err) { fail(err); e.target.disabled = false; });
+    }
+  });
+
   // ---------------------------------------------------------------- campaigns
   var camps = function () { return (state.status && state.status.campaigns) || []; };
   function campName(id) { if (!id) return camps().length ? "none" : "–"; var c = camps().filter(function (x) { return String(x.id) === String(id); })[0]; return c ? c.name : "(removed)"; }

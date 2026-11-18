@@ -304,6 +304,15 @@ async function parseLeadFilter(query, facets = {}, stageNames = []) {
     minScore: Number.isFinite(min) && min >= 1 && min <= 10 ? min : 0, sort: ["score", "recent"].includes(String(o.sort)) ? String(o.sort) : "", text: clean(o.text, 60), summary: clean(o.summary, 100) };
 }
 
+// ---------------------------------------------------------------- business type -> map tags (lead finder)
+const MAPTYPE_SYSTEM = `You map a kind of local business to OpenStreetMap tags so it can be found on the map.
+Use ONLY these keys: craft, shop, amenity, office, healthcare, leisure, tourism. Values are lowercase OpenStreetMap values with underscores (for example craft=roofer, shop=bakery, amenity=dentist, office=lawyer). Give 1 to 4 tags, the most common first. If the business is not a local business that appears on a map, return an empty list.
+Return {"tags": [{"key": string, "value": string}]}.`;
+async function mapBusinessType(text) {
+  const o = await callJson(`Business type: <data>${clean(text, 80)}</data>`, MAPTYPE_SYSTEM);
+  return Array.isArray(o.tags) ? o.tags : [];
+}
+
 // ---------------------------------------------------------------- the daily brief
 const BRIEF_SYSTEM = `You are an analyst writing a short brief for the owner of a small cold-email operation, from the numbers you are given. Be specific, plain and honest; never invent numbers. If there is too little data to conclude something, say so.
 Return {"headline": max 90 characters, "bullets": [2-4 items, each max 140 characters], "next_action": the single most useful thing to do next, max 140 characters}.`;
@@ -353,5 +362,5 @@ function status() {
   return { configured: configured(), usedToday: usageToday(), dailyMax: aiDailyCap(), job: { ...job }, objections: store.readJson("objections.json", null) };
 }
 
-module.exports = { buildCampaign, writeSequence, rewriteEmail, checkedEmail, parseLeadFilter, brief, cachedBrief, TEMPLATE_FIELDS, POSITIVE, setGenerator, classifyReply, enrichReply, addReferral, draftReply, validDraft, scoreLead, mineObjections, reviewCopy, startScoring, stopJob, status,
+module.exports = { mapBusinessType, buildCampaign, writeSequence, rewriteEmail, checkedEmail, parseLeadFilter, brief, cachedBrief, TEMPLATE_FIELDS, POSITIVE, setGenerator, classifyReply, enrichReply, addReferral, draftReply, validDraft, scoreLead, mineObjections, reviewCopy, startScoring, stopJob, status,
   localReturnDate, validReturnDate, QuotaError, configured };

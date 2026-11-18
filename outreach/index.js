@@ -19,6 +19,7 @@ const research = require("./research");
 const clicks = require("./clicks");
 const backup = require("./backup");
 const ai = require("./ai");
+const finder = require("./finder");
 const unsub = require("./unsub");
 const warmup = require("./warmup");
 const verify = require("./verify");
@@ -227,6 +228,30 @@ async function route(req, res, url, method) {
     } catch (e) { return send(res, 400, { ok: false, error: e.message }); }
   }
   // --- Gemini: scoring, drafts, objections ---
+  // --- lead finder (free map data + public websites) ---
+  if (p === "/finder/status" && method === "GET") return send(res, 200, { ok: true, ...finder.status(), gemini: ai.configured() });
+  if (p === "/finder/search" && method === "POST") {
+    const body = await readJson(req);
+    const track = store.loadTracking();
+    const r = finder.startSearch({ type: body.type, place: body.place, limit: body.limit }, {
+      mx: eng.domainReceivesMail, mapType: ai.configured() ? (t) => ai.mapBusinessType(t) : null,
+      leadEmails: new Set(track.map((t) => t.email.toLowerCase())), leadDomains: new Set(track.map((t) => String(t.domain || "").toLowerCase()).filter(Boolean)),
+      suppressed: (e) => { const sup = store.loadSuppression(); return sup.has(e) || sup.has("@" + e.split("@")[1]); },
+    });
+    return send(res, r.started ? 202 : 400, { ok: r.started, ...(r.started ? {} : { error: r.reason }) });
+  }
+  if (p === "/finder/stop" && method === "POST") { finder.stopSearch(); return send(res, 200, { ok: true }); }
+  if (p === "/finder/results" && method === "GET") return send(res, 200, { ok: true, results: finder.results() });
+  if (p === "/finder/import" && method === "POST") {
+    const body = await readJson(req);
+    const ids = (Array.isArray(body.ids) ? body.ids : []).map(String).slice(0, 500);
+    const rows = finder.rowsFor(ids);
+    if (!rows.length) return send(res, 400, { ok: false, error: "Nothing selected to import." });
+    const r = eng.importLeads(rows, eng.loadConfig());
+    finder.markImported(ids);
+    return send(res, 200, { ok: true, ...r });
+  }
+  if (p === "/finder/clear" && method === "POST") { finder.clearResults(); return send(res, 200, { ok: true }); }
   if (p === "/ai/status" && method === "GET") return send(res, 200, { ok: true, ...ai.status() });
   if (p === "/ai/score/start" && method === "POST") {
     const body = await readJson(req);
