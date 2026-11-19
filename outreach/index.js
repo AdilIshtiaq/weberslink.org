@@ -116,7 +116,7 @@ const clientIp = (req) => {
   return xff.length ? xff[xff.length - 1] : String(req.socket.remoteAddress || "");
 };
 
-const LEAD_VIEW = ["email", "first_name", "store", "domain", "country", "category", "step", "status", "mailbox", "variant", "last_sent", "psi", "note", "loom_sent", "ai_score", "ai_score_reason", "reply_label", "snooze_until", "outcome", "smtp", "state", "city", "campaign"];
+const LEAD_VIEW = ["email", "first_name", "store", "domain", "country", "category", "step", "status", "mailbox", "variant", "last_sent", "psi", "note", "loom_sent", "ai_score", "ai_score_reason", "reply_label", "snooze_until", "outcome", "smtp", "state", "city", "campaign", "campaign_lock"];
 
 async function route(req, res, url, method) {
   const p = url.pathname.replace(/^\/api\/outreach/, "") || "/";
@@ -391,6 +391,19 @@ async function route(req, res, url, method) {
   if (p === "/leads/remove-bounced" && method === "POST") {
     if (eng.status().running) return send(res, 409, { ok: false, error: "A run is in progress. Wait for it to finish, then try again." });
     return send(res, 200, cleaner.removeBounced());
+  }
+  if (p === "/leads/bulk" && method === "POST") {
+    const body = await readJson(req, 2 * 1024 * 1024);
+    if (!["delete", "dnc", "move", "auto"].includes(body.action)) return send(res, 400, { ok: false, error: "Unknown action." });
+    if (eng.run.running) return send(res, 409, { ok: false, error: "A run is in progress. Stop it first, then try again." });
+    const cfg = eng.loadConfig(), track = store.loadTracking();
+    let emails = Array.isArray(body.emails) ? body.emails.map(String).slice(0, 20000) : [];
+    if (body.filter && typeof body.filter === "object") { // "all N leads matching these filters"
+      const f = body.filter;
+      emails = eng.leadQuery(track, { text: f.text, stage: f.stage, campaign: f.campaign, country: f.country, state: f.state, city: f.city, type: f.type, minScore: f.minScore }, cfg, new Date(), clicks.allLeads()).map((t) => t.email);
+    }
+    if (!emails.length) return send(res, 400, { ok: false, error: "No leads selected." });
+    try { return send(res, 200, { ok: true, ...eng.bulkLeads(body.action, emails, { campaign: body.campaign }, cfg) }); } catch (e) { return send(res, 400, { ok: false, error: e.message }); }
   }
   if (p === "/leads/clear-all" && method === "POST") {
     const body = await readJson(req);

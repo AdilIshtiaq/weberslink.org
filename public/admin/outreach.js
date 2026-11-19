@@ -22,6 +22,29 @@
     });
   }
   function fail(e) { toast(e.message || String(e), true); }
+  // In-page dialog instead of the browser's confirm/prompt (browsers can silently block those). Resolves null (cancelled) or { value }.
+  // o: { title, body, yes, danger, info (no cancel), type (a word that must be typed), input: { label, value, placeholder }, select: { label, options: [{ value, label }] } }
+  function ask(o) {
+    return new Promise(function (resolve) {
+      var m = $("askModal"), input = $("askInput"), sel = $("askSelect");
+      $("askTitle").textContent = o.title || "Are you sure?"; $("askBody").textContent = o.body || ""; $("askErr").hidden = true;
+      var field = o.type || o.input || o.select;
+      $("askField").hidden = !field; $("askLabel").textContent = o.type ? "Type " + o.type + " to confirm" : o.input ? o.input.label : o.select ? o.select.label : "";
+      input.hidden = !(o.type || o.input); input.value = (o.input && o.input.value) || ""; input.placeholder = o.type || (o.input && o.input.placeholder) || "";
+      sel.hidden = !o.select; if (o.select) sel.innerHTML = o.select.options.map(function (x) { return '<option value="' + esc(x.value) + '">' + esc(x.label) + "</option>"; }).join("");
+      $("askYes").textContent = o.yes || "OK"; $("askYes").className = "btn " + (o.danger ? "danger" : "primary"); $("askNo").hidden = Boolean(o.info);
+      function done(v) { m.hidden = true; $("askForm").onsubmit = null; $("askNo").onclick = null; m.onmousedown = null; document.removeEventListener("keydown", onKey); resolve(v); }
+      function onKey(e) { if (e.key === "Escape") done(null); }
+      document.addEventListener("keydown", onKey);
+      $("askForm").onsubmit = function (e) {
+        e.preventDefault();
+        if (o.type && input.value.trim() !== o.type) { $("askErr").textContent = "Type " + o.type + " exactly to continue."; $("askErr").hidden = false; return; }
+        done({ value: o.select ? sel.value : input.value.trim() });
+      };
+      $("askNo").onclick = function () { done(null); }; m.onmousedown = function (e) { if (e.target === m) done(null); };
+      m.hidden = false; (o.type || o.input ? input : $("askYes")).focus();
+    });
+  }
   var ago = function (iso) {
     if (!iso) return "";
     var h = (Date.now() - new Date(iso).getTime()) / 36e5;
@@ -55,7 +78,7 @@
     if (history.replaceState) history.replaceState(null, "", "#" + view);
     window.scrollTo(0, 0);
     if (view === "campaigns") loadCampaigns();
-    if (view === "leads") { loadFacets().then(loadLeads); }
+    if (view === "leads") { loadFacets().then(function () { if (state.preCampaign) { $("leadCampaign").value = state.preCampaign; state.preCampaign = null; } loadLeads(); }); }
     if (view === "templates") loadTemplates();
     if (view === "settings") { if (!state.dirty) loadSettings(); showDataInfo(); showSettingsTab(tab || state.stab || "sender"); }
     if (state.status) renderStatus();
@@ -200,20 +223,22 @@
   function start(dry) {
     var s = state.status;
     var live = !dry && !s.dryRun;
-    if (live && !confirm("Start a LIVE run? Real emails will be sent now, up to each mailbox's daily limit.")) return;
-    api("POST", "/api/outreach/run", { dry: !!dry }).then(function () { toast(live ? "Live run started" : "Test run started"); refresh(); }).catch(fail);
+    var go = function () { api("POST", "/api/outreach/run", { dry: !!dry }).then(function () { toast(live ? "Live run started" : "Test run started"); refresh(); }).catch(fail); };
+    if (!live) return go();
+    ask({ title: "Start a live run?", body: "Real emails will be sent now, up to each mailbox's daily limit.", yes: "Start live run", danger: true }).then(function (r) { if (r) go(); });
   }
   $("runBtn").addEventListener("click", function () { start(state.status.dryRun); });
   $("testBtn").addEventListener("click", function () { start(true); });
   $("stopBtn").addEventListener("click", function () { api("POST", "/api/outreach/stop", {}).then(function () { toast("Stopping after the current email…"); refresh(); }).catch(fail); });
   function setMode(mode) {
     var s = state.status; if (!s || (mode === "live") === !s.dryRun) return;
-    if (mode === "live") {
-      if ((s.liveProblems || []).length) return alert("Before you go live, fix this:\n\n• " + s.liveProblems.join("\n• "));
-      if (!confirm("Switch to LIVE?\n\nRuns will send real emails to your leads, up to each mailbox's daily limit.")) return;
-    }
-    api("GET", "/api/outreach/config").then(function (r) { r.config.sending.dry_run = mode !== "live"; return api("PUT", "/api/outreach/config", r.config); })
-      .then(function () { toast(mode === "live" ? "Live: runs now send real emails" : "Test mode: nothing will be sent"); if (state.view === "settings") loadSettings(); return refresh(); }).catch(fail);
+    var apply = function () {
+      api("GET", "/api/outreach/config").then(function (r) { r.config.sending.dry_run = mode !== "live"; return api("PUT", "/api/outreach/config", r.config); })
+        .then(function () { toast(mode === "live" ? "Live: runs now send real emails" : "Test mode: nothing will be sent"); if (state.view === "settings") loadSettings(); return refresh(); }).catch(fail);
+    };
+    if (mode !== "live") return apply();
+    if ((s.liveProblems || []).length) return ask({ title: "Before you go live", body: "Fix this first:\n\n• " + s.liveProblems.join("\n• "), yes: "OK", info: true });
+    ask({ title: "Switch to Live?", body: "Runs will send real emails to your leads, up to each mailbox's daily limit.", yes: "Go live", danger: true }).then(function (r) { if (r) apply(); });
   }
   $("modeSwitch").addEventListener("click", function (e) { var b = e.target.closest("button[data-mode]"); if (b) setMode(b.dataset.mode); });
 
@@ -380,17 +405,18 @@
   });
   function editLink() {
     ed.focus(); restoreRange();
-    var sel = getSelection(), node = sel.anchorNode, a = node && (node.nodeType === 1 ? node : node.parentNode).closest("a");
-    var url = prompt("Link address (https://…). Leave empty to remove the link.", a ? a.getAttribute("href") : "https://");
-    if (url === null) return;
-    url = url.trim();
-    if (!url) { if (a) { var r = document.createRange(); r.selectNode(a); sel.removeAllRanges(); sel.addRange(r); } document.execCommand("unlink", false, null); return; }
-    var h = okHref(url); if (!h) return fail(new Error("Links must start with https://, http:// or mailto:"));
-    if (a) { a.setAttribute("href", h); return; }
-    if (sel.isCollapsed) { var t = document.createElement("a"); t.href = h; t.textContent = url; var fr = document.createDocumentFragment(); fr.appendChild(t); insertNode(fr); }
-    else document.execCommand("createLink", false, h);
+    var sel = getSelection(), node = sel.anchorNode, a = node && (node.nodeType === 1 ? node : node.parentNode).closest("a"), saved = sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+    ask({ title: "Link", body: "Paste the address. Leave it empty to remove the link.", input: { label: "Link address", value: a ? a.getAttribute("href") : "https://" }, yes: "Apply" }).then(function (r) {
+      if (!r) return;
+      ed.focus(); if (saved) { var s2 = getSelection(); s2.removeAllRanges(); s2.addRange(saved); }
+      var url = r.value, sel2 = getSelection();
+      if (!url) { if (a) { var rg = document.createRange(); rg.selectNode(a); sel2.removeAllRanges(); sel2.addRange(rg); } document.execCommand("unlink", false, null); return; }
+      var h = okHref(url); if (!h) return fail(new Error("Links must start with https://, http:// or mailto:"));
+      if (a) { a.setAttribute("href", h); return; }
+      if (sel2.isCollapsed) { var t = document.createElement("a"); t.href = h; t.textContent = url; var fr = document.createDocumentFragment(); fr.appendChild(t); insertNode(fr); }
+      else document.execCommand("createLink", false, h);
+    });
   }
-  $("rmLink").addEventListener("click", editLink);
   ed.addEventListener("keydown", function (e) { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); saveRange(); editLink(); } });
   // attachments
   function addFile(f) {
@@ -420,7 +446,11 @@
     var body = { email: replyTo, subject: $("rmSubject").value, html: editorHtml(), text: ed.innerText }, later = $("rmLater").checked;
     if (later) {
       var d = new Date($("rmWhen").value); if (isNaN(d)) return fail(new Error("Pick a date and time to send."));
-      if (d.getHours() === 0 && d.getMinutes() === 0 && !confirm("That is 12:00 AM (midnight) on " + d.toLocaleDateString() + ". Schedule it for midnight?")) return;
+      if (d.getHours() === 0 && d.getMinutes() === 0 && !state.midnightOk) {
+        ask({ title: "Schedule for midnight?", body: "That is 12:00 AM (midnight) on " + d.toLocaleDateString() + ".", yes: "Yes, midnight" }).then(function (r) { if (r) { state.midnightOk = true; $("replyForm").requestSubmit(); } });
+        return;
+      }
+      state.midnightOk = false;
       body.sendAt = d.toISOString();
     }
     $("rmSend").disabled = true;
@@ -440,8 +470,10 @@
     }).join("");
   }
   $("schedList").addEventListener("click", function (e) {
-    var b = e.target.closest("button[data-unsched]"); if (!b || !confirm("Cancel this scheduled message?")) return;
-    api("POST", "/api/outreach/scheduled/cancel", { id: b.dataset.unsched }).then(function () { toast("Cancelled"); refresh(); }).catch(fail);
+    var b = e.target.closest("button[data-unsched]"); if (!b) return;
+    ask({ title: "Cancel this message?", body: "It will not be sent.", yes: "Cancel the message", danger: true }).then(function (r) {
+      if (r) api("POST", "/api/outreach/scheduled/cancel", { id: b.dataset.unsched }).then(function () { toast("Cancelled"); refresh(); }).catch(fail);
+    });
   });
   $("replyList").addEventListener("change", function (e) {
     var em = e.target.getAttribute("data-loom"); if (!em) return;
@@ -472,17 +504,19 @@
     var pl = $("leadPlace").value.split(":"); if (pl[0]) q.set(pl[0], pl.slice(1).join(":"));
     if (state.minScore) q.set("minScore", state.minScore);
     $("clearFilters").hidden = !leadFilterActive();
+    var sig = JSON.stringify(leadFilterObj()); if (sig !== state.filterSig) { state.filterSig = sig; clearSelection(); }
     api("GET", "/api/outreach/leads?" + q).then(function (r) {
       $("leadCount").textContent = r.total + " lead" + (r.total === 1 ? "" : "s") + (leadFilterActive() ? " match" : "") + (state.minScore ? " · fit " + state.minScore + "+" : "");
-      $("leadTable").innerHTML = r.rows.length ? "<tr><th>Lead</th><th>Where</th><th>Status</th><th>Progress</th><th>Details</th></tr>" + r.rows.map(function (t) {
+      $("leadTable").innerHTML = r.rows.length ? '<tr><th class="tick"><input type="checkbox" id="selPage" aria-label="Select all on this page"></th><th>Lead</th><th>Where</th><th>Status</th><th>Progress</th><th>Details</th></tr>' + r.rows.map(function (t) {
         var sent = Number(t.step) || 0, place = [t.city, t.state, t.country].filter(Boolean).join(", ");
         var cname = campName(t.campaign); cname = cname === "–" || cname === "none" ? "" : cname;
-        return '<tr><td><div style="font-weight:600">' + esc(t.store || t.domain) + '</div><div class="hint">' + esc(t.email) + "</div></td>" +
-          "<td>" + esc(place || "–") + (cname ? '<div class="hint">' + esc(cname) + "</div>" : "") + "</td>" +
+        return '<tr><td class="tick"><input type="checkbox" data-sel="' + esc(t.email) + '" aria-label="Select ' + esc(t.email) + '"></td><td><div style="font-weight:600">' + esc(t.store || t.domain) + '</div><div class="hint">' + esc(t.email) + "</div></td>" +
+          "<td>" + esc(place || "–") + (cname ? '<div class="hint">' + esc(cname) + (t.campaign_lock === "1" ? " · chosen by you" : "") + "</div>" : "") + "</td>" +
           '<td><span class="chip ' + esc(t.status) + '">' + esc(t.status === "skipped-bad-address" ? "set aside" : t.status) + "</span>" + (t.reply_label ? ' <span class="chip lab-' + esc(t.reply_label) + '">' + esc(LABEL[t.reply_label] || t.reply_label) + "</span>" : "") + "</td>" +
           "<td>" + (sent ? "Email " + sent + " of 4" : "Not started") + '<div class="hint">' + esc(t.next || "") + (t.snooze_until && t.status === "active" ? ' <button class="btn sm ghost" data-unsnooze="' + esc(t.email) + '">Resume now</button>' : "") + (t.status === "skipped-bad-address" ? ' <button class="btn sm" data-restore="' + esc(t.email) + '">Restore</button>' : "") + "</div></td>" +
           '<td class="hint">' + [t.ai_score ? '<span title="' + esc(t.ai_score_reason || "") + '">Fit ' + esc(t.ai_score) + "/10</span>" : "", t.clicks ? '<span class="clicked">' + t.clicks + " click" + (t.clicks === 1 ? "" : "s") + "</span>" : "", t.smtp === "catch-all" ? '<span class="warn" title="This domain accepts any address, so the mailbox could not be verified">catch-all</span>' : "", t.mailbox ? esc(t.mailbox) : ""].filter(Boolean).join("<br>") + "</td></tr>";
       }).join("") : '<tr><td class="empty">No leads match.</td></tr>';
+      state.leadRows = r.rows.map(function (x) { return x.email; }); state.leadTotal = r.total; syncBulk();
       var from = r.total ? state.leadPage * PAGE + 1 : 0;
       $("pgInfo").textContent = from + "–" + Math.min(r.total, (state.leadPage + 1) * PAGE) + " of " + r.total;
       $("prevPg").disabled = state.leadPage === 0; $("nextPg").disabled = (state.leadPage + 1) * PAGE >= r.total;
@@ -506,26 +540,82 @@
   });
   $("prevPg").addEventListener("click", function () { state.leadPage--; loadLeads(); });
   $("nextPg").addEventListener("click", function () { state.leadPage++; loadLeads(); });
+  // ---- tick boxes and bulk actions
+  state.sel = {}; state.selAllFilter = false; state.leadRows = []; state.leadTotal = 0;
+  function leadFilterObj() {
+    var pl = $("leadPlace").value.split(":"), f = { text: $("leadQ").value.trim(), stage: $("leadStage").value, campaign: $("leadCampaign").value, type: $("leadType").value, minScore: state.minScore || 0 };
+    if (pl[0]) f[pl[0]] = pl.slice(1).join(":");
+    return f;
+  }
+  var selCount = function () { return state.selAllFilter ? state.leadTotal : Object.keys(state.sel).length; };
+  function clearSelection() { state.sel = {}; state.selAllFilter = false; syncBulk(); }
+  function syncBulk() {
+    var n = selCount(), rows = state.leadRows || [], allPage = rows.length > 0 && rows.every(function (e) { return state.sel[e]; });
+    $("bulkBar").hidden = !n;
+    $("bulkCount").textContent = state.selAllFilter ? "All " + n + " matching lead" + (n === 1 ? "" : "s") + " selected" : n + " selected";
+    $("bulkAll").hidden = state.selAllFilter || !allPage || state.leadTotal <= rows.length;
+    $("bulkAll").textContent = "Select all " + state.leadTotal + " leads matching these filters";
+    if ($("selPage")) $("selPage").checked = state.selAllFilter || allPage;
+    $("leadTable").querySelectorAll("input[data-sel]").forEach(function (b) { b.checked = state.selAllFilter || Boolean(state.sel[b.dataset.sel]); });
+  }
+  $("leadTable").addEventListener("change", function (e) {
+    var t = e.target;
+    if (t.id === "selPage") {
+      if (t.checked) (state.leadRows || []).forEach(function (m) { state.sel[m] = true; }); else { state.selAllFilter = false; (state.leadRows || []).forEach(function (m) { delete state.sel[m]; }); }
+      return syncBulk();
+    }
+    var em = t.getAttribute("data-sel"); if (!em) return;
+    if (state.selAllFilter && !t.checked) { state.selAllFilter = false; state.sel = {}; (state.leadRows || []).forEach(function (m) { state.sel[m] = true; }); }
+    if (t.checked) state.sel[em] = true; else delete state.sel[em];
+    syncBulk();
+  });
+  $("bulkAll").addEventListener("click", function () { state.selAllFilter = true; syncBulk(); });
+  $("bulkClear").addEventListener("click", clearSelection);
+  function bulkSend(action, extra, verb) {
+    var body = { action: action }; for (var k in extra) body[k] = extra[k];
+    if (state.selAllFilter) body.filter = leadFilterObj(); else body.emails = Object.keys(state.sel);
+    return api("POST", "/api/outreach/leads/bulk", body).then(function (r) {
+      toast(verb + " " + r.affected + " lead" + (r.affected === 1 ? "" : "s") + (r.skipped ? " (" + r.skipped + " skipped: only waiting or in-sequence leads can be moved)" : ""));
+      clearSelection(); return loadFacets().then(function () { loadLeads(); return refresh(); });
+    }).catch(fail);
+  }
+  $("bulkDel").addEventListener("click", function () {
+    var n = selCount(); if (!n) return;
+    ask({ title: "Delete " + n + " lead" + (n === 1 ? "" : "s") + "?", body: "They are removed from your list. Anyone who opted out or bounced stays on your never-contact list, so they can't be emailed again. This can't be undone (a backup file can restore it).", yes: "Delete", danger: true, type: n >= 25 ? "DELETE" : undefined }).then(function (r) { if (r) bulkSend("delete", {}, "Deleted"); });
+  });
+  $("bulkDnc").addEventListener("click", function () {
+    var n = selCount(); if (!n) return;
+    ask({ title: "Never contact " + n + " lead" + (n === 1 ? "" : "s") + "?", body: "They are marked do-not-contact and added to your never-contact list. Their sequences stop.", yes: "Never contact", danger: true }).then(function (r) { if (r) bulkSend("dnc", {}, "Blocked"); });
+  });
+  $("bulkCamp").addEventListener("change", function () {
+    var v = this.value, n = selCount(); this.value = ""; if (!v || !n) return;
+    if (v === "auto") return ask({ title: "Back to automatic sorting?", body: n + " lead" + (n === 1 ? "" : "s") + " go back to being sorted into campaigns by their place and business type.", yes: "Sort automatically" }).then(function (r) { if (r) bulkSend("auto", {}, "Updated"); });
+    ask({ title: "Move " + n + " lead" + (n === 1 ? "" : "s") + " to " + campName(v) + "?", body: "They stay in this campaign even if they do not match its filters, until you move them again or choose automatic sorting. Leads that have already replied or finished are skipped.", yes: "Move" }).then(function (r) { if (r) bulkSend("move", { campaign: Number(v) }, "Moved"); });
+  });
+
   $("dncBtn").addEventListener("click", function () {
-    var v = prompt("Email address or whole domain (like @example.com) that must never be emailed:");
-    if (v) api("POST", "/api/outreach/dnc", { value: v }).then(function () { toast("Added to the never-contact list"); loadLeads(); refresh(); }).catch(fail);
+    ask({ title: "Never contact", body: "This address or whole domain is added to your never-contact list and will not be emailed again.", input: { label: "Email address or domain", placeholder: "name@company.com or @company.com" }, yes: "Add to the list" }).then(function (r) {
+      if (r && r.value) api("POST", "/api/outreach/dnc", { value: r.value }).then(function () { toast("Added to the never-contact list"); loadLeads(); refresh(); }).catch(fail);
+    });
   });
   $("clearAllBtn").addEventListener("click", function () {
-    var n = state.status ? state.status.total : 0;
+    var n = state.status ? state.status.total : 0, btn = this;
     if (!n) return toast("The lead list is already empty.");
-    var typed = prompt("This deletes ALL " + n + " leads and starts you from zero.\n\nKept: your never-contact list, sent history, settings, mailboxes, campaigns and email wording.\nRemoved: every lead and its progress, replies and labels, link-click stats, waiting scheduled replies and search results.\n\nA backup file will download first, so you can undo this with Restore from backup.\n\nType DELETE to continue:");
-    if (typed !== "DELETE") return typed === null ? null : toast("Not deleted: you did not type DELETE.", true);
-    var btn = this; btn.disabled = true;
-    fetch("/api/outreach/backup", { credentials: "same-origin" }).then(function (r) { if (!r.ok) throw new Error("Could not make the backup, so nothing was deleted."); return r.blob(); }).then(function (blob) {
-      var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "outreach-backup-before-delete-" + new Date().toISOString().slice(0, 10) + ".json"; document.body.appendChild(a); a.click(); a.remove();
-      return new Promise(function (ok) { setTimeout(ok, 600); });
-    }).then(function () { return api("POST", "/api/outreach/leads/clear-all", { confirm: "DELETE" }); })
-      .then(function (r) { toast("Deleted " + r.removed + " leads. The list is now empty and clean."); state.leadPage = 0; ["leadStage", "leadPlace", "leadType", "leadCampaign", "leadSort"].forEach(function (id) { $(id).value = ""; }); $("leadQ").value = ""; return loadFacets(); })
-      .then(function () { loadLeads(); return refresh(); }).catch(fail).then(function () { btn.disabled = false; });
+    ask({ title: "Delete ALL " + n + " leads?", body: "Starts you from zero.\n\nKept: your never-contact list (anyone who opted out or bounced is added to it first), sent history, settings, mailboxes, campaigns and email wording.\nRemoved: every lead and its progress, replies and labels, link-click stats, waiting scheduled replies and search results.\n\nA backup file downloads first, so Restore from backup can undo this.", type: "DELETE", yes: "Delete all leads", danger: true }).then(function (r) {
+      if (!r) return;
+      btn.disabled = true;
+      fetch("/api/outreach/backup", { credentials: "same-origin" }).then(function (res) { if (!res.ok) throw new Error("Could not make the backup, so nothing was deleted."); return res.blob(); }).then(function (blob) {
+        var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "outreach-backup-before-delete-" + new Date().toISOString().slice(0, 10) + ".json"; document.body.appendChild(a); a.click(); a.remove();
+        return new Promise(function (ok) { setTimeout(ok, 600); });
+      }).then(function () { return api("POST", "/api/outreach/leads/clear-all", { confirm: "DELETE" }); })
+        .then(function (res) { toast("Deleted " + res.removed + " leads. The list is now empty and clean."); clearSelection(); state.leadPage = 0; ["leadStage", "leadPlace", "leadType", "leadCampaign", "leadSort"].forEach(function (id) { $(id).value = ""; }); $("leadQ").value = ""; return loadFacets(); })
+        .then(function () { loadLeads(); return refresh(); }).catch(fail).then(function () { btn.disabled = false; });
+    });
   });
   $("rmBouncedBtn").addEventListener("click", function () {
-    if (!confirm("Delete every bounced lead from the list? Their addresses are added to the never-contact list so they can't be emailed again. This can't be undone.")) return;
-    api("POST", "/api/outreach/leads/remove-bounced", {}).then(function (r) { toast("Removed " + r.removed + " bounced lead" + (r.removed === 1 ? "" : "s")); state.leadPage = 0; loadLeads(); refresh(); }).catch(fail);
+    ask({ title: "Delete every bounced lead?", body: "Their addresses are added to the never-contact list so they can't be emailed again. This can't be undone.", yes: "Delete bounced leads", danger: true }).then(function (r) {
+      if (r) api("POST", "/api/outreach/leads/remove-bounced", {}).then(function (res) { toast("Removed " + res.removed + " bounced lead" + (res.removed === 1 ? "" : "s")); state.leadPage = 0; loadFacets().then(loadLeads); refresh(); }).catch(fail);
+    });
   });
   $("importFile").addEventListener("change", function (e) {
     var f = e.target.files[0]; e.target.value = ""; if (!f) return;
@@ -739,10 +829,11 @@
     var ed = e.target.closest("[data-wedit]"), sv = e.target.closest("#wSave");
     if (ed) { var d = (state.drafts || []).filter(function (x) { return x.step === Number(ed.dataset.wedit); })[0]; if (d) { selectTpl("email" + d.step + ".txt"); $("tplText").value = d.text; previewTpl(); window.scrollTo(0, $("tplText").getBoundingClientRect().top + window.scrollY - 120); toast("Loaded into the editor. Press Save to keep it."); } }
     if (sv) {
-      if (!confirm("Save these emails" + (state.tplCampaign ? " for " + campName(state.tplCampaign) : " as your default emails") + "? They replace the current wording for steps 1 to " + state.drafts.length + ".")) return;
+      ask({ title: "Save these emails?", body: "They replace the current wording" + (state.tplCampaign ? " for " + campName(state.tplCampaign) : " of your default emails") + " for steps 1 to " + state.drafts.length + ".", yes: "Save emails" }).then(function (r) { if (!r) return;
       sv.disabled = true;
       state.drafts.reduce(function (p, d) { return p.then(function () { return api("PUT", "/api/outreach/templates", { name: "email" + d.step + ".txt", text: d.text, campaign: state.tplCampaign || undefined }); }); }, Promise.resolve())
         .then(function () { toast("Saved " + state.drafts.length + " emails"); $("wOut").innerHTML = ""; $("wMsg").textContent = ""; return loadTemplates(); }).then(refresh).catch(fail);
+      });
     }
   });
   $("pvDesk").addEventListener("click", function () { $("pvFrame").style.width = "100%"; $("pvDesk").className = "on"; $("pvPhone").className = ""; });
@@ -766,8 +857,9 @@
     api("PUT", "/api/outreach/templates", { name: state.tpl, text: $("tplText").value, campaign: state.tplCampaign || undefined }).then(function () { toast("Saved"); return loadTemplates(); }).catch(fail);
   });
   $("tplReset").addEventListener("click", function () {
-    if (!confirm("Discard your edits and go back to the default text?")) return;
-    api("DELETE", "/api/outreach/templates?name=" + encodeURIComponent(state.tpl) + (state.tplCampaign ? "&campaign=" + encodeURIComponent(state.tplCampaign) : ""), {}).then(function () { toast("Reset"); return loadTemplates(); }).catch(fail);
+    ask({ title: "Go back to the default text?", body: "Your edits to this email are discarded.", yes: "Reset to default", danger: true }).then(function (r) {
+      if (r) api("DELETE", "/api/outreach/templates?name=" + encodeURIComponent(state.tpl) + (state.tplCampaign ? "&campaign=" + encodeURIComponent(state.tplCampaign) : ""), {}).then(function () { toast("Reset"); return loadTemplates(); }).catch(fail);
+    });
   });
   $("queueBtn").addEventListener("click", function () {
     api("GET", "/api/outreach/preview?n=3").then(function (r) {
@@ -913,6 +1005,8 @@
     var tc = $("tplCampaign"), tcur = state.tplCampaign || "";
     tc.innerHTML = '<option value="">Everyone (default)</option>' + opts; tc.value = tcur;
     $("tplCampBar").hidden = !camps().length;
+    var bc = $("bulkCamp"); bc.disabled = !camps().length;
+    bc.innerHTML = camps().length ? '<option value="">Move to campaign…</option>' + camps().map(function (c) { return '<option value="' + c.id + '">' + esc(c.name) + "</option>"; }).join("") + '<option value="auto">Back to automatic sorting</option>' : '<option value="">No campaigns yet</option>';
   }
   function renderCampaignCards() {
     var cs = camps(); $("campEmpty").hidden = !!cs.length; $("campTable").parentNode.hidden = !cs.length;
@@ -926,7 +1020,7 @@
   var FILTERS = [["countries", "Countries", "US, UK"], ["states", "States / regions", "TX, Florida"], ["cities", "Cities", "Austin, Dallas"], ["types", "Business types", "roofing, hvac, dentist"]];
   function emailsRow(c) {
     var st = camps().filter(function (x) { return x.id === c.id; })[0], own = st && st.ownEmails;
-    return '<div class="toolbar" style="margin:0"><span class="chip ' + (own ? "okc" : "warnc") + '">' + (own ? "Has its own emails" : "Sends the default emails") + '</span><button type="button" class="btn sm" data-emails="' + esc(c.id) + '">' + (own ? "Edit emails" : "Edit emails") + '</button><button type="button" class="btn sm" data-aiwrite="' + esc(c.id) + '">✨ Write with AI</button></div>';
+    return '<div class="toolbar" style="margin:0"><span class="chip ' + (own ? "okc" : "warnc") + '">' + (own ? "Has its own emails" : "Sends the default emails") + '</span><button type="button" class="btn sm" data-emails="' + esc(c.id) + '">' + (own ? "Edit emails" : "Edit emails") + '</button><button type="button" class="btn sm" data-aiwrite="' + esc(c.id) + '">✨ Write with AI</button><button type="button" class="btn sm" data-viewleads="' + esc(c.id) + '">View its leads</button></div>';
   }
   function campBlock(c) {
     c = c || {};
@@ -977,8 +1071,11 @@
     var add = e.target.closest("[data-add]"), mv = e.target.closest("[data-mv]"), rm = e.target.closest("[data-rmc]"), em = e.target.closest("[data-emails]");
     if (add) { var inp = el.querySelector('[data-f="' + add.dataset.add + '"]'), have = inp.value.split(",").map(function (x) { return x.trim().toLowerCase(); }); if (have.indexOf(add.dataset.v.toLowerCase()) < 0) inp.value = (inp.value.trim() ? inp.value.trim().replace(/,$/, "") + ", " : "") + add.dataset.v; previewCamp(el); }
     if (mv) { var list = collectCamps(), i = [].indexOf.call($("campList").querySelectorAll(".camp"), el), j = i + Number(mv.dataset.mv); if (j >= 0 && j < list.length) { var t = list[i]; list[i] = list[j]; list[j] = t; renderCamps(list); } }
-    if (rm && confirm("Remove this campaign? Its leads that are still waiting stop being emailed unless another campaign fits them.")) { var l2 = collectCamps(); l2.splice([].indexOf.call($("campList").querySelectorAll(".camp"), el), 1); renderCamps(l2); }
+    if (rm) ask({ title: "Remove this campaign?", body: "Its leads that are still waiting stop being emailed unless another campaign fits them. Press Save campaigns afterwards to keep the change.", yes: "Remove campaign", danger: true }).then(function (r) {
+      if (!r) return; var l2 = collectCamps(); l2.splice([].indexOf.call($("campList").querySelectorAll(".camp"), el), 1); renderCamps(l2);
+    });
     if (em) { state.tplCampaign = em.dataset.emails; state.tpl = null; go("templates"); }
+    var vl = e.target.closest("[data-viewleads]"); if (vl) { state.preCampaign = vl.dataset.viewleads; go("leads"); }
     var aw = e.target.closest("[data-aiwrite]"); if (aw) { state.tplCampaign = aw.dataset.aiwrite; state.tpl = null; state.openWriter = true; go("templates"); }
   });
   function aiCampState() { var on = aiOn(); $("aiCampBtn").disabled = !on; $("aiCampChip").textContent = on ? "Gemini connected" : "Gemini not connected"; $("aiCampChip").className = "chip " + (on ? "okc" : "warnc"); }
@@ -1062,8 +1159,9 @@
       var bundle; try { bundle = JSON.parse(rd.result); } catch (err) { return fail(new Error("That isn't a valid backup file.")); }
       if (!bundle || bundle.format !== "weberslink-outreach-backup") return fail(new Error("That isn't an outreach backup file."));
       var n = Object.keys(bundle.files || {}).length;
-      if (!confirm("Restore this backup (made " + String(bundle.createdAt || "").slice(0, 10) + ", " + n + " files)?\n\nIt REPLACES your current settings and leads. A safety copy of the current data is saved first.")) return;
-      api("POST", "/api/outreach/backup/restore", { backup: bundle }).then(function (r) { toast("Restored " + r.restored.length + " files"); loadSettings(); refresh().then(showDataInfo); }).catch(fail);
+      ask({ title: "Restore this backup?", body: "Made " + String(bundle.createdAt || "").slice(0, 10) + ", " + n + " files.\n\nIt REPLACES your current settings and leads. A safety copy of the current data is saved first.", yes: "Restore", danger: true }).then(function (r) {
+        if (r) api("POST", "/api/outreach/backup/restore", { backup: bundle }).then(function (res) { toast("Restored " + res.restored.length + " files"); loadSettings(); refresh().then(showDataInfo); }).catch(fail);
+      });
     };
     rd.readAsText(f);
   });

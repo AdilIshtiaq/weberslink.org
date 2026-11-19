@@ -179,8 +179,17 @@ function removeBounced() {
  * Deliberately KEPT: the never-contact list (so nobody who opted out is ever emailed again), the sent log (daily limits and history),
  * settings, mailboxes and their warm-up dates, campaigns and email wording. Returns { removed, neverContact }.
  */
+const STOPPED = ["unsubscribed", "bounced", "do-not-contact"];
+/** Anyone who opted out, bounced or was blocked goes on the never-contact list BEFORE their lead row disappears, so re-importing them can't email them. */
+function protectStopped(rows) {
+  const have = store.loadSuppression();
+  let added = 0;
+  for (const t of rows) if (STOPPED.includes(t.status) && !have.has(t.email.toLowerCase())) { store.addSuppression(t.email); have.add(t.email.toLowerCase()); added++; }
+  return added;
+}
 function clearAll() {
-  const removed = store.loadTracking().length;
+  const rows = store.loadTracking(), removed = rows.length;
+  protectStopped(rows);
   store.saveTracking([]);
   for (const f of ["objections.json", "ai_brief.json", "finder_results.json"]) { try { fs.unlinkSync(store.P(f)); } catch (e) { /* not there */ } }
   return { removed, neverContact: store.loadSuppression().size };
@@ -197,4 +206,4 @@ function restore(email) {
 const SHARED_HOSTS = new Set(["myshopify.com", "etsy.com", "wixsite.com", "squarespace.com", "weebly.com", "blogspot.com", "wordpress.com", "facebook.com", "instagram.com",
   "linktr.ee", "amazon.com", "ebay.com", "godaddysites.com", "business.site", "webflow.io", "carrd.co", "tumblr.com", "medium.com", "github.io", "sites.google.com"]);
 
-module.exports = { FREE_MAIL, SHARED_HOSTS, SKIPPED, assess, startScan, jobStatus, applyScan, restore, removeBounced, clearAll };
+module.exports = { FREE_MAIL, SHARED_HOSTS, SKIPPED, assess, startScan, jobStatus, applyScan, restore, removeBounced, clearAll, protectStopped };
