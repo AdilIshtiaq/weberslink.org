@@ -31,14 +31,38 @@ const addDaysIso = (iso, n) => new Date(Date.parse(iso + "T12:00:00Z") + n * 864
 let generator = null; // tests replace the model call: async (prompt, system) => text
 function setGenerator(fn) { generator = fn; }
 
-async function defaultGenerate(prompt, system) {
+// Google's models are sometimes overloaded (HTTP 503 "high demand") for a minute or two. Such errors are retried with a short wait, then
+// the call moves to a backup model (GEMINI_OUTREACH_FALLBACK_MODEL, default gemini-flash-lite-latest). Quota errors are never retried.
+const FALLBACK_MODEL = () => (env().GEMINI_OUTREACH_FALLBACK_MODEL || "").trim() || "gemini-flash-lite-latest";
+const isBusy = (e) => [500, 502, 503, 504].includes(Number(e && e.status)) || /UNAVAILABLE|overloaded|high demand|temporarily|deadline exceeded|fetch failed|ECONNRESET|ETIMEDOUT/i.test(String((e && e.message) || ""));
+const realWait = (ms) => new Promise((r) => setTimeout(r, ms));
+let wait = realWait;
+const setWait = (fn) => { wait = fn || realWait; };
+/** call(model) is tried up to 3 times on the main model and 3 on the backup, with growing pauses, but only for "busy" errors. */
+async function resilient(call) {
+  const models = [...new Set([research.modelName(), FALLBACK_MODEL()])];
+  let last;
+  for (const m of models) {
+    for (let i = 0; i < 3; i++) {
+      try { return await call(m); } catch (e) {
+        last = e;
+        if (research.isQuota(e) || !isBusy(e)) throw e;
+        if (i < 2) await wait(1500 * (i + 1));
+      }
+    }
+  }
+  throw last;
+}
+const generate = (prompt, system) => resilient((model) => defaultGenerate(prompt, system, model));
+
+async function defaultGenerate(prompt, system, model) {
   const { GoogleGenAI } = require("@google/genai");
   const ai = new GoogleGenAI({ apiKey: research.keyInfo().key });
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 60000);
   try {
     const res = await ai.models.generateContent({
-      model: research.modelName(), contents: prompt,
+      model: model || research.modelName(), contents: prompt,
       config: { systemInstruction: system, responseMimeType: "application/json", temperature: 0.1, maxOutputTokens: 1500, abortSignal: ctl.signal },
     });
     return res.text || "";
@@ -49,15 +73,22 @@ function usageToday() { const st = store.readJson("ai_state.json", {}); return s
 function bumpUsage() { store.writeJson("ai_state.json", { date: stamp(), count: usageToday() + 1 }); }
 
 class QuotaError extends Error {}
+/** Google's errors arrive as a JSON blob; show only its message. */
+function friendlyMessage(e) {
+  const raw = String((e && e.message) || e);
+  try { const j = JSON.parse(raw); if (j && j.error && j.error.message) return research.redact(j.error.message); } catch (x) { /* not JSON */ }
+  return research.redact(raw);
+}
 /** One model call that must answer with a JSON object. Throws QuotaError (stop everything) or Error (this item failed). */
 async function callJson(prompt, system) {
   if (!configured()) throw new Error("Gemini is not configured (set GEMINI_OUTREACH_KEY on the server).");
   if (usageToday() >= aiDailyCap()) throw new QuotaError(`daily Gemini limit of ${aiDailyCap()} reached`);
   bumpUsage();
   let text;
-  try { text = await (generator || defaultGenerate)(prompt, `${system}\n${SYSTEM_BASE}`); } catch (e) {
+  try { text = await (generator || generate)(prompt, `${system}\n${SYSTEM_BASE}`); } catch (e) {
     if (research.isQuota(e)) throw new QuotaError(research.redact(e.message));
-    throw new Error("Gemini error: " + research.redact(e.message));
+    if (isBusy(e)) throw new Error("Gemini is very busy right now (Google reported high demand). Nothing was lost: try again in a minute.");
+    throw new Error("Gemini error: " + friendlyMessage(e));
   }
   const o = research.parseModelJson(text);
   if (!o) throw new Error("no usable answer from Gemini");
@@ -362,5 +393,5 @@ function status() {
   return { configured: configured(), usedToday: usageToday(), dailyMax: aiDailyCap(), job: { ...job }, objections: store.readJson("objections.json", null) };
 }
 
-module.exports = { mapBusinessType, buildCampaign, writeSequence, rewriteEmail, checkedEmail, parseLeadFilter, brief, cachedBrief, TEMPLATE_FIELDS, POSITIVE, setGenerator, classifyReply, enrichReply, addReferral, draftReply, validDraft, scoreLead, mineObjections, reviewCopy, startScoring, stopJob, status,
+module.exports = { resilient, setWait, isBusy, friendlyMessage, mapBusinessType, buildCampaign, writeSequence, rewriteEmail, checkedEmail, parseLeadFilter, brief, cachedBrief, TEMPLATE_FIELDS, POSITIVE, setGenerator, classifyReply, enrichReply, addReferral, draftReply, validDraft, scoreLead, mineObjections, reviewCopy, startScoring, stopJob, status,
   localReturnDate, validReturnDate, QuotaError, configured };
