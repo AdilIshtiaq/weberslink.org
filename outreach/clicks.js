@@ -101,6 +101,8 @@ function record(token, { method = "GET", ua = "", now = new Date() } = {}) {
 }
 
 /** Per-lead summary: { clicks, scanner, first, last, links: { label: count } } or null. */
+/** Forget who clicked what (used when the lead list is emptied). The link tokens stay, so links in emails already sent keep working. */
+function clearLeads() { store.writeJson(CLICKS, { leads: {}, recent: [] }); }
 function forLead(email) { return readClicks().leads[String(email || "").toLowerCase()] || null; }
 function allLeads() { return readClicks().leads; }
 /** Latest clicks by people (scanner hits left out unless withScanners). */
@@ -117,4 +119,4 @@ function handle(req, res) {
   return true;
 }
 
-module.exports = { baseUrl, trackHtml, record, forLead, allLeads, recent, handle };
+module.exports = { clearLeads, baseUrl, trackHtml, record, forLead, allLeads, recent, handle };

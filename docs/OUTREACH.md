@@ -46,6 +46,13 @@ one search runs at a time. Daily caps: 400 websites (`FINDER_DAILY_SITES_MAX`) a
 Map data (c) OpenStreetMap contributors (ODbL). You remain responsible for emailing lawfully: honour opt-outs and include a postal address (both are built into every email).
 Other sources (Google Places, Overture Maps, Apollo) can be added behind the same screen later.
 
+## Starting again from zero
+**Leads -> Tools -> Delete all leads...** empties the lead list. You must type `DELETE`; a backup file downloads to your computer first (and a copy is saved in the data folder under `backups/`),
+so **Settings -> Checks & backup -> Restore from backup** can undo it. It is refused while a run or a lead search is in progress.
+- **Removed:** every lead and its progress, replies and AI labels, link-click stats, scheduled replies still waiting, the AI brief and objection summary, and the lead-finder results.
+- **Kept on purpose:** the never-contact list (so nobody who opted out can ever be emailed again), the sent log (daily limits and history), settings, mailboxes and their warm-up dates, campaigns and email wording.
+  Links in emails you already sent keep working.
+
 ## Using the dashboard
 Six sections, left to right in the menu:
 - **Overview:** what needs you right now. A **Get ready to send** checklist (sender details, mailbox, leads, optional campaigns, test email, domain check, go live)
@@ -309,7 +316,7 @@ Every email carries the postal address and an opt-out line. A mailbox pauses its
 A/B versions share one body and differ only in subject; judge after about 100 leads each.
 
 ## Tests
-`npm test` (about 187 tests: engine, API, auth, regression tests for an independent code review; no network or real
+`npm test` (about 188 tests: engine, API, auth, regression tests for an independent code review; no network or real
 mailboxes needed).
 
 ## Not covered by tests

@@ -231,3 +231,53 @@ test("insights tell you where to go to fix each problem", () => {
   const ins = eng.status(cfg, new Date()).insights;
   assert.strictEqual(ins.find((i) => /matches? no campaign/.test(i.text)).go, "campaigns");
 });
+
+test("Delete all leads: empties the list and its by-products, keeps the never-contact list, history and settings, saves a restorable safety copy, and needs the word DELETE", async () => {
+  reset();
+  const cfg = cfgWith([{ id: 1, name: "Roofers", types: "roof" }]);
+  eng.saveConfig(cfg);
+  store.saveTracking([L("a@a.com", { category: "Roofing", status: "replied", reply_label: "interested" }), L("b@b.com", { category: "Dentist" }), L("c@c.com", { status: "active", step: "1" })]);
+  store.addSuppression("optout@x.com"); store.addSuppression("@blocked.com");
+  fs.writeFileSync(store.P("sent_log.csv"), "date,mode,mailbox,email,store,step,variant,subject\n2026-11-17T10:00:00Z,live,a@x.com,a@a.com,A,1,a,Hi\n");
+  store.writeJson("clicks.json", { leads: { "a@a.com": { clicks: 2 } }, recent: [{ email: "a@a.com" }] });
+  store.writeJson("links.json", { tokens: { abc: { url: "https://x.com" } } });
+  store.writeJson("objections.json", { themes: [] }); store.writeJson("ai_brief.json", { headline: "x" }); store.writeJson("finder_results.json", { items: [] });
+  fs.writeFileSync(store.P("scheduled.json"), JSON.stringify({ items: [{ id: "p1", email: "a@a.com", status: "pending", sendAt: "2030-01-01T00:00:00Z", text: "hi" }, { id: "d1", email: "a@a.com", status: "sent", sentAt: new Date().toISOString(), text: "old" }] }));
+  const server = http.createServer((req, res) => { if (!outreach.handle(req, res)) { res.writeHead(404); res.end(); } });
+  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const call = (m, u, b, c) => fetch(base + "/api/outreach" + u, { method: m, headers: { "Content-Type": "application/json", ...(c ? { Cookie: c } : {}) }, body: b === undefined ? undefined : JSON.stringify(b) }).then(async (r) => ({ status: r.status, json: await r.json() }));
+  try {
+    assert.strictEqual((await call("POST", "/leads/clear-all", { confirm: "DELETE" })).status, 401);
+    const login = await fetch(base + "/api/outreach/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: process.env.ADMIN_PASSWORD }) });
+    const c = login.headers.get("set-cookie").split(";")[0];
+    for (const bad of [{}, { confirm: "delete" }, { confirm: "yes" }]) assert.strictEqual((await call("POST", "/leads/clear-all", bad, c)).status, 400);
+    assert.strictEqual(store.loadTracking().length, 3, "nothing is deleted without the exact word");
+    eng.run.running = true;
+    assert.strictEqual((await call("POST", "/leads/clear-all", { confirm: "DELETE" }, c)).status, 409, "not while a run is in progress");
+    eng.run.running = false;
+    const r = await call("POST", "/leads/clear-all", { confirm: "DELETE" }, c);
+    assert.strictEqual(r.status, 200);
+    assert.deepStrictEqual([r.json.removed, r.json.neverContact, r.json.scheduledCancelled], [3, 2, 1]);
+    assert.strictEqual(store.loadTracking().length, 0);
+    assert.ok(store.loadSuppression().has("optout@x.com") && store.loadSuppression().has("@blocked.com"), "opt-outs are never forgotten");
+    assert.strictEqual(store.readCsv("sent_log.csv").length, 1, "sent history stays (daily limits)");
+    assert.strictEqual(eng.loadConfig().campaigns.length, 1, "campaigns and settings stay");
+    assert.deepStrictEqual(store.readJson("clicks.json", null), { leads: {}, recent: [] });
+    assert.ok(store.readJson("links.json", {}).tokens.abc, "old tracked links keep working");
+    for (const f of ["objections.json", "ai_brief.json", "finder_results.json"]) assert.ok(!fs.existsSync(store.P(f)), f);
+    assert.deepStrictEqual(eng.listScheduled().map((x) => x.id), ["d1"], "only waiting messages are cancelled");
+    // a safety copy was written and can bring the leads back
+    const copies = fs.readdirSync(store.P("backups")).filter((f) => f.startsWith("before-delete-"));
+    assert.strictEqual(copies.length, 1);
+    const bundle = JSON.parse(fs.readFileSync(store.P("backups/" + copies[0]), "utf8"));
+    assert.ok(require("../outreach/backup").validate(bundle).length > 0);
+    assert.match(bundle.files["tracking.csv"], /a@a\.com/);
+    const st = (await call("GET", "/status", undefined, c)).json;
+    assert.deepStrictEqual([st.total, st.remaining, st.byStatus.new || 0], [0, 0, 0]);
+    assert.strictEqual((await call("GET", "/leads/facets", undefined, c)).json.total, 0);
+    // starting again works
+    assert.strictEqual(eng.importLeads([{ Email: "new@fresh.com", Store: "Fresh", Website: "fresh.com", Country: "United States" }], cfg).added, 1);
+    assert.strictEqual(store.loadTracking().length, 1);
+  } finally { eng.run.running = false; server.close(); }
+});

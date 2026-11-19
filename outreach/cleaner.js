@@ -8,6 +8,7 @@
  *
  * It cannot prove a specific inbox exists (only paid verifiers do that), so the bounce auto-pause stays the safety net.
  */
+const fs = require("fs");
 const store = require("./store");
 
 const SKIPPED = "skipped-bad-address";
@@ -173,6 +174,18 @@ function removeBounced() {
   return { ok: true, removed: gone.length };
 }
 
+/**
+ * Empties the lead list and the things that only make sense with it (who clicked, the AI summaries, review results, waiting replies).
+ * Deliberately KEPT: the never-contact list (so nobody who opted out is ever emailed again), the sent log (daily limits and history),
+ * settings, mailboxes and their warm-up dates, campaigns and email wording. Returns { removed, neverContact }.
+ */
+function clearAll() {
+  const removed = store.loadTracking().length;
+  store.saveTracking([]);
+  for (const f of ["objections.json", "ai_brief.json", "finder_results.json"]) { try { fs.unlinkSync(store.P(f)); } catch (e) { /* not there */ } }
+  return { removed, neverContact: store.loadSuppression().size };
+}
+
 /** Undo for a single lead the cleaner skipped. */
 function restore(email) {
   const row = store.loadTracking().find((t) => t.email.toLowerCase() === String(email).toLowerCase());
@@ -184,4 +197,4 @@ function restore(email) {
 const SHARED_HOSTS = new Set(["myshopify.com", "etsy.com", "wixsite.com", "squarespace.com", "weebly.com", "blogspot.com", "wordpress.com", "facebook.com", "instagram.com",
   "linktr.ee", "amazon.com", "ebay.com", "godaddysites.com", "business.site", "webflow.io", "carrd.co", "tumblr.com", "medium.com", "github.io", "sites.google.com"]);
 
-module.exports = { FREE_MAIL, SHARED_HOSTS, SKIPPED, assess, startScan, jobStatus, applyScan, restore, removeBounced };
+module.exports = { FREE_MAIL, SHARED_HOSTS, SKIPPED, assess, startScan, jobStatus, applyScan, restore, removeBounced, clearAll };

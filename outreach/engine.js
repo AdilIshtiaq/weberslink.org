@@ -1330,6 +1330,12 @@ function cancelScheduled(id) {
   writeScheduled(items.filter((x) => x !== i));
   return true;
 }
+/** Drops every message still waiting to be sent (their leads are gone). Returns how many. */
+function cancelAllScheduled() {
+  const items = readScheduled(), pending = items.filter((x) => x.status === "pending");
+  if (pending.length) writeScheduled(items.filter((x) => x.status !== "pending"));
+  return pending.length;
+}
 // Once a message is finished its file contents are no longer needed; keep only the names for the list.
 const lighten = (i) => (i.attachments ? { attachments: i.attachments.map((a) => ({ filename: a.filename, contentType: a.contentType, content: "", ...(a.cid ? { cid: a.cid } : {}) })) } : {});
 let processing = false;
@@ -1359,5 +1365,5 @@ async function processScheduled(cfg = loadConfig(), deps = {}, now = new Date())
   return sent;
 }
 
-module.exports = { sendReply, scheduleReply, cancelScheduled, listScheduled, processScheduled, autoRunDue, MAX_PER_MAILBOX_PER_DAY, RESCAN_MS, logTail, markInterrupted, readLastRun, windowState, inWindow, campaignDate, domainReceivesMail, nextEmail, sendTest, dnsHealth, resolveHeld, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dueFollowups, runOnce,
+module.exports = { sendReply, scheduleReply, cancelScheduled, cancelAllScheduled, listScheduled, processScheduled, autoRunDue, MAX_PER_MAILBOX_PER_DAY, RESCAN_MS, logTail, markInterrupted, readLastRun, windowState, inWindow, campaignDate, domainReceivesMail, nextEmail, sendTest, dnsHealth, resolveHeld, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dueFollowups, runOnce,
   startRun, requestStop, previewNext, status, markSetup, leadQuery, leadFacets, STAGE_NAMES, campaignOptions, campaignPreview, assignCampaigns, leadMatches, queueOrder, cfgFor, healthScore, analytics, loadState, tzParts, isSendDay, today, run, log };

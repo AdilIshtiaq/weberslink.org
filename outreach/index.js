@@ -392,6 +392,17 @@ async function route(req, res, url, method) {
     if (eng.status().running) return send(res, 409, { ok: false, error: "A run is in progress. Wait for it to finish, then try again." });
     return send(res, 200, cleaner.removeBounced());
   }
+  if (p === "/leads/clear-all" && method === "POST") {
+    const body = await readJson(req);
+    if (body.confirm !== "DELETE") return send(res, 400, { ok: false, error: 'Type DELETE to confirm.' });
+    if (eng.run.running || finder.status().job.running) return send(res, 409, { ok: false, error: "A run or a lead search is in progress. Stop it first, then try again." });
+    // A safety copy is written to the data folder first (the dashboard also downloads one to your computer before it calls this).
+    let safetyCopy = "";
+    try { const b = backup.create({ markDone: false }); fs.mkdirSync(store.P("backups"), { recursive: true }); safetyCopy = `backups/before-delete-${new Date().toISOString().replace(/[:.]/g, "-")}.json`; store.atomicWrite(store.P(safetyCopy), JSON.stringify(b)); } catch (e) { return send(res, 500, { ok: false, error: "Could not save a safety copy, so nothing was deleted." }); }
+    const r = cleaner.clearAll();
+    clicks.clearLeads(); const cancelled = eng.cancelAllScheduled();
+    return send(res, 200, { ok: true, ...r, scheduledCancelled: cancelled, safetyCopy });
+  }
   if (p === "/leads/action" && method === "POST") {
     const body = await readJson(req);
     const email = String(body.email || "");
