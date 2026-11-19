@@ -17,6 +17,6 @@
     "@google/genai": "^2.27.0",
     "imapflow": "^2.3.0",
     "mailparser": "^3.9.37",
-    "nodemailer": "^10.0.14"
+    "nodemailer": "^10.1.4"
   }
 }
