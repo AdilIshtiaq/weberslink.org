@@ -389,6 +389,7 @@ function assignCampaigns(track, cfg) {
   const camps = cfg.campaigns || [];
   let changed = false;
   for (const t of track) {
+    if (t.campaign_lock === "1") { if (campaignById(cfg, t.campaign)) continue; t.campaign_lock = ""; changed = true; } // chosen by hand: stays put (unless its campaign is gone)
     const first = camps.find((c) => leadMatches(t, c));
     const want = first ? String(first.id) : "";
     if (t.status !== "new" && t.campaign && campaignById(cfg, t.campaign)) continue; // already in a sequence: keeps its campaign
@@ -396,6 +397,32 @@ function assignCampaigns(track, cfg) {
     if (t.campaign !== want) { t.campaign = want; changed = true; }
   }
   return changed;
+}
+/**
+ * Actions on ticked leads. opts: { emails: [...], campaign } . delete | dnc | move (to a campaign, pinned so the automatic sorting leaves them) | auto (hand back to the automatic sorting).
+ * Returns { affected, skipped }.
+ */
+function bulkLeads(action, emails, opts, cfg) {
+  const want = new Set(emails.map((e) => String(e).toLowerCase())), rows = store.loadTracking(), hit = rows.filter((t) => want.has(t.email.toLowerCase()));
+  let affected = 0, skipped = 0;
+  if (action === "delete") {
+    cleaner.protectStopped(hit);
+    store.saveTracking(rows.filter((t) => !want.has(t.email.toLowerCase())));
+    return { affected: hit.length, skipped: 0 };
+  }
+  if (action === "dnc") {
+    const have = store.loadSuppression();
+    for (const t of hit) { if (!have.has(t.email.toLowerCase())) store.addSuppression(t.email); t.status = "do-not-contact"; t.note = "marked never-contact in dashboard"; t.sending = ""; affected++; }
+  } else if (action === "move") {
+    const c = campaignById(cfg, opts.campaign);
+    if (!c) throw new Error("That campaign does not exist.");
+    for (const t of hit) { if (["new", "active"].includes(t.status)) { t.campaign = String(c.id); t.campaign_lock = "1"; affected++; } else skipped++; }
+  } else if (action === "auto") {
+    for (const t of hit) { t.campaign_lock = ""; t.campaign = ""; affected++; }
+    assignCampaigns(rows, cfg);
+  } else throw new Error("Unknown action.");
+  store.saveTracking(rows);
+  return { affected, skipped };
 }
 /** May this lead be emailed under the campaign rules? */
 function campaignAllows(t, cfg) {
@@ -1366,4 +1393,4 @@ async function processScheduled(cfg = loadConfig(), deps = {}, now = new Date())
 }
 
 module.exports = { sendReply, scheduleReply, cancelScheduled, cancelAllScheduled, listScheduled, processScheduled, autoRunDue, MAX_PER_MAILBOX_PER_DAY, RESCAN_MS, logTail, markInterrupted, readLastRun, windowState, inWindow, campaignDate, domainReceivesMail, nextEmail, sendTest, dnsHealth, resolveHeld, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dueFollowups, runOnce,
-  startRun, requestStop, previewNext, status, markSetup, leadQuery, leadFacets, STAGE_NAMES, campaignOptions, campaignPreview, assignCampaigns, leadMatches, queueOrder, cfgFor, healthScore, analytics, loadState, tzParts, isSendDay, today, run, log };
+  startRun, requestStop, previewNext, status, markSetup, bulkLeads, leadQuery, leadFacets, STAGE_NAMES, campaignOptions, campaignPreview, assignCampaigns, leadMatches, queueOrder, cfgFor, healthScore, analytics, loadState, tzParts, isSendDay, today, run, log };

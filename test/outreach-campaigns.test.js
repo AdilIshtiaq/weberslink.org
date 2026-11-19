@@ -281,3 +281,56 @@ test("Delete all leads: empties the list and its by-products, keeps the never-co
     assert.strictEqual(store.loadTracking().length, 1);
   } finally { eng.run.running = false; server.close(); }
 });
+
+test("bulk actions on ticked leads: move pins them to a campaign, auto hands them back, never-contact and delete keep opt-outs protected", async () => {
+  reset();
+  const cfg = cfgWith([{ id: 1, name: "Roofers", types: "roof" }, { id: 2, name: "Dentists", types: "dent" }]); eng.saveConfig(cfg);
+  store.saveTracking([L("a@a.com", { category: "Roofing" }), L("b@b.com", { category: "Dentist" }), L("c@c.com", { category: "Plumber" }), L("d@d.com", { category: "Roofing", status: "unsubscribed" }), L("e@e.com", { category: "Roofing", status: "replied" }), L("f@f.com", { category: "Roofing", status: "bounced" })]);
+  eng.loadState(cfg);
+  const server = http.createServer((req, res) => { if (!outreach.handle(req, res)) { res.writeHead(404); res.end(); } });
+  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const call = (m, u, b, c) => fetch(base + "/api/outreach" + u, { method: m, headers: { "Content-Type": "application/json", ...(c ? { Cookie: c } : {}) }, body: b === undefined ? undefined : JSON.stringify(b) }).then(async (r) => ({ status: r.status, json: await r.json() }));
+  const get = (e) => store.loadTracking().find((t) => t.email === e);
+  try {
+    assert.strictEqual((await call("POST", "/leads/bulk", { action: "delete", emails: ["a@a.com"] })).status, 401);
+    const login = await fetch(base + "/api/outreach/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: process.env.ADMIN_PASSWORD }) });
+    const c = login.headers.get("set-cookie").split(";")[0];
+    assert.strictEqual(get("c@c.com").campaign, "", "the plumber matches no campaign");
+    // divide leads by hand: the plumber into Dentists, a roofer into Dentists as well
+    let r = await call("POST", "/leads/bulk", { action: "move", campaign: 2, emails: ["c@c.com", "a@a.com", "e@e.com", "nobody@x.com"] }, c);
+    assert.deepStrictEqual([r.json.affected, r.json.skipped], [2, 1], "a replied lead can't be moved");
+    assert.deepStrictEqual([get("c@c.com").campaign, get("c@c.com").campaign_lock, get("a@a.com").campaign], ["2", "1", "2"]);
+    eng.loadState(eng.loadConfig());
+    assert.strictEqual(get("a@a.com").campaign, "2", "automatic sorting leaves a hand-picked lead alone, even though it fits Roofers");
+    assert.strictEqual((await call("POST", "/leads/bulk", { action: "move", campaign: 99, emails: ["a@a.com"] }, c)).status, 400);
+    // hand it back
+    r = await call("POST", "/leads/bulk", { action: "auto", emails: ["a@a.com", "c@c.com"] }, c);
+    assert.strictEqual(r.json.affected, 2);
+    assert.deepStrictEqual([get("a@a.com").campaign, get("a@a.com").campaign_lock, get("c@c.com").campaign], ["1", "", ""]);
+    // a filter instead of ticks: everything in Roofers that is still waiting
+    r = await call("POST", "/leads/bulk", { action: "move", campaign: 2, filter: { stage: "waiting", campaign: "1" } }, c);
+    assert.strictEqual(r.json.affected, 1); assert.strictEqual(get("a@a.com").campaign, "2");
+    // never contact
+    r = await call("POST", "/leads/bulk", { action: "dnc", emails: ["b@b.com"] }, c);
+    assert.strictEqual(get("b@b.com").status, "do-not-contact"); assert.ok(store.loadSuppression().has("b@b.com"));
+    // delete: opted-out and bounced addresses are protected first; ordinary ones are simply removed
+    r = await call("POST", "/leads/bulk", { action: "delete", emails: ["d@d.com", "f@f.com", "c@c.com"] }, c);
+    assert.strictEqual(r.json.affected, 3);
+    assert.ok(!get("d@d.com") && !get("c@c.com"));
+    assert.ok(store.loadSuppression().has("d@d.com") && store.loadSuppression().has("f@f.com"), "opt-outs and bounces are remembered");
+    assert.ok(!store.loadSuppression().has("c@c.com"), "an ordinary lead is not blocked forever");
+    assert.strictEqual(eng.importLeads([{ Email: "d@d.com", Store: "D", Website: "d.com", Country: "United States" }], cfg).added, 1);
+    eng.loadState(cfg);
+    assert.strictEqual(get("d@d.com").status, "do-not-contact", "re-importing an opted-out address never brings them back into the queue");
+    // guards
+    assert.strictEqual((await call("POST", "/leads/bulk", { action: "explode", emails: ["a@a.com"] }, c)).status, 400);
+    assert.strictEqual((await call("POST", "/leads/bulk", { action: "delete", emails: [] }, c)).status, 400);
+    eng.run.running = true; assert.strictEqual((await call("POST", "/leads/bulk", { action: "delete", emails: ["a@a.com"] }, c)).status, 409); eng.run.running = false;
+    assert.ok(get("a@a.com"));
+    // deleting every lead also protects people who opted out
+    store.saveTracking([L("x@x.com", { status: "unsubscribed" }), L("y@y.com")]);
+    const all = await call("POST", "/leads/clear-all", { confirm: "DELETE" }, c);
+    assert.strictEqual(all.status, 200); assert.ok(store.loadSuppression().has("x@x.com")); assert.ok(!store.loadSuppression().has("y@y.com"));
+  } finally { eng.run.running = false; server.close(); }
+});

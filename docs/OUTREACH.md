@@ -46,11 +46,21 @@ one search runs at a time. Daily caps: 400 websites (`FINDER_DAILY_SITES_MAX`) a
 Map data (c) OpenStreetMap contributors (ODbL). You remain responsible for emailing lawfully: honour opt-outs and include a postal address (both are built into every email).
 Other sources (Google Places, Overture Maps, Apollo) can be added behind the same screen later.
 
+## Selecting leads and dividing them between campaigns
+Every row on **Leads** has a **tick box** (the box in the header ticks the whole page; once a page is ticked, **Select all N leads matching these filters** picks every match across pages).
+A bar appears with what you can do to the ticked leads:
+- **Move to campaign...** divides leads by hand. A lead you move is *pinned* ("chosen by you" under its place): the automatic sorting by place and business type leaves it alone, even if it does not fit the
+  campaign's filters. Only waiting and in-sequence leads can be moved. **Back to automatic sorting** un-pins them. Each campaign also has a **View its leads** button.
+- **Never contact:** marks them do-not-contact and adds them to the never-contact list.
+- **Delete:** removes them from the list. Anyone who opted out, bounced or was blocked is added to the never-contact list first, so re-importing them can never email them again.
+  Deleting 25 or more leads (or "all matching") asks you to type `DELETE`.
+All of these are refused while a run is in progress. The dashboard uses its own in-page dialogs for every confirmation (browsers can silently block built-in pop-ups, which made some buttons look dead).
+
 ## Starting again from zero
 **Leads -> Tools -> Delete all leads...** empties the lead list. You must type `DELETE`; a backup file downloads to your computer first (and a copy is saved in the data folder under `backups/`),
 so **Settings -> Checks & backup -> Restore from backup** can undo it. It is refused while a run or a lead search is in progress.
 - **Removed:** every lead and its progress, replies and AI labels, link-click stats, scheduled replies still waiting, the AI brief and objection summary, and the lead-finder results.
-- **Kept on purpose:** the never-contact list (so nobody who opted out can ever be emailed again), the sent log (daily limits and history), settings, mailboxes and their warm-up dates, campaigns and email wording.
+- **Kept on purpose:** the never-contact list (anyone who opted out or bounced is added to it first, so nobody can be emailed again), the sent log (daily limits and history), settings, mailboxes and their warm-up dates, campaigns and email wording.
   Links in emails you already sent keep working.
 
 ## Using the dashboard
@@ -316,7 +326,7 @@ Every email carries the postal address and an opt-out line. A mailbox pauses its
 A/B versions share one body and differ only in subject; judge after about 100 leads each.
 
 ## Tests
-`npm test` (about 188 tests: engine, API, auth, regression tests for an independent code review; no network or real
+`npm test` (about 189 tests: engine, API, auth, regression tests for an independent code review; no network or real
 mailboxes needed).
 
 ## Not covered by tests
