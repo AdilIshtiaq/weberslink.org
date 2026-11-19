@@ -37,7 +37,7 @@ test("everything needs a login; wrong password is rejected; right password sets 
   cookie = sc.split(";")[0];
   assert.strictEqual((await api("GET", "/api/outreach/session")).json.authed, true);
   // a tampered cookie is rejected
-  assert.strictEqual((await api("GET", "/api/outreach/status", undefined, { headers: { Cookie: cookie.slice(0, -2) + "00" } })).status, 401);
+  assert.strictEqual((await api("GET", "/api/outreach/status", undefined, { headers: { Cookie: cookie.slice(0, -1) + (cookie.endsWith("0") ? "1" : "0") } })).status, 401);
 });
 
 test("state-changing calls refuse non-JSON (cross-site form posts)", async () => {
