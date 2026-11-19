@@ -16,6 +16,8 @@ The Overview says so ("N waiting leads match no campaign"), warns when a campaig
 emails would send the default ones (which are written for roofing companies).
 
 **Gemini tools** (all need `GEMINI_OUTREACH_KEY`; each call counts toward `GEMINI_OUTREACH_AI_DAILY_MAX`, default 300; none can send anything):
+
+**When Google is busy.** Gemini sometimes answers "503, high demand" for a minute or two. The app retries (up to 3 times), then switches to a backup model (`GEMINI_OUTREACH_FALLBACK_MODEL`, default `gemini-flash-lite-latest`) before giving up with a plain "Gemini is very busy, try again in a minute". Quota errors are never retried.
 - **Describe a campaign** (Campaigns tab): "roofing companies in Texas and Florida" becomes a campaign with real places and business-type words from your leads; you see the live match count before saving.
 - **Write the emails with Gemini** (Emails tab, or **Write with AI** on a campaign): a 4-email sequence from a short brief and a tone. Every email is checked: no links, only the
   allowed placeholders, sensible length, greeting and sign-off enforced, copy score shown. Nothing is saved until you press **Save these emails** (for that campaign, or for everyone).
@@ -307,7 +309,7 @@ Every email carries the postal address and an opt-out line. A mailbox pauses its
 A/B versions share one body and differ only in subject; judge after about 100 leads each.
 
 ## Tests
-`npm test` (about 182 tests: engine, API, auth, regression tests for an independent code review; no network or real
+`npm test` (about 187 tests: engine, API, auth, regression tests for an independent code review; no network or real
 mailboxes needed).
 
 ## Not covered by tests

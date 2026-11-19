@@ -185,3 +185,29 @@ test("API: the new AI endpoints refuse without a key, facets and filters are ser
     assert.strictEqual((await call("POST", "/api/outreach/ai/filter", { query: "texas" }, c)).json.filter.state, "TX");
   } finally { server.close(); }
 });
+
+test("Gemini overload (503) is retried, then a backup model is used; quota and other errors are not retried; messages are plain", async () => {
+  const waits = []; ai.setWait(async (ms) => { waits.push(ms); });
+  const busy = () => Object.assign(new Error('{"error":{"code":503,"message":"This model is currently experiencing high demand.","status":"UNAVAILABLE"}}'), { status: 503 });
+  try {
+    // two overloads, then success on the same model
+    let n = 0, models = [];
+    assert.strictEqual(await ai.resilient(async (m) => { models.push(m); if (++n < 3) throw busy(); return "ok"; }), "ok");
+    assert.strictEqual(new Set(models).size, 1); assert.deepStrictEqual(waits, [1500, 3000]);
+    // the main model stays overloaded: the backup model answers
+    waits.length = 0; models = [];
+    assert.strictEqual(await ai.resilient(async (m) => { models.push(m); if (models.length <= 3) throw busy(); return "from backup"; }), "from backup");
+    assert.strictEqual(models.length, 4); assert.notStrictEqual(models[0], models[3]);
+    // everything overloaded: gives up after 6 tries
+    models = []; await assert.rejects(ai.resilient(async (m) => { models.push(m); throw busy(); }), /high demand/); assert.strictEqual(models.length, 6);
+    // quota and ordinary errors are not retried
+    models = []; await assert.rejects(ai.resilient(async (m) => { models.push(m); throw Object.assign(new Error("RESOURCE_EXHAUSTED quota"), { status: 429 }); }), /quota/); assert.strictEqual(models.length, 1);
+    models = []; await assert.rejects(ai.resilient(async (m) => { models.push(m); throw new Error("API key not valid"); }), /API key/); assert.strictEqual(models.length, 1);
+    // what the person sees
+    ai.setGenerator(async () => { throw busy(); });
+    await assert.rejects(ai.buildCampaign("x", {}), (e) => /very busy right now/.test(e.message) && !/\{|code|UNAVAILABLE/.test(e.message));
+    ai.setGenerator(async () => { throw new Error('{"error":{"code":400,"message":"API key not valid. Please pass a valid API key."}}'); });
+    await assert.rejects(ai.buildCampaign("x", {}), (e) => e.message === "Gemini error: API key not valid. Please pass a valid API key.");
+    assert.strictEqual(ai.isBusy({ status: 503 }), true); assert.strictEqual(ai.isBusy(new Error("bad request")), false);
+  } finally { ai.setWait(null); ai.setGenerator(null); }
+});
