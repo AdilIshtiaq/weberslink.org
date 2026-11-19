@@ -510,6 +510,19 @@
     var v = prompt("Email address or whole domain (like @example.com) that must never be emailed:");
     if (v) api("POST", "/api/outreach/dnc", { value: v }).then(function () { toast("Added to the never-contact list"); loadLeads(); refresh(); }).catch(fail);
   });
+  $("clearAllBtn").addEventListener("click", function () {
+    var n = state.status ? state.status.total : 0;
+    if (!n) return toast("The lead list is already empty.");
+    var typed = prompt("This deletes ALL " + n + " leads and starts you from zero.\n\nKept: your never-contact list, sent history, settings, mailboxes, campaigns and email wording.\nRemoved: every lead and its progress, replies and labels, link-click stats, waiting scheduled replies and search results.\n\nA backup file will download first, so you can undo this with Restore from backup.\n\nType DELETE to continue:");
+    if (typed !== "DELETE") return typed === null ? null : toast("Not deleted: you did not type DELETE.", true);
+    var btn = this; btn.disabled = true;
+    fetch("/api/outreach/backup", { credentials: "same-origin" }).then(function (r) { if (!r.ok) throw new Error("Could not make the backup, so nothing was deleted."); return r.blob(); }).then(function (blob) {
+      var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "outreach-backup-before-delete-" + new Date().toISOString().slice(0, 10) + ".json"; document.body.appendChild(a); a.click(); a.remove();
+      return new Promise(function (ok) { setTimeout(ok, 600); });
+    }).then(function () { return api("POST", "/api/outreach/leads/clear-all", { confirm: "DELETE" }); })
+      .then(function (r) { toast("Deleted " + r.removed + " leads. The list is now empty and clean."); state.leadPage = 0; ["leadStage", "leadPlace", "leadType", "leadCampaign", "leadSort"].forEach(function (id) { $(id).value = ""; }); $("leadQ").value = ""; return loadFacets(); })
+      .then(function () { loadLeads(); return refresh(); }).catch(fail).then(function () { btn.disabled = false; });
+  });
   $("rmBouncedBtn").addEventListener("click", function () {
     if (!confirm("Delete every bounced lead from the list? Their addresses are added to the never-contact list so they can't be emailed again. This can't be undone.")) return;
     api("POST", "/api/outreach/leads/remove-bounced", {}).then(function (r) { toast("Removed " + r.removed + " bounced lead" + (r.removed === 1 ? "" : "s")); state.leadPage = 0; loadLeads(); refresh(); }).catch(fail);
