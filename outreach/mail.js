@@ -125,6 +125,32 @@ class Mailbox {
   }
 
   /**
+   * The newest message in the inbox from one address (its new text only, not the quoted history), or null.
+   * Used to show an older reply that was not saved when it arrived. Read-only: nothing is marked as read.
+   */
+  async findReplyFrom(address, { sinceDays = 180 } = {}) {
+    const { simpleParser } = require("mailparser");
+    const want = String(address || "").trim().toLowerCase();
+    const client = await this.imap();
+    try {
+      const lock = await client.getMailboxLock("INBOX", { readOnly: true });
+      try {
+        const found = (await client.search({ from: want, since: new Date(Date.now() - sinceDays * 864e5) }, { uid: true })) || [];
+        for (const uid of found.sort((a, b) => b - a).slice(0, 5)) {
+          const m = await client.fetchOne(String(uid), { source: { maxLength: 150000 } }, { uid: true });
+          if (!m || !m.source) continue;
+          let parsed, msg;
+          try { parsed = await simpleParser(m.source); msg = await parseIncoming(parsed); } catch (e) { continue; }
+          if (msg.from !== want) continue; // the search matches part of an address
+          const text = String(msg.fresh || msg.body || "").trim();
+          if (text) return { text, subject: msg.subject, date: parsed.date ? parsed.date.toISOString() : "" };
+        }
+        return null;
+      } finally { lock.release(); }
+    } finally { await client.logout().catch(() => {}); }
+  }
+
+  /**
    * Warm-up helper: finds unread warm-up messages (header X-Warmup) in the inbox and the spam folder, marks them read,
    * moves any found in spam back to the inbox, and says where each one had landed. Returns
    * [{ folder: "inbox" | "spam", from, subject, messageId, token, isReply }]. Only our own warm-up mail is touched.

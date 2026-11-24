@@ -662,6 +662,8 @@ async function runOnce(opts = {}, deps = {}) {
         const changes = classify(msgs, track, scanBoxes.map((b) => b.addr));
         for (const c of changes) {
           if (c.kind === "UNMATCHED-STOP") { if (!dry) store.addSuppression(c.lead.email); } else store.saveRow(c.lead);
+          // Keep what the person wrote whether or not the AI is on, so the Inbox can show it.
+          if (c.kind === "REPLIED") { const f = replyFields(c); Object.assign(c.lead, f); store.updateLead(c.lead.email, f); }
         }
         for (const c of changes) {
           if (aiOff || !["REPLIED", "AUTO-REPLY"].includes(c.kind)) continue;
@@ -1019,7 +1021,7 @@ function status(cfg = loadConfig(), now = new Date()) {
     daysLeft: remaining && daily ? Math.ceil(remaining / daily) : 0,
     replied: track.filter((t) => t.status === "replied").sort((a, b) => String(b.replied_at).localeCompare(String(a.replied_at))).map((t) => ({
       email: t.email, store: t.store, mailbox: t.mailbox, note: t.note, repliedAt: t.replied_at, loomSent: t.loom_sent === "1", domain: t.domain, firstName: t.first_name, subject: t.subject, clicks: clicks.forLead(t.email),
-      label: t.reply_label, summary: t.reply_summary, snippet: t.reply_snippet, draft: t.draft_reply, outcome: t.outcome })),
+      label: t.reply_label, summary: t.reply_summary, snippet: t.reply_snippet, text: t.reply_text, replySubject: t.reply_subject, draft: t.draft_reply, outcome: t.outcome })),
     analytics: analytics(track, started),
     campaigns: campaignStats(track, cfg, now, mailboxes), unassigned: (cfg.campaigns || []).length ? track.filter((t) => t.status === "new" && !t.campaign).length : 0,
     insights: insights(track, cfg, now, mailboxes),
@@ -1301,6 +1303,36 @@ async function sendReply(input, cfg = loadConfig(), deps = {}, prepared = false)
   return { mailbox: box.addr };
 }
 
+/** What the person wrote, as stored on the lead: a short preview, the full text and the subject. */
+function replyFields(change) {
+  const text = String(change.text || change.snippet || "").replace(/\r\n/g, "\n").trim().slice(0, 3000);
+  return { reply_snippet: String(change.snippet || text.replace(/\s+/g, " ")).slice(0, 300), reply_text: text, reply_subject: String(change.subject || "").replace(/\s+/g, " ").trim().slice(0, 200) };
+}
+
+/**
+ * The message a lead replied with. Returns what was saved when the reply arrived; for older replies
+ * (saved before this existed) it reads the message from the mailbox they wrote to and keeps it.
+ * deps.mailboxes can replace the real mailboxes (tests).
+ */
+async function fetchReplyMessage(email, cfg = loadConfig(), deps = {}) {
+  const key = String(email || "").trim().toLowerCase();
+  const lead = store.loadTracking().find((t) => t.email.toLowerCase() === key);
+  if (!lead) throw new Error("Lead not found.");
+  if (lead.reply_text) return { text: lead.reply_text, subject: lead.reply_subject || "", stored: true };
+  if (lead.status !== "replied") throw new Error("This lead has not replied.");
+  const want = String(lead.mailbox || "").toLowerCase();
+  const pool = deps.mailboxes || cfg.mailboxes.filter((m) => m.email).map((m) => new Mailbox(m));
+  const box = pool.find((b) => (b.addr || b.email || "").toLowerCase() === want) || (want ? null : pool[0]);
+  if (!box) throw new Error(`The mailbox ${lead.mailbox} is not set up in Settings, so their message can't be loaded from it.`);
+  if (box.hasPassword && !box.hasPassword()) throw new Error(`No password is set on the server for ${box.addr}, so their message can't be loaded.`);
+  let found;
+  try { found = await box.findReplyFrom(lead.email, { sinceDays: 180 }); } finally { box.close && box.close(); }
+  if (!found || !found.text) throw new Error(`Couldn't find their message in the inbox of ${box.addr}. It may have been moved or deleted.`);
+  const fields = replyFields({ text: found.text, subject: found.subject, snippet: lead.reply_snippet });
+  store.updateLead(lead.email, fields);
+  return { text: fields.reply_text, subject: fields.reply_subject, date: found.date || "", stored: false };
+}
+
 function readScheduled() { const d = store.readJson(SCHEDULE_FILE, { items: [] }); return Array.isArray(d.items) ? d.items : []; }
 function writeScheduled(items) {
   const cut = Date.now() - 30 * 864e5;
@@ -1359,5 +1391,5 @@ async function processScheduled(cfg = loadConfig(), deps = {}, now = new Date())
   return sent;
 }
 
-module.exports = { sendReply, scheduleReply, cancelScheduled, listScheduled, processScheduled, autoRunDue, MAX_PER_MAILBOX_PER_DAY, RESCAN_MS, logTail, markInterrupted, readLastRun, windowState, inWindow, campaignDate, domainReceivesMail, nextEmail, sendTest, dnsHealth, resolveHeld, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dueFollowups, runOnce,
+module.exports = { sendReply, fetchReplyMessage, replyFields, scheduleReply, cancelScheduled, listScheduled, processScheduled, autoRunDue, MAX_PER_MAILBOX_PER_DAY, RESCAN_MS, logTail, markInterrupted, readLastRun, windowState, inWindow, campaignDate, domainReceivesMail, nextEmail, sendTest, dnsHealth, resolveHeld, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dueFollowups, runOnce,
   startRun, requestStop, previewNext, status, markSetup, leadQuery, leadFacets, STAGE_NAMES, campaignOptions, campaignPreview, assignCampaigns, leadMatches, queueOrder, cfgFor, healthScore, analytics, loadState, tzParts, isSendDay, today, run, log };

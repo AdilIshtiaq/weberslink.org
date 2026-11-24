@@ -249,11 +249,12 @@
     $("replyList").innerHTML = rs.length ? rs.map(function (r) {
       var late = !r.loomSent && r.repliedAt && Date.now() - new Date(r.repliedAt).getTime() > 24 * 36e5;
       var pos = POSITIVE.indexOf(r.label) >= 0 || r.label === "not_now" || r.label === "wrong_person";
-      return '<div class="reply"><div><div class="who">' + esc(r.store || r.domain) + (r.label ? ' <span class="chip lab-' + esc(r.label) + '">' + esc(LABEL[r.label] || r.label) + "</span>" : "") + (r.outcome ? ' <span class="chip high">' + esc(r.outcome.replace("_", " ")) + "</span>" : "") + '</div><div class="meta">' + esc(r.email) + " · via " + esc(r.mailbox || "?") + (r.repliedAt ? " · " + esc(ago(r.repliedAt)) : "") + "</div>" +
+      return '<div class="reply clickable" data-email="' + esc(r.email) + '"><div><div class="who">' + esc(r.store || r.domain) + (r.label ? ' <span class="chip lab-' + esc(r.label) + '">' + esc(LABEL[r.label] || r.label) + "</span>" : "") + (r.outcome ? ' <span class="chip high">' + esc(r.outcome.replace("_", " ")) + "</span>" : "") + '</div><div class="meta">' + esc(r.email) + " · via " + esc(r.mailbox || "?") + (r.repliedAt ? " · " + esc(ago(r.repliedAt)) : "") + "</div>" +
         (r.summary || r.snippet ? '<div class="meta" style="color:var(--text);margin-top:4px">' + esc(r.summary || r.snippet) + "</div>" : "") +
         clickLine(r.clicks) +
         (r.draft ? '<div class="draft"><b>Suggested reply</b> (review it before sending)\n' + esc(r.draft) + "</div>" : "") +
         (late ? '<div class="bad" style="font-size:13px">Over 24 hours — send the video now</div>' : "") + '</div><div class="acts">' +
+        '<button class="btn sm" data-open="' + esc(r.email) + '">Read</button>' +
         '<button class="btn sm" data-reply="' + esc(r.email) + '">Reply</button>' +
         (r.draft ? '<button class="btn sm primary" data-usedraft="' + esc(r.email) + '">Use suggested reply</button>' : pos && state.status.ai && state.status.ai.configured ? '<button class="btn sm" data-draft="' + esc(r.email) + '">Suggest a reply</button>' : "") +
         '<select data-outcome="' + esc(r.email) + '" style="font-size:13px"><option value="">Outcome…</option><option value="meeting_booked"' + (r.outcome === "meeting_booked" ? " selected" : "") + '>Meeting booked</option><option value="won"' + (r.outcome === "won" ? " selected" : "") + '>Won</option><option value="lost"' + (r.outcome === "lost" ? " selected" : "") + '>Lost</option><option value="clear_outcome">Clear</option></select>' +
@@ -271,6 +272,71 @@
     var em = e.target.getAttribute("data-outcome"); if (!em || !e.target.value) return;
     api("POST", "/api/outreach/leads/action", { email: em, action: e.target.value }).then(function () { toast("Saved"); return refresh(); }).catch(fail);
   });
+  // Inbox detail: what they wrote, the AI's suggested answer, and the way into the reply window.
+  var detailEmail = null, detailReq = 0;
+  var replyOf = function (email) { return (state.status.replied || []).filter(function (x) { return x.email === email; })[0]; };
+  var aiReady = function () { return Boolean(state.status.ai && state.status.ai.configured); };
+  function renderDetail() {
+    var r = replyOf(detailEmail); if (!r) return;
+    $("mdMessage").textContent = r.text || r.snippet || "(No message text is saved for this reply.)";
+    $("mdDraft").textContent = r.draft || (aiReady() ? "No suggestion yet. Press \u201cSuggest a reply\u201d." : "Turn on Gemini in Settings to get a suggested reply.");
+    $("mdUse").hidden = !r.draft;
+    $("mdSuggest").hidden = !aiReady();
+    $("mdSuggest").textContent = r.draft ? "New suggestion" : "Suggest a reply";
+  }
+  function showDetailError(msg) { $("mdErr").textContent = msg; $("mdErr").hidden = !msg; }
+  function openDetail(email) {
+    var r = replyOf(email); if (!r) return;
+    detailEmail = email; var req = ++detailReq;
+    $("mdTitle").textContent = r.store || r.domain || r.email;
+    $("mdMeta").innerHTML = esc(r.email) + " \u00b7 via " + esc(r.mailbox || "?") + (r.repliedAt ? " \u00b7 " + esc(ago(r.repliedAt)) : "") +
+      (r.label ? ' <span class="chip lab-' + esc(r.label) + '">' + esc(LABEL[r.label] || r.label) + "</span>" : "") +
+      (r.summary ? '<div style="color:var(--text);margin-top:4px">' + esc(r.summary) + "</div>" : "");
+    showDetailError("");
+    $("mdSuggest").disabled = false;
+    renderDetail();
+    $("msgModal").hidden = false;
+    if (!r.text) {
+      // Replies from before messages were saved: read it from the mailbox they wrote to, once.
+      $("mdMessage").textContent = "Loading their message from the mailbox\u2026";
+      api("POST", "/api/outreach/replies/message", { email: email }).then(function (d) {
+        if (req !== detailReq) return;
+        var cur = replyOf(email); if (cur) { cur.text = d.text; cur.replySubject = cur.replySubject || d.subject; }
+        renderDetail();
+      }).catch(function (err) {
+        if (req !== detailReq) return;
+        renderDetail(); showDetailError(err.message);
+      });
+    }
+  }
+  function closeDetail() { $("msgModal").hidden = true; detailEmail = null; detailReq++; }
+  $("mdClose").addEventListener("click", closeDetail);
+  $("msgModal").addEventListener("mousedown", function (e) { if (e.target === $("msgModal")) closeDetail(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("msgModal").hidden) closeDetail(); });
+  $("replyList").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-open]");
+    if (b) { openDetail(b.dataset.open); return; }
+    var card = e.target.closest(".reply[data-email]");
+    if (card && !e.target.closest("button, select, input, label, a, .draft")) openDetail(card.dataset.email);
+  });
+  $("mdReply").addEventListener("click", function () { var em = detailEmail; closeDetail(); if (em) openReply(em); });
+  $("mdUse").addEventListener("click", function () {
+    var em = detailEmail, r = replyOf(em); closeDetail();
+    if (em) { openReply(em); if (r && r.draft) ed.innerHTML = textToHtml(r.draft); }
+  });
+  $("mdSuggest").addEventListener("click", function () {
+    var em = detailEmail, btn = $("mdSuggest"), req = detailReq; if (!em) return;
+    btn.disabled = true; btn.textContent = "Writing\u2026"; showDetailError("");
+    api("POST", "/api/outreach/ai/draft", { email: em }).then(function (d) {
+      var cur = replyOf(em); if (cur) cur.draft = d.draft;
+      if (req === detailReq) { btn.disabled = false; renderDetail(); }
+      return refresh();
+    }).catch(function (err) {
+      if (req !== detailReq) return;
+      btn.disabled = false; renderDetail(); showDetailError(err.message);
+    });
+  });
+
   // Reply window: sends from the mailbox that emailed them, in the same thread; or schedules it for later.
   var replyTo = null;
   var pad = function (n) { return (n < 10 ? "0" : "") + n; };
@@ -285,6 +351,8 @@
     $("rmTo").value = r.email; $("rmFrom").value = r.mailbox || "";
     $("rmSubject").value = /^re:/i.test(r.subject || "") ? r.subject : "Re: " + (r.subject || "your free video for " + (r.domain || ""));
     ed.innerHTML = r.firstName ? "<div>Hi " + esc(r.firstName) + ",</div><div><br></div><div><br></div>" : "";
+    var theirs = r.text || r.snippet || "";
+    $("rmTheirs").hidden = !theirs; $("rmTheirsText").textContent = theirs;
     rmFiles = []; renderFiles();
     $("rmLater").checked = false; $("rmWhen").value = ""; syncLater();
     $("replyModal").hidden = false; ed.focus();

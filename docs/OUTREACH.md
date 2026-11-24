@@ -32,7 +32,8 @@ Six sections, left to right in the menu:
 - **Overview:** what needs you right now. A **Get ready to send** checklist (sender details, mailbox, leads, optional campaigns, test email, domain check, go live)
   stays on top until you are set up and ticks itself off. Below it: **needs attention** (the most important problem or opportunity first, each with an Open
   button that takes you to the fix), six key numbers (sent today, last 7 days, replies, replies waiting for you, meetings), a 14-day chart of sends and replies, your campaigns and mailboxes.
-- **Inbox:** people who replied, with Gemini's label and suggested answer. Reply, schedule, mark the outcome.
+- **Inbox:** people who replied, with Gemini's label and suggested answer. Click a reply (or **Read**) to see exactly what they wrote, then **Suggest a reply** for a draft to review, **Use suggested reply** to open it in the reply window, or **Reply** to write your own. Their message stays visible while you write. The message is saved when the reply arrives (with or without Gemini). For replies from before this existed, it is read from the mailbox they wrote to the first time you open it, which needs that mailbox's password on the server.
+- Reply, schedule, mark the outcome.
 - **Campaigns:** groups of leads by place and business type, plus an **Emails** tab for the wording of each campaign.
 - **Leads:** search, filter, import. **Tools** holds the list cleaner, Gemini helpers, never-contact list, exports.
 - **Reports:** results by label, step and mailbox, subject-line test, link clicks, why people say no, and the run log.
