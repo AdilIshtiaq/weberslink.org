@@ -211,6 +211,11 @@ async function route(req, res, url, method) {
       return send(res, 200, { ok: true, ...(await eng.sendReply(body)) });
     } catch (e) { return send(res, 400, { ok: false, error: String(e.message).slice(0, 300) }); }
   }
+  if (p === "/replies/message" && method === "POST") {
+    const body = await readJson(req);
+    try { return send(res, 200, { ok: true, ...(await eng.fetchReplyMessage(String(body.email || ""))) }); }
+    catch (e) { return send(res, 400, { ok: false, error: String(e.message).slice(0, 300) }); }
+  }
   if (p === "/scheduled/cancel" && method === "POST") {
     return eng.cancelScheduled(String((await readJson(req)).id || "")) ? send(res, 200, { ok: true }) : send(res, 404, { ok: false, error: "That message is no longer waiting to be sent." });
   }
@@ -265,7 +270,11 @@ async function route(req, res, url, method) {
     const lead = store.loadTracking().find((t) => t.email.toLowerCase() === String(body.email || "").toLowerCase());
     if (!lead) return send(res, 404, { ok: false, error: "Lead not found." });
     try {
-      const draft = await ai.draftReply(lead, eng.loadConfig(), { text: lead.reply_snippet, label: lead.reply_label });
+      // Work from what they actually wrote; an older reply that wasn't saved is read from the mailbox first.
+      let text = lead.reply_text || lead.reply_snippet || "";
+      if (!text) { try { text = (await eng.fetchReplyMessage(lead.email)).text; } catch (e) { /* handled below */ } }
+      if (!text) return send(res, 422, { ok: false, error: "The AI needs their message first, and it couldn't be loaded from the mailbox." });
+      const draft = await ai.draftReply(lead, eng.loadConfig(), { text, label: lead.reply_label });
       if (!draft) return send(res, 422, { ok: false, error: "Gemini's draft didn't pass the safety checks (length or links). Try again." });
       store.updateLead(lead.email, { draft_reply: draft });
       return send(res, 200, { ok: true, draft });

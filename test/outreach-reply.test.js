@@ -138,3 +138,49 @@ test("a scheduled rich reply keeps its links and attachments, sent as HTML", asy
   assert.strictEqual(m.attachments[0].content.toString(), "hello");
   assert.strictEqual(store.readJson("scheduled.json").items[0].attachments[0].content, ""); // contents dropped once sent
 });
+
+test("compose sends a new message from the chosen mailbox to any address, unthreaded", async () => {
+  reset();
+  const a = fakeBox("hassan@weberslink.org"), b = fakeBox("sales@weberslink.org");
+  const r = await eng.sendReply({ compose: true, email: "New@Client.com", from: "SALES@weberslink.org", subject: "Hello there", text: "Nice to meet you" }, cfg, { mailboxes: [a, b] });
+  assert.strictEqual(r.mailbox, "sales@weberslink.org");
+  assert.strictEqual(a.sent.length, 0);
+  const m = b.sent[0];
+  assert.strictEqual(m.to, "new@client.com");
+  assert.strictEqual(m.subject, "Hello there");
+  assert.strictEqual(m.inReplyTo, undefined);
+  assert.strictEqual(m.references, undefined);
+  assert.strictEqual(m.listUnsubscribe, false);
+  assert.strictEqual(store.readCsv("sent_log.csv").pop().mode, "compose");
+});
+
+test("compose validates the address, subject, sender and still blocks opted-out leads", async () => {
+  reset();
+  const box = fakeBox("hassan@weberslink.org");
+  const d = { mailboxes: [box] };
+  await assert.rejects(eng.sendReply({ compose: true, email: "nope", from: "hassan@weberslink.org", subject: "x", text: "hi" }, cfg, d), /valid email/);
+  await assert.rejects(eng.sendReply({ compose: true, email: "a@b.com", from: "hassan@weberslink.org", subject: " ", text: "hi" }, cfg, d), /subject/);
+  await assert.rejects(eng.sendReply({ compose: true, email: "a@b.com", subject: "x", text: "hi" }, cfg, d), /Choose which mailbox/);
+  await assert.rejects(eng.sendReply({ compose: true, email: "a@b.com", from: "ghost@weberslink.org", subject: "x", text: "hi" }, cfg, d), /not set up/);
+  await assert.rejects(eng.sendReply({ compose: true, email: "stop@shop.com", from: "hassan@weberslink.org", subject: "x", text: "hi" }, cfg, d), /unsubscribed/);
+  assert.strictEqual(box.sent.length, 0);
+});
+
+test("a reply can be sent from a different mailbox than the one that emailed the lead", async () => {
+  reset();
+  const a = fakeBox("hassan@weberslink.org"), b = fakeBox("sales@weberslink.org");
+  await eng.sendReply({ email: "a@shop.com", from: "sales@weberslink.org", text: "hi" }, cfg, { mailboxes: [a, b] });
+  assert.strictEqual(a.sent.length, 0);
+  assert.strictEqual(b.sent[0].inReplyTo, "<2@x>");
+});
+
+test("a scheduled compose keeps its sender and is sent from it", async () => {
+  reset();
+  const now = new Date("2026-11-04T10:00:00Z");
+  const item = eng.scheduleReply({ compose: true, email: "new@client.com", from: "sales@weberslink.org", subject: "Later", text: "see you", sendAt: "2026-11-04T10:30:00Z" }, now);
+  assert.strictEqual(item.email, "new@client.com");
+  const a = fakeBox("hassan@weberslink.org"), b = fakeBox("sales@weberslink.org");
+  assert.strictEqual(await eng.processScheduled(cfg, { mailboxes: [a, b] }, new Date("2026-11-04T11:00:00Z")), 1);
+  assert.strictEqual(b.sent[0].to, "new@client.com");
+  assert.strictEqual(a.sent.length, 0);
+});

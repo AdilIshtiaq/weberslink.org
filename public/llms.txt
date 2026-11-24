@@ -56,6 +56,7 @@
 - [WebersLink AI Assistant](https://weberslink.org/work/ai-assistant): A streaming AI chat agent trained on our services and prices. It answers questions, qualifies visitors and saves leads straight to our inbox, with guardrails and daily limits.
 
 ## Free resources
+- [WeberslinkClip](https://clip.weberslink.org/): Turn long videos into short, captioned vertical clips for YouTube Shorts, TikTok and Reels. Free early bird plan.
 - [Free WordPress plugins](https://weberslink.org/plugins/): Free, GPL-licensed WordPress plugins for forms, email, redirects, security and SEO.
 
 ## Contact

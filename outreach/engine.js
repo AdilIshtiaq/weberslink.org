@@ -689,6 +689,8 @@ async function runOnce(opts = {}, deps = {}) {
         const changes = classify(msgs, track, scanBoxes.map((b) => b.addr));
         for (const c of changes) {
           if (c.kind === "UNMATCHED-STOP") { if (!dry) store.addSuppression(c.lead.email); } else store.saveRow(c.lead);
+          // Keep what the person wrote whether or not the AI is on, so the Inbox can show it.
+          if (c.kind === "REPLIED") { const f = replyFields(c); Object.assign(c.lead, f); store.updateLead(c.lead.email, f); }
         }
         for (const c of changes) {
           if (aiOff || !["REPLIED", "AUTO-REPLY"].includes(c.kind)) continue;
@@ -1046,7 +1048,7 @@ function status(cfg = loadConfig(), now = new Date()) {
     daysLeft: remaining && daily ? Math.ceil(remaining / daily) : 0,
     replied: track.filter((t) => t.status === "replied").sort((a, b) => String(b.replied_at).localeCompare(String(a.replied_at))).map((t) => ({
       email: t.email, store: t.store, mailbox: t.mailbox, note: t.note, repliedAt: t.replied_at, loomSent: t.loom_sent === "1", domain: t.domain, firstName: t.first_name, subject: t.subject, clicks: clicks.forLead(t.email),
-      label: t.reply_label, summary: t.reply_summary, snippet: t.reply_snippet, draft: t.draft_reply, outcome: t.outcome })),
+      label: t.reply_label, summary: t.reply_summary, snippet: t.reply_snippet, text: t.reply_text, replySubject: t.reply_subject, draft: t.draft_reply, outcome: t.outcome })),
     analytics: analytics(track, started),
     campaigns: campaignStats(track, cfg, now, mailboxes), unassigned: (cfg.campaigns || []).length ? track.filter((t) => t.status === "new" && !t.campaign).length : 0,
     insights: insights(track, cfg, now, mailboxes),
@@ -1289,11 +1291,22 @@ function findLead(email) {
   return store.loadTracking().find((t) => t.email.toLowerCase() === String(email || "").trim().toLowerCase());
 }
 // html (from the dashboard's rich editor) wins over text; prepared = already-sanitised { html, attachments } of a scheduled item.
-function checkReply({ email, subject, text, html, files, attachments }, prepared = false) {
-  const lead = findLead(email);
+const SINGLE_EMAIL_RE = /^[^\s@<>",;]+@[^\s@<>",;]+\.[^\s@<>",;]+$/;
+// compose = a new message to any address (not only a lead); leads who opted out or bounced are still blocked.
+function checkReply({ email, subject, text, html, files, attachments, compose }, prepared = false) {
+  let lead = findLead(email);
+  if (compose) {
+    email = String(email || "").trim();
+    if (!SINGLE_EMAIL_RE.test(email) || email.length > 254) throw new Error("Enter a valid email address in To.");
+    if (!lead) lead = { email: email.toLowerCase(), store: "", domain: "", status: "", mailbox: "" };
+  }
   if (!lead) throw new Error("That address is not in your lead list.");
   if (BLOCKED_FOR_REPLY.includes(lead.status)) throw new Error(`Not sending: this lead is ${lead.status}.`);
-  subject = String(subject || "").replace(/[\r\n]+/g, " ").trim().slice(0, 300) || `Re: ${lead.subject || "your free video for " + lead.domain}`;
+  subject = String(subject || "").replace(/[\r\n]+/g, " ").trim().slice(0, 300);
+  if (!subject) {
+    if (compose) throw new Error("Add a subject.");
+    subject = `Re: ${lead.subject || "your free video for " + lead.domain}`;
+  }
   let rich = null;
   if (prepared && html) rich = { html: String(html), text: richtext.htmlToText(html), attachments: Array.isArray(attachments) ? attachments : [] };
   else if (html && String(html).trim()) rich = richtext.prepare(html, files);
@@ -1309,12 +1322,15 @@ const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">
 /** Sends one personal reply to a lead from the mailbox that emailed them, inside the same thread. deps.mailboxes is for tests. */
 async function sendReply(input, cfg = loadConfig(), deps = {}, prepared = false) {
   const { lead, subject, text, html, attachments } = checkReply(input, prepared);
-  const want = String(lead.mailbox || "").toLowerCase();
+  // From: the mailbox picked in the window; otherwise the one that emailed the lead.
+  const pick = String(input.from || "").trim().toLowerCase();
+  const want = pick || String(lead.mailbox || "").toLowerCase();
+  if (input.compose && !want) throw new Error("Choose which mailbox to send from.");
   const pool = deps.mailboxes || cfg.mailboxes.filter((m) => m.email).map((m) => new Mailbox(m));
   const box = pool.find((b) => (b.addr || b.email || "").toLowerCase() === want) || (want ? null : pool[0]);
-  if (!box) throw new Error(`The mailbox ${lead.mailbox} is not set up in Settings, so this reply can't be sent from it.`);
+  if (!box) throw new Error(`The mailbox ${pick || lead.mailbox} is not set up in Settings, so this message can't be sent from it.`);
   if (box.hasPassword && !box.hasPassword()) throw new Error(`No password is set on the server for ${box.addr}.`);
-  const refs = [...new Set([lead.first_message_id, lead.last_message_id].filter(Boolean))];
+  const refs = input.compose ? [] : [...new Set([lead.first_message_id, lead.last_message_id].filter(Boolean))];
   let body = html ? richtext.wrapEmail(html) : undefined;
   if (body && cfg.sending.track_clicks) {
     try { body = clicks.trackHtml(body, { email: lead.email, source: "reply", cfg }); } catch (e) { log(`(click tracking off for this reply: ${e.message})`); }
@@ -1323,9 +1339,39 @@ async function sendReply(input, cfg = loadConfig(), deps = {}, prepared = false)
     await box.send({ to: lead.email, subject, text, html: body, attachments: attachments.length ? richtext.forMail(attachments) : undefined,
       inReplyTo: refs[refs.length - 1], references: refs.length ? refs : undefined, listUnsubscribe: false });
   } finally { box.close && box.close(); }
-  log(`REPLY sent ${box.addr} -> ${lead.email} (${lead.store})`);
-  try { store.appendSentLog({ date: new Date().toISOString(), mode: "reply", mailbox: box.addr, email: lead.email, store: lead.store, step: "reply", variant: "", subject }); } catch (e) { /* the log is optional */ }
+  log(`${input.compose ? "MESSAGE" : "REPLY"} sent ${box.addr} -> ${lead.email} (${lead.store})`);
+  try { store.appendSentLog({ date: new Date().toISOString(), mode: input.compose ? "compose" : "reply", mailbox: box.addr, email: lead.email, store: lead.store, step: input.compose ? "compose" : "reply", variant: "", subject }); } catch (e) { /* the log is optional */ }
   return { mailbox: box.addr };
+}
+
+/** What the person wrote, as stored on the lead: a short preview, the full text and the subject. */
+function replyFields(change) {
+  const text = String(change.text || change.snippet || "").replace(/\r\n/g, "\n").trim().slice(0, 3000);
+  return { reply_snippet: String(change.snippet || text.replace(/\s+/g, " ")).slice(0, 300), reply_text: text, reply_subject: String(change.subject || "").replace(/\s+/g, " ").trim().slice(0, 200) };
+}
+
+/**
+ * The message a lead replied with. Returns what was saved when the reply arrived; for older replies
+ * (saved before this existed) it reads the message from the mailbox they wrote to and keeps it.
+ * deps.mailboxes can replace the real mailboxes (tests).
+ */
+async function fetchReplyMessage(email, cfg = loadConfig(), deps = {}) {
+  const key = String(email || "").trim().toLowerCase();
+  const lead = store.loadTracking().find((t) => t.email.toLowerCase() === key);
+  if (!lead) throw new Error("Lead not found.");
+  if (lead.reply_text) return { text: lead.reply_text, subject: lead.reply_subject || "", stored: true };
+  if (lead.status !== "replied") throw new Error("This lead has not replied.");
+  const want = String(lead.mailbox || "").toLowerCase();
+  const pool = deps.mailboxes || cfg.mailboxes.filter((m) => m.email).map((m) => new Mailbox(m));
+  const box = pool.find((b) => (b.addr || b.email || "").toLowerCase() === want) || (want ? null : pool[0]);
+  if (!box) throw new Error(`The mailbox ${lead.mailbox} is not set up in Settings, so their message can't be loaded from it.`);
+  if (box.hasPassword && !box.hasPassword()) throw new Error(`No password is set on the server for ${box.addr}, so their message can't be loaded.`);
+  let found;
+  try { found = await box.findReplyFrom(lead.email, { sinceDays: 180 }); } finally { box.close && box.close(); }
+  if (!found || !found.text) throw new Error(`Couldn't find their message in the inbox of ${box.addr}. It may have been moved or deleted.`);
+  const fields = replyFields({ text: found.text, subject: found.subject, snippet: lead.reply_snippet });
+  store.updateLead(lead.email, fields);
+  return { text: fields.reply_text, subject: fields.reply_subject, date: found.date || "", stored: false };
 }
 
 function readScheduled() { const d = store.readJson(SCHEDULE_FILE, { items: [] }); return Array.isArray(d.items) ? d.items : []; }
@@ -1340,13 +1386,13 @@ const publicItem = (i) => ({ id: i.id, email: i.email, subject: i.subject, text:
 function listScheduled() {
   return readScheduled().map(publicItem).sort((a, b) => (a.status === "pending" ? 0 : 1) - (b.status === "pending" ? 0 : 1) || a.sendAt.localeCompare(b.sendAt));
 }
-function scheduleReply({ email, subject, text, html, files, sendAt }, now = new Date()) {
-  const { lead, subject: subj, text: body, html: rich, attachments } = checkReply({ email, subject, text, html, files });
+function scheduleReply({ email, subject, text, html, files, sendAt, from, compose }, now = new Date()) {
+  const { lead, subject: subj, text: body, html: rich, attachments } = checkReply({ email, subject, text, html, files, compose });
   const when = new Date(sendAt);
   if (isNaN(when)) throw new Error("Pick a date and time to send.");
   if (when.getTime() < now.getTime() - 60 * 1000) throw new Error("That time is in the past. Pick a later time, or send it now.");
   if (when.getTime() > now.getTime() + SCHEDULE_MAX_DAYS * 864e5) throw new Error("Pick a date within the next year.");
-  const item = { id: require("crypto").randomBytes(6).toString("hex"), email: lead.email, subject: subj, text: body, ...(rich ? { html: rich } : {}), ...(attachments.length ? { attachments } : {}), sendAt: when.toISOString(), status: "pending", tries: 0, createdAt: now.toISOString() };
+  const item = { id: require("crypto").randomBytes(6).toString("hex"), email: lead.email, subject: subj, text: body, ...(from ? { from: String(from).trim() } : {}), ...(compose ? { compose: true } : {}), ...(rich ? { html: rich } : {}), ...(attachments.length ? { attachments } : {}), sendAt: when.toISOString(), status: "pending", tries: 0, createdAt: now.toISOString() };
   writeScheduled(readScheduled().concat(item));
   log(`Scheduled a reply to ${lead.email} for ${item.sendAt}`);
   return publicItem(item);
@@ -1392,5 +1438,5 @@ async function processScheduled(cfg = loadConfig(), deps = {}, now = new Date())
   return sent;
 }
 
-module.exports = { sendReply, scheduleReply, cancelScheduled, cancelAllScheduled, listScheduled, processScheduled, autoRunDue, MAX_PER_MAILBOX_PER_DAY, RESCAN_MS, logTail, markInterrupted, readLastRun, windowState, inWindow, campaignDate, domainReceivesMail, nextEmail, sendTest, dnsHealth, resolveHeld, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dueFollowups, runOnce,
+module.exports = { sendReply, fetchReplyMessage, replyFields, scheduleReply, cancelScheduled, cancelAllScheduled, listScheduled, processScheduled, autoRunDue, MAX_PER_MAILBOX_PER_DAY, RESCAN_MS, logTail, markInterrupted, readLastRun, windowState, inWindow, campaignDate, domainReceivesMail, nextEmail, sendTest, dnsHealth, resolveHeld, DEFAULT_CONFIG, loadConfig, saveConfig, sanitizeConfig, importLeads, classify, dueFollowups, runOnce,
   startRun, requestStop, previewNext, status, markSetup, bulkLeads, leadQuery, leadFacets, STAGE_NAMES, campaignOptions, campaignPreview, assignCampaigns, leadMatches, queueOrder, cfgFor, healthScore, analytics, loadState, tzParts, isSendDay, today, run, log };
