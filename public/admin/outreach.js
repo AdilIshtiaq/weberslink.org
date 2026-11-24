@@ -345,10 +345,38 @@
     var on = $("rmLater").checked; $("rmWhenField").hidden = !on; $("rmSend").textContent = on ? "Schedule" : "Send now";
     if (on && !$("rmWhen").value) { var d = new Date(Date.now() + 36e5); d.setMinutes(0, 0, 0); $("rmWhen").value = localInput(d); }
   }
+  // From dropdown: every mailbox added in Settings; `pick` is preselected when it exists.
+  function fillFrom(pick) {
+    var ms = (state.status && state.status.mailboxes || []).filter(function (m) { return m.email; });
+    pick = String(pick || "").toLowerCase();
+    $("rmFrom").innerHTML = ms.map(function (m) {
+      var note = !m.passwordSet ? " (no password set)" : m.paused ? " (paused)" : "";
+      return '<option value="' + esc(m.email) + '"' + (m.passwordSet ? "" : " disabled") + ">" + esc(m.email) + note + "</option>";
+    }).join("") || '<option value="">Add a mailbox in Settings first</option>';
+    var has = ms.some(function (m) { return m.email.toLowerCase() === pick && m.passwordSet; });
+    if (has) $("rmFrom").value = ms.filter(function (m) { return m.email.toLowerCase() === pick; })[0].email;
+    else { var first = ms.filter(function (m) { return m.passwordSet; })[0]; if (first) $("rmFrom").value = first.email; }
+  }
+  function openCompose() {
+    replyTo = null; composing = true;
+    $("rmTitle").textContent = "New message";
+    $("rmTo").value = ""; $("rmTo").readOnly = false; fillFrom(lastFrom);
+    $("rmFromHint").textContent = "(choose which of your mailboxes sends this)";
+    $("rmSubject").value = ""; ed.innerHTML = "";
+    $("rmTheirs").hidden = true; $("rmTheirsText").textContent = "";
+    rmFiles = []; renderFiles();
+    $("rmLater").checked = false; $("rmWhen").value = ""; syncLater();
+    $("replyModal").hidden = false; $("rmTo").focus();
+  }
+  $("composeBtn").addEventListener("click", openCompose);
+  var composing = false, lastFrom = "";
+  try { lastFrom = localStorage.getItem("outreach.lastFrom") || ""; } catch (e) {}
   function openReply(email) {
     var r = state.status.replied.filter(function (x) { return x.email === email; })[0]; if (!r) return;
-    replyTo = r.email;
-    $("rmTo").value = r.email; $("rmFrom").value = r.mailbox || "";
+    replyTo = r.email; composing = false;
+    $("rmTitle").textContent = "Reply";
+    $("rmTo").value = r.email; $("rmTo").readOnly = true; fillFrom(r.mailbox);
+    $("rmFromHint").textContent = "(defaults to the mailbox that emailed them; same conversation)";
     $("rmSubject").value = /^re:/i.test(r.subject || "") ? r.subject : "Re: " + (r.subject || "your free video for " + (r.domain || ""));
     ed.innerHTML = r.firstName ? "<div>Hi " + esc(r.firstName) + ",</div><div><br></div><div><br></div>" : "";
     var theirs = r.text || r.snippet || "";
@@ -476,16 +504,20 @@
   $("rmFileInput").addEventListener("change", function () { Array.prototype.forEach.call(this.files, addFile); this.value = ""; });
   $("rmImageInput").addEventListener("change", function () { Array.prototype.forEach.call(this.files, addImage); this.value = ""; });
   function editorHtml() { var box = document.createElement("div"); box.innerHTML = ed.innerHTML; autoLink(box); return box.innerHTML; }
-  function closeReply() { $("replyModal").hidden = true; replyTo = null; }
+  function closeReply() { $("replyModal").hidden = true; replyTo = null; composing = false; }
   $("replyList").addEventListener("click", function (e) { var b = e.target.closest("button[data-reply]"); if (b) openReply(b.dataset.reply); });
   $("rmLater").addEventListener("change", syncLater);
   $("rmCancel").addEventListener("click", closeReply);
   $("replyModal").addEventListener("mousedown", function (e) { if (e.target === $("replyModal")) closeReply(); });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("replyModal").hidden) closeReply(); });
   $("replyForm").addEventListener("submit", function (e) {
-    e.preventDefault(); if (!replyTo) return;
+    e.preventDefault(); if (!replyTo && !composing) return;
+    if (composing && !$("rmTo").value.trim()) return fail(new Error("Enter who to send it to."));
+    if (!$("rmFrom").value) return fail(new Error("Choose which mailbox to send from."));
     if (!ed.innerText.trim() && !ed.querySelector("img") && !rmFiles.length) return fail(new Error("Write a message first."));
-    var body = { email: replyTo, subject: $("rmSubject").value, html: editorHtml(), text: ed.innerText }, later = $("rmLater").checked;
+    var body = { email: composing ? $("rmTo").value.trim() : replyTo, from: $("rmFrom").value, subject: $("rmSubject").value, html: editorHtml(), text: ed.innerText }, later = $("rmLater").checked;
+    if (composing) body.compose = true;
+    try { localStorage.setItem("outreach.lastFrom", body.from); lastFrom = body.from; } catch (e2) {}
     if (later) {
       var d = new Date($("rmWhen").value); if (isNaN(d)) return fail(new Error("Pick a date and time to send."));
       if (d.getHours() === 0 && d.getMinutes() === 0 && !confirm("That is 12:00 AM (midnight) on " + d.toLocaleDateString() + ". Schedule it for midnight?")) return;
@@ -493,7 +525,7 @@
     }
     $("rmSend").disabled = true;
     Promise.all(rmFiles.map(function (f) { return readFile(f.file).then(function (u) { return { name: f.name, type: f.type, data: u.slice(u.indexOf(",") + 1) }; }); }))
-      .then(function (files) { body.files = files; return api("POST", "/api/outreach/reply", body); }).then(function () { toast(later ? "Scheduled for " + new Date(body.sendAt).toLocaleString() : "Reply sent"); closeReply(); refresh(); })
+      .then(function (files) { body.files = files; return api("POST", "/api/outreach/reply", body); }).then(function () { toast(later ? "Scheduled for " + new Date(body.sendAt).toLocaleString() : (body.compose ? "Message sent" : "Reply sent")); closeReply(); refresh(); })
       .catch(fail).then(function () { $("rmSend").disabled = false; });
   });
   function renderScheduled() {
