@@ -224,7 +224,7 @@ Return {"score": integer 1-10, "reason": max 120 characters}.`;
 async function scoreLead(lead, cfg) {
   const icp = clean(cfg && cfg.ai && cfg.ai.icp, 1200);
   if (!icp) throw new Error("Describe your ideal customer in Settings > AI first.");
-  const facts = [["Store", lead.store], ["Website", lead.domain], ["Category", lead.category], ["Niche", lead.niche], ["Country", lead.country], ["Mobile PageSpeed (0-100)", lead.psi], ["Largest content paint (s)", lead.lcp]]
+  const facts = [["Store", lead.store], ["Website", lead.domain], ["Category", lead.category], ["Niche", lead.niche], ["Country", lead.country], ["Google rating (1-5)", lead.rating], ["Google reviews", lead.reviews], ["Mobile PageSpeed (0-100)", lead.psi], ["Largest content paint (s)", lead.lcp]]
     .filter(([, v]) => String(v || "").trim()).map(([k, v]) => `${k}: ${clean(v, 120)}`).join("\n");
   const o = await callJson(`ICP:\n${icp}\n\nStore facts:\n<data>\n${facts}\n</data>`, SCORE_SYSTEM);
   const n = Math.round(Number(o.score));

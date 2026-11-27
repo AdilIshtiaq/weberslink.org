@@ -18,6 +18,7 @@ const https = require("https");
 const crypto = require("crypto");
 const store = require("./store");
 const cleaner = require("./cleaner");
+const places = require("./places");
 
 const UA = "WebersLinkLeadFinder/1.0 (business contact research; respects robots.txt)";
 const RESULTS = "finder_results.json", STATE = "finder_state.json";
@@ -142,17 +143,26 @@ function emailsFromHtml(html, domain = "") {
   const rank = (e) => { const [l, d] = e.split("@"), same = base && (d === base || d.endsWith("." + base) || base.endsWith("." + d)); return (same ? 0 : FREE.test(d) ? 2 : 3) + (ROLE.test(l.split("+")[0]) ? 0.5 : 0); };
   return [...new Set(list)].sort((a, b) => rank(a) - rank(b));
 }
-/** robots.txt for "*": returns a function path -> allowed? (a missing or unreadable file allows everything). */
+/**
+ * robots.txt for "*" (and for us): returns a function path -> allowed? A missing or unreadable file allows everything.
+ * Patterns follow the standard: "*" matches any text, "$" ends the path, and the longest matching rule wins (Allow wins a tie).
+ */
 function robotsRules(text) {
-  const rules = []; let active = false;
+  const rules = []; let active = false, lastWasAgent = false;
+  const toRe = (v) => new RegExp("^" + v.replace(/[.+?^${}()|[\]\\]/g, (c) => (c === "$" ? "$" : "\\" + c)).replace(/\*/g, ".*"));
   for (const raw of String(text || "").split(/\r?\n/)) {
     const line = raw.replace(/#.*/, "").trim(), m = /^([a-z-]+)\s*:\s*(.*)$/i.exec(line);
     if (!m) continue;
-    const k = m[1].toLowerCase();
-    if (k === "user-agent") { active = m[2].trim() === "*" || /webers/i.test(m[2]); }
-    else if (active && k === "disallow" && m[2].trim()) rules.push(m[2].trim());
+    const k = m[1].toLowerCase(), v = m[2].trim();
+    if (k === "user-agent") { const hit = v === "*" || /webers/i.test(v); active = lastWasAgent ? active || hit : hit; lastWasAgent = true; continue; }
+    lastWasAgent = false;
+    if (active && (k === "disallow" || k === "allow") && v) rules.push({ allow: k === "allow", len: v.length, re: toRe(v) });
   }
-  return (p) => !rules.some((r) => r === "/" || p.startsWith(r.replace(/\*.*$/, "")));
+  return (p) => {
+    let best = null;
+    for (const r of rules) if (r.re.test(p) && (!best || r.len > best.len || (r.len === best.len && r.allow))) best = r;
+    return !best || best.allow;
+  };
 }
 const homepageOf = (site) => { try { const u = new URL(/^https?:/i.test(site) ? site : "https://" + site); return /^https?:$/.test(u.protocol) ? u : null; } catch (e) { return null; } };
 const bareDomain = (site) => { const u = homepageOf(site); return u ? u.hostname.toLowerCase().replace(/^www\./, "") : ""; };
@@ -180,7 +190,7 @@ async function findEmailOnSite(site, { maxPages = 4 } = {}) {
       }
       for (const p of ["/contact", "/contact-us", "/about", "/about-us"]) queue.push(home.origin + p);
     }
-    if (r.status === 200) { const e = emailsFromHtml(r.body, domain); if (e.length) return { email: e[0], alternatives: e.slice(1, 3), page: url }; }
+    if (r.status === 200) { const e = places.rankEmails(emailsFromHtml(r.body, domain), domain).map((x) => x.email); if (e.length) return { email: e[0], alternatives: e.slice(1, 3), page: url }; }
   }
   return { email: "", reason: "no public email found on the website" };
 }
@@ -313,28 +323,85 @@ function startSearch({ type, place, limit = 40 }, deps = {}) {
     };
     await Promise.all(Array.from({ length: 3 }, worker));
     job.phase = "Checking the emails";
-    const mx = deps.mx || (async () => "unknown"), emails = deps.leadEmails || new Set(), domains = deps.leadDomains || new Set(), mxCache = new Map(), inResults = new Set();
-    for (const c of items) {
-      if (!c.email) continue;
-      const v = cleaner.assess(c.email);
-      c.role = v.action === "flag";
-      c.free = FREE.test(c.email.split("@")[1]);
-      if (v.action === "remove") { c.reason = v.reason; c.email = ""; continue; }
-      const dom = c.email.split("@")[1];
-      if (!mxCache.has(dom)) mxCache.set(dom, c.free ? "yes" : await mx(dom).catch(() => "unknown"));
-      if (mxCache.get(dom) === "no") { c.reason = "its domain has no mail server"; c.email = ""; continue; }
-      if (emails.has(c.email) || (deps.suppressed && deps.suppressed(c.email))) { c.duplicate = true; c.reason = "already in your leads or never-contact list"; }
-      else if (!c.free && c.domain && domains.has(c.domain)) { c.duplicate = true; c.reason = "that company is already in your leads"; }
-      else if (inResults.has(c.email)) { c.duplicate = true; c.reason = "found twice in this search"; }
-      inResults.add(c.email);
-    }
-    for (const c of items) { c.usable = Boolean(c.email) && !c.duplicate; delete c.osmEmail; }
+    await verifyItems(items, deps);
     store.writeJson(RESULTS, { at: new Date().toISOString(), query: { type: known.label, place: area.name, country: area.country }, items });
     job.message = `Found ${items.length} businesses, ${items.filter((c) => c.usable).length} with a usable email.`;
   })().catch((e) => { job.message = String(e.message).slice(0, 200); job.failed = true; }).finally(() => { job.running = false; job.phase = ""; if (job.stop && !job.message) job.message = "Stopped."; });
   job.failed = false;
   return { started: true, done };
 }
+/**
+ * Checks every candidate's email the same way whatever found it (map, website or a file): junk and system addresses out, a mail server must exist,
+ * duplicates against your leads and never-contact list and within the batch, countries you allow. Sets c.usable. Already-checked emails are skipped.
+ * deps: { mx, leadEmails, leadDomains, suppressed, allowedCountries }
+ */
+async function verifyItems(items, deps = {}) {
+  const mx = deps.mx || (async () => "unknown"), emails = deps.leadEmails || new Set(), domains = deps.leadDomains || new Set(), mxCache = new Map();
+  const taken = new Set(items.filter((c) => c.verified && c.usable).map((c) => c.email));
+  for (const c of items) {
+    if (c.blocked || !c.email || c.verified) continue;
+    const v = cleaner.assess(c.email);
+    c.role = v.action === "flag"; c.free = FREE.test(c.email.split("@")[1]);
+    if (v.action === "remove") { c.reason = v.reason; c.email = ""; continue; }
+    const dom = c.email.split("@")[1];
+    if (!mxCache.has(dom)) mxCache.set(dom, c.free ? "yes" : await mx(dom).catch(() => "unknown"));
+    if (mxCache.get(dom) === "no") { c.reason = "its domain has no mail server"; c.email = ""; continue; }
+    if (emails.has(c.email) || (deps.suppressed && deps.suppressed(c.email))) { c.duplicate = true; c.reason = "already in your leads or never-contact list"; }
+    else if (!c.free && c.domain && domains.has(c.domain)) { c.duplicate = true; c.reason = "that company is already in your leads"; }
+    else if (taken.has(c.email)) { c.duplicate = true; c.reason = "found twice in this batch"; }
+    else { c.reason = ""; c.duplicate = false; }
+    taken.add(c.email); c.verified = true;
+  }
+  for (const c of items) { c.usable = Boolean(c.email) && !c.duplicate && !c.blocked; delete c.osmEmail; }
+}
+
+/** Reads a Google Maps / Apify export (rows already parsed) in the background: cleans it, checks the emails, and leaves it for review like a search. */
+function startPlacesImport(rows, fileName, deps = {}) {
+  if (job.running) return { started: false, reason: "A search or file import is already running." };
+  if (!places.looksLikePlaces(rows)) return { started: false, reason: "This does not look like a Google Maps export (the columns title, placeId and address are missing)." };
+  Object.assign(job, { running: true, stop: false, phase: "Reading the file", done: 0, total: rows.length, found: rows.length, withEmail: 0, message: "", failed: false, startedAt: new Date().toISOString(), query: { type: "Google Maps file", place: cleanText(fileName, 80), limit: rows.length } });
+  const done = (async () => {
+    const flat = rows.map(places.flattenRow);
+    const { items, stats } = places.candidatesFromRows(flat, { allowedCountries: deps.allowedCountries });
+    job.phase = "Checking the emails"; job.done = rows.length; job.withEmail = items.filter((c) => c.email).length;
+    await verifyItems(items, deps);
+    store.writeJson(RESULTS, { at: new Date().toISOString(), query: { type: "Google Maps file", place: cleanText(fileName, 80), country: "" }, fileStats: stats, items });
+    const u = items.filter((c) => c.usable).length, missing = items.filter((c) => !c.email && c.domain && !c.blocked).length;
+    job.message = `Read ${rows.length} businesses: ${u} have a usable email${missing ? `, ${missing} have a website but no email (you can search their sites)` : ""}.`;
+  })().catch((e) => { job.message = "Could not read the file: " + String(e.message).slice(0, 160); job.failed = true; }).finally(() => { job.running = false; job.phase = ""; });
+  return { started: true, done };
+}
+
+/** Looks on the websites of businesses that have no email yet (free; polite and capped like a search), then verifies what was found. */
+function startEnrich(deps = {}) {
+  if (job.running) return { started: false, reason: "A search or file import is already running." };
+  const r = results();
+  if (!r) return { started: false, reason: "There are no results to work on." };
+  const todo = r.items.filter((c) => !c.email && c.domain && !c.blocked && !c.searched);
+  if (!todo.length) return { started: false, reason: "Every business that has a website has been searched already." };
+  Object.assign(job, { running: true, stop: false, phase: "Reading business websites", done: 0, total: todo.length, found: r.items.length, withEmail: 0, message: "", failed: false, startedAt: new Date().toISOString(), query: r.query });
+  const done = (async () => {
+    const queue = [...todo];
+    const worker = async () => {
+      while (queue.length && !job.stop) {
+        const c = queue.shift();
+        if (stateOn().sites >= capSites()) { c.reason = "daily website limit reached (try again tomorrow)"; job.done++; continue; }
+        bump("sites");
+        const f = await findEmailOnSite(c.website || c.domain).catch(() => ({ email: "", reason: "website did not answer" }));
+        c.searched = true;
+        if (f.email) { c.email = f.email; c.emailSource = "website"; c.alternatives = f.alternatives || []; c.reason = ""; job.withEmail++; } else c.reason = f.reason || "no public email found on the website";
+        job.done++; await sleep(250);
+      }
+    };
+    await Promise.all(Array.from({ length: 3 }, worker));
+    job.phase = "Checking the emails";
+    await verifyItems(r.items, deps);
+    store.writeJson(RESULTS, r);
+    job.message = `Searched ${job.done} websites and found ${job.withEmail} new email${job.withEmail === 1 ? "" : "s"}. ${r.items.filter((c) => c.usable && !c.imported).length} businesses are ready to import.`;
+  })().catch((e) => { job.message = String(e.message).slice(0, 200); job.failed = true; }).finally(() => { job.running = false; job.phase = ""; });
+  return { started: true, done };
+}
+
 const stopSearch = () => { job.stop = true; };
 
 /** Tests every link of the chain from this server and says exactly where it breaks. Returns [{ step, ok, ms, detail }]. */
@@ -347,12 +414,17 @@ async function diagnose() {
   return out;
 }
 const results = () => store.readJson(RESULTS, null);
-const status = () => ({ job: { ...job }, usage: usage(), types: typeNames(), results: (() => { const r = results(); return r ? { at: r.at, query: r.query, total: r.items.length, usable: r.items.filter((c) => c.usable && !c.imported).length, imported: r.items.filter((c) => c.imported).length } : null; })() });
+const status = () => ({ job: { ...job }, usage: usage(), types: typeNames(), results: (() => {
+  const r = results(); if (!r) return null;
+  const it = r.items, n = (f) => it.filter(f).length;
+  return { at: r.at, query: r.query, total: it.length, usable: n((c) => c.usable && !c.imported), imported: n((c) => c.imported),
+    breakdown: { noEmail: n((c) => !c.email && !c.blocked), canSearch: n((c) => !c.email && c.domain && !c.blocked && !c.searched), duplicates: n((c) => c.duplicate), blocked: n((c) => c.blocked && !c.duplicate), offTarget: n((c) => c.offTarget && c.usable), file: r.fileStats || null } };
+})() });
 /** The chosen candidates as spreadsheet-style rows for importLeads(); marks nothing until markImported() is called. */
 function rowsFor(ids) {
   const r = results(); if (!r) return [];
   const want = new Set(ids);
-  return r.items.filter((c) => want.has(c.id) && c.usable && !c.imported).map((c) => ({ Email: c.email, Store: c.name, Website: c.domain, Country: c.country, State: c.state, City: c.city, Category: c.category, Address: c.address }));
+  return r.items.filter((c) => want.has(c.id) && c.usable && !c.imported).map((c) => ({ Email: c.email, Store: c.name, Website: c.domain, Country: c.country, State: c.state, City: c.city, Category: c.category, Address: c.address, Phone: c.phone, Rating: c.rating, Reviews: c.reviews, Source: c.source || (r.query && r.query.type ? `${r.query.type}: ${r.query.place}` : "") }));
 }
 function markImported(ids) {
   const r = results(); if (!r) return 0;
@@ -363,5 +435,5 @@ function markImported(ids) {
 }
 const clearResults = () => store.writeJson(RESULTS, null);
 
-module.exports = { overpass, diagnose, explain, startSearch, stopSearch, status, results, rowsFor, markImported, clearResults, tagsForType, safeTags, typeNames, emailsFromHtml, robotsRules, findEmailOnSite,
+module.exports = { startPlacesImport, startEnrich, verifyItems, overpass, diagnose, explain, startSearch, stopSearch, status, results, rowsFor, markImported, clearResults, tagsForType, safeTags, typeNames, emailsFromHtml, robotsRules, findEmailOnSite,
   isPrivateIp, publicLookup, fetchText, _test: testHooks, overpassQuery, candidateFrom, geocode, setTransport, setSleep, usage };

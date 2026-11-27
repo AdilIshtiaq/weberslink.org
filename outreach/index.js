@@ -20,6 +20,7 @@ const clicks = require("./clicks");
 const backup = require("./backup");
 const ai = require("./ai");
 const finder = require("./finder");
+const places = require("./places");
 const unsub = require("./unsub");
 const warmup = require("./warmup");
 const verify = require("./verify");
@@ -116,7 +117,28 @@ const clientIp = (req) => {
   return xff.length ? xff[xff.length - 1] : String(req.socket.remoteAddress || "");
 };
 
-const LEAD_VIEW = ["email", "first_name", "store", "domain", "country", "category", "step", "status", "mailbox", "variant", "last_sent", "psi", "note", "loom_sent", "ai_score", "ai_score_reason", "reply_label", "snooze_until", "outcome", "smtp", "state", "city", "campaign", "campaign_lock"];
+const LEAD_VIEW = ["email", "first_name", "store", "domain", "country", "category", "step", "status", "mailbox", "variant", "last_sent", "psi", "note", "loom_sent", "ai_score", "ai_score_reason", "reply_label", "snooze_until", "outcome", "smtp", "state", "city", "campaign", "campaign_lock", "phone", "rating", "reviews", "source"];
+
+/** The cleaning step's view of your current leads, never-contact list and allowed countries. */
+function finderDeps(extra = {}) {
+  const track = store.loadTracking(), cfg = eng.loadConfig();
+  return { mx: eng.domainReceivesMail, leadEmails: new Set(track.map((t) => t.email.toLowerCase())), leadDomains: new Set(track.map((t) => String(t.domain || "").toLowerCase()).filter(Boolean)),
+    suppressed: (e) => { const sup = store.loadSuppression(); return sup.has(e) || sup.has("@" + e.split("@")[1]); }, allowedCountries: new Set(cfg.sending.countries.map((c) => c.toUpperCase())), ...extra };
+}
+/** An uploaded file's rows (.xlsx sheet "Leads", .csv, or an Apify .json export), or { error }. */
+function parseUpload(name, buf) {
+  if (!buf.length) return { error: "The file was empty." };
+  let rows;
+  try {
+    if (/\.xlsx$/i.test(name)) rows = xlsx.readSheet(buf, "Leads");
+    else if (/\.csv$/i.test(name)) rows = store.parseCsv(buf.toString("utf8").replace(/^\uFEFF/, ""));
+    else if (/\.json$/i.test(name)) { rows = JSON.parse(buf.toString("utf8")); if (!Array.isArray(rows)) return { error: "The JSON file must be a list of businesses." }; rows = Object.assign(rows.filter((r) => r && typeof r === "object"), { json: true }); }
+    else return { error: "Please choose an .xlsx, .csv or .json file (in Excel: File > Save As)." };
+  } catch (e) { return { error: "That file could not be read." }; }
+  if (!rows.length) return { error: "No rows found in the file." };
+  if (rows.length > 20000) return { error: "Up to 20,000 rows at a time." };
+  return rows;
+}
 
 async function route(req, res, url, method) {
   const p = url.pathname.replace(/^\/api\/outreach/, "") || "/";
@@ -237,12 +259,18 @@ async function route(req, res, url, method) {
   if (p === "/finder/status" && method === "GET") return send(res, 200, { ok: true, ...finder.status(), gemini: ai.configured() });
   if (p === "/finder/search" && method === "POST") {
     const body = await readJson(req);
-    const track = store.loadTracking();
-    const r = finder.startSearch({ type: body.type, place: body.place, limit: body.limit }, {
-      mx: eng.domainReceivesMail, mapType: ai.configured() ? (t) => ai.mapBusinessType(t) : null,
-      leadEmails: new Set(track.map((t) => t.email.toLowerCase())), leadDomains: new Set(track.map((t) => String(t.domain || "").toLowerCase()).filter(Boolean)),
-      suppressed: (e) => { const sup = store.loadSuppression(); return sup.has(e) || sup.has("@" + e.split("@")[1]); },
-    });
+    const r = finder.startSearch({ type: body.type, place: body.place, limit: body.limit }, finderDeps({ mapType: ai.configured() ? (t) => ai.mapBusinessType(t) : null }));
+    return send(res, r.started ? 202 : 400, { ok: r.started, ...(r.started ? {} : { error: r.reason }) });
+  }
+  if (p === "/finder/file" && method === "POST") { // a Google Maps / Apify export: cleaned, checked and left for review
+    const body = await readJson(req, 12 * 1024 * 1024);
+    const rows = parseUpload(String(body.name || ""), Buffer.from(String(body.data || ""), "base64"));
+    if (rows.error) return send(res, 400, { ok: false, error: rows.error });
+    const r = finder.startPlacesImport(rows, body.name, finderDeps());
+    return send(res, r.started ? 202 : 400, { ok: r.started, ...(r.started ? { rows: rows.length } : { error: r.reason }) });
+  }
+  if (p === "/finder/enrich" && method === "POST") {
+    const r = finder.startEnrich(finderDeps());
     return send(res, r.started ? 202 : 400, { ok: r.started, ...(r.started ? {} : { error: r.reason }) });
   }
   if (p === "/finder/diagnose" && method === "GET") return send(res, 200, { ok: true, steps: await finder.diagnose() });
@@ -360,12 +388,13 @@ async function route(req, res, url, method) {
     const name = String(body.name || "");
     const buf = Buffer.from(String(body.data || ""), "base64");
     if (!buf.length) return send(res, 400, { ok: false, error: "The file was empty." });
-    let rows;
-    if (/\.xlsx$/i.test(name)) rows = xlsx.readSheet(buf, "Leads");
-    else if (/\.csv$/i.test(name)) rows = store.parseCsv(buf.toString("utf8"));
-    else return send(res, 400, { ok: false, error: "Please choose an .xlsx or .csv file (in Excel: File > Save As)." });
-    if (!rows.length) return send(res, 400, { ok: false, error: "No rows found in the file." });
-    if (rows.length > 20000) return send(res, 400, { ok: false, error: "Up to 20,000 rows at a time." });
+    const rows = parseUpload(name, buf);
+    if (rows.error) return send(res, 400, { ok: false, error: rows.error });
+    if (places.looksLikePlaces(rows)) { // a Google Maps export has no plain "email" column: it goes through cleaning and review instead of a blind import
+      const r = finder.startPlacesImport(rows, name, finderDeps());
+      return send(res, r.started ? 202 : 400, { ok: r.started, places: true, rows: rows.length, ...(r.started ? {} : { error: r.reason }) });
+    }
+    if (rows.json) return send(res, 400, { ok: false, error: "That JSON file is not a Google Maps export. Use .xlsx or .csv." });
     return send(res, 200, { ok: true, ...eng.importLeads(rows, eng.loadConfig()) });
   }
   if (p === "/leads/research/status" && method === "GET") return send(res, 200, { ok: true, ...research.status() });

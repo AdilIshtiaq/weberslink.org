@@ -8,6 +8,7 @@
 const fs = require("fs");
 const dns = require("dns").promises;
 const store = require("./store");
+const { normState, normCountry } = require("./geo");
 const tpl = require("./templates");
 const cleaner = require("./cleaner");
 const research = require("./research");
@@ -34,7 +35,6 @@ const AUTO_REPLY = /auto.?reply|automatic reply|out of (the )?office|autorespond
 const FREE_MAIL = /^(gmail|googlemail|yahoo|ymail|hotmail|outlook|live|msn|aol|icloud|me|comcast|verizon|proton|protonmail|gmx|mail)\./i;
 const EMAIL_RE = /[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/g;
 const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
-const COUNTRY_ALIAS = { "UNITED STATES": "US", USA: "US", "UNITED KINGDOM": "UK", GB: "UK", CANADA: "CA" };
 
 // ---------------------------------------------------------------- config
 // What a fresh install (or a wiped data folder) starts with: the owner's own settings, taken from their backup of 2026-10-13.
@@ -127,9 +127,6 @@ function sanitizeAi(a = {}) {
     icp: str(a.icp, 1200), min_score: intIn(a.min_score, 0, 10, 0), booking_link: https(a.booking_link), offer: str(a.offer, 200) || d.offer, webhook_url: https(a.webhook_url),
   };
 }
-const US_STATES = { alabama: "AL", alaska: "AK", arizona: "AZ", arkansas: "AR", california: "CA", colorado: "CO", connecticut: "CT", delaware: "DE", florida: "FL", georgia: "GA", hawaii: "HI", idaho: "ID", illinois: "IL", indiana: "IN", iowa: "IA", kansas: "KS", kentucky: "KY", louisiana: "LA", maine: "ME", maryland: "MD", massachusetts: "MA", michigan: "MI", minnesota: "MN", mississippi: "MS", missouri: "MO", montana: "MT", nebraska: "NE", nevada: "NV", "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM", "new york": "NY", "north carolina": "NC", "north dakota": "ND", ohio: "OH", oklahoma: "OK", oregon: "OR", pennsylvania: "PA", "rhode island": "RI", "south carolina": "SC", "south dakota": "SD", tennessee: "TN", texas: "TX", utah: "UT", vermont: "VT", virginia: "VA", washington: "WA", "west virginia": "WV", wisconsin: "WI", wyoming: "WY", "district of columbia": "DC" };
-/** "Texas", "texas" and "tx" all become "TX"; anything else (a UK county, say) is kept as written, upper-cased. */
-const normState = (s) => { const v = String(s || "").trim().replace(/\./g, ""); return US_STATES[v.toLowerCase()] || v.toUpperCase(); };
 
 /** Campaigns from the dashboard. Ids are permanent (like mailbox ids) because leads remember the id of their campaign. */
 function sanitizeCampaigns(list) {
@@ -326,10 +323,6 @@ function requestStop() {
 }
 
 // ---------------------------------------------------------------- leads
-function normCountry(c) {
-  const u = String(c || "").trim().toUpperCase();
-  return COUNTRY_ALIAS[u] || u;
-}
 /** One address per business from a cell holding several ("a@x.com; b@x.com"): prefer a business-domain address over free mail. */
 function pickEmail(cell) {
   const all = String(cell || "").split(/[;\n]+/).map((e) => e.trim()).filter((e) => store.isEmail(e));
@@ -454,6 +447,7 @@ function importLeads(rows, cfg) {
       email, first_name: (pick(r, "first_name", "owner name").split(/\s+/)[0] || "").slice(0, 60), store: pick(r, "store", "business").slice(0, 150),
       domain: tpl.prettyDomain(pick(r, "domain", "website") || emailDomain(email)).slice(0, 150), country: normCountry(pick(r, "country") || guessCountry(r, pick)),
       category: pick(r, "category").slice(0, 100), niche: pick(r, "niche").slice(0, 100), ...placeOf(r, pick),
+      phone: pick(r, "phone", "phone (maps)").slice(0, 40), rating: pick(r, "rating", "totalscore").slice(0, 6), reviews: pick(r, "reviews", "reviewscount").slice(0, 8), source: pick(r, "source").slice(0, 120),
       psi: num(pick(r, "psi", "mobile pagespeed (0-100)")), lcp: /^\d+(\.\d+)?$/.test(lcp) ? lcp : "",
     };
     // A line you wrote yourself in the spreadsheet is trusted like an approved one (after the same safety checks).
@@ -462,7 +456,7 @@ function importLeads(rows, cfg) {
     const cur = have.get(key);
     if (cur) {
       res.existing++;
-      for (const k of ["first_name", "store", "category", "niche", "psi", "lcp", "state", "city"]) if (!cur[k] && lead[k]) cur[k] = lead[k];
+      for (const k of ["first_name", "store", "category", "niche", "psi", "lcp", "state", "city", "phone", "rating", "reviews", "source"]) if (!cur[k] && lead[k]) cur[k] = lead[k];
       if (lead.custom_line && !cur.custom_line && !cur.research_status) { cur.custom_line = lead.custom_line; cur.research_status = "approved"; }
       continue;
     }

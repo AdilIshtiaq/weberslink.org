@@ -46,6 +46,19 @@ one search runs at a time. Daily caps: 400 websites (`FINDER_DAILY_SITES_MAX`) a
 Map data (c) OpenStreetMap contributors (ODbL). You remain responsible for emailing lawfully: honour opt-outs and include a postal address (both are built into every email).
 Other sources (Google Places, Overture Maps, Apollo) can be added behind the same screen later.
 
+## Importing a Google Maps export (Apify and similar)
+**Leads -> Import leads** (or **Find new leads -> Import a Google Maps file**) recognises an export from Apify's Google Maps / Google Places scraper (.csv or .json) and **does not import it blindly**: a raw export has hundreds
+of columns and no plain "email" column. It is cleaned and left for your review:
+- **Emails:** every email column is read (up to dozens per business). Placeholders (`contact@mysite.com`), job-application, privacy, press and no-reply addresses are removed. One address is chosen per business: a person at the
+  business's own domain, then its shared mailbox (`info@`), then free mail, then an address on some other domain (marked "different domain than their website", for example a parent firm or a virtual-office provider). For a big firm with
+  four or more individual lawyers listed, its general mailbox is chosen instead of an arbitrary lawyer. The other emails stay visible as "+ N other emails".
+- **Websites and places:** tracking parameters and paths are stripped ("https://www.x.com/miami/?utm_source=google" becomes x.com); "Texas" becomes TX and "Ontario" becomes ON; a missing country is worked out from the state, ZIP code or web
+  address ending. Phone, Google rating and review count are kept on the lead, and the search that found it is kept as its source.
+- **Removed or flagged:** permanently or temporarily closed businesses, countries your Settings do not allow (Canada is off by default), the same company listed once per office, the same listing or email twice, anything already in your leads or on
+  the never-contact list, domains with no mail server. Results that do not match what you searched for (a winery in a "personal injury lawyer" search) are flagged "off-target" and left unticked.
+- **No email in the file?** If a business has a website, **Search the websites ... for emails (free)** reads its public contact pages (same safe, capped reader as the map search) and verifies what it finds.
+- Review, tick what you want, **Import selected**: leads arrive with place, business type, phone, rating and source, and join the campaign that fits. Gemini lead scoring also looks at rating and reviews.
+
 ## Selecting leads and dividing them between campaigns
 Every row on **Leads** has a **tick box** (the box in the header ticks the whole page; once a page is ticked, **Select all N leads matching these filters** picks every match across pages).
 A bar appears with what you can do to the ticked leads:
@@ -328,7 +341,7 @@ Every email carries the postal address and an opt-out line. A mailbox pauses its
 A/B versions share one body and differ only in subject; judge after about 100 leads each.
 
 ## Tests
-`npm test` (about 189 tests: engine, API, auth, regression tests for an independent code review; no network or real
+`npm test` (about 211 tests: engine, API, auth, regression tests for an independent code review; no network or real
 mailboxes needed).
 
 ## Not covered by tests

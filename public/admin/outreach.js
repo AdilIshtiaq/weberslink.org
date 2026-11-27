@@ -614,7 +614,7 @@
           "<td>" + esc(place || "–") + (cname ? '<div class="hint">' + esc(cname) + (t.campaign_lock === "1" ? " · chosen by you" : "") + "</div>" : "") + "</td>" +
           '<td><span class="chip ' + esc(t.status) + '">' + esc(t.status === "skipped-bad-address" ? "set aside" : t.status) + "</span>" + (t.reply_label ? ' <span class="chip lab-' + esc(t.reply_label) + '">' + esc(LABEL[t.reply_label] || t.reply_label) + "</span>" : "") + "</td>" +
           "<td>" + (sent ? "Email " + sent + " of 4" : "Not started") + '<div class="hint">' + esc(t.next || "") + (t.snooze_until && t.status === "active" ? ' <button class="btn sm ghost" data-unsnooze="' + esc(t.email) + '">Resume now</button>' : "") + (t.status === "skipped-bad-address" ? ' <button class="btn sm" data-restore="' + esc(t.email) + '">Restore</button>' : "") + "</div></td>" +
-          '<td class="hint">' + [t.ai_score ? '<span title="' + esc(t.ai_score_reason || "") + '">Fit ' + esc(t.ai_score) + "/10</span>" : "", t.clicks ? '<span class="clicked">' + t.clicks + " click" + (t.clicks === 1 ? "" : "s") + "</span>" : "", t.smtp === "catch-all" ? '<span class="warn" title="This domain accepts any address, so the mailbox could not be verified">catch-all</span>' : "", t.mailbox ? esc(t.mailbox) : ""].filter(Boolean).join("<br>") + "</td></tr>";
+          '<td class="hint">' + [t.ai_score ? '<span title="' + esc(t.ai_score_reason || "") + '">Fit ' + esc(t.ai_score) + "/10</span>" : "", t.rating ? "★ " + esc(t.rating) + (t.reviews ? " (" + esc(t.reviews) + ")" : "") : "", t.phone ? esc(t.phone) : "", t.clicks ? '<span class="clicked">' + t.clicks + " click" + (t.clicks === 1 ? "" : "s") + "</span>" : "", t.smtp === "catch-all" ? '<span class="warn" title="This domain accepts any address, so the mailbox could not be verified">catch-all</span>' : "", t.mailbox ? esc(t.mailbox) : ""].filter(Boolean).join("<br>") + "</td></tr>";
       }).join("") : '<tr><td class="empty">No leads match.</td></tr>';
       state.leadRows = r.rows.map(function (x) { return x.email; }); state.leadTotal = r.total; syncBulk();
       var from = r.total ? state.leadPage * PAGE + 1 : 0;
@@ -725,6 +725,7 @@
       var bytes = new Uint8Array(rd.result), bin = "", i;
       for (i = 0; i < bytes.length; i += 32768) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
       api("POST", "/api/outreach/leads/import-file", { name: f.name, data: btoa(bin) }).then(function (r) {
+        if (r.places) { openFinder("file"); toast("Recognised a Google Maps file with " + r.rows + " businesses. Cleaning and checking it…"); return pollFinder(); }
         toast("Imported " + r.added + " new leads (" + r.existing + " already there, " + r.invalid + " invalid" + (r.cleaned ? ", " + r.cleaned + " bad addresses set aside" : "") + ")"); state.leadPage = 0; loadLeads(); refresh();
       }).catch(fail);
     };
@@ -1033,7 +1034,21 @@
   // ---------------------------------------------------------------- lead finder (free map data + public websites)
   var fTimer;
   var safeHref = function (u) { return /^https?:\/\//i.test(u) ? u : /^[a-z0-9.-]+\.[a-z]{2,}/i.test(u) ? "https://" + u : ""; };
+  function showFinderTab(tab) { $("fCredit").hidden = tab !== "map"; $("fPaneMap").hidden = tab !== "map"; $("fPaneFile").hidden = tab !== "file"; [].forEach.call($("fTabs").children, function (b) { b.classList.toggle("on", b.dataset.ftab === tab); }); }
+  function openFinder(tab) { go("leads"); $("finderBox").hidden = false; showFinderTab(tab || "map"); }
+  $("fTabs").addEventListener("click", function (e) { var b = e.target.closest("button[data-ftab]"); if (b) showFinderTab(b.dataset.ftab); });
   $("findBtn").addEventListener("click", function () { $("finderBox").hidden = !$("finderBox").hidden; if (!$("finderBox").hidden) pollFinder(true); else clearTimeout(fTimer); });
+  $("fFile").addEventListener("change", function (e) {
+    var f = e.target.files[0]; e.target.value = ""; if (!f) return;
+    if (f.size > 8 * 1024 * 1024) return fail(new Error("That file is over 8 MB."));
+    var rd = new FileReader();
+    rd.onload = function () {
+      var bytes = new Uint8Array(rd.result), bin = "", i;
+      for (i = 0; i < bytes.length; i += 32768) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
+      $("fBody").innerHTML = ""; api("POST", "/api/outreach/finder/file", { name: f.name, data: btoa(bin) }).then(function (r) { toast("Reading " + r.rows + " businesses…"); pollFinder(); }).catch(fail);
+    };
+    rd.readAsArrayBuffer(f);
+  });
   function pollFinder(first) {
     clearTimeout(fTimer);
     api("GET", "/api/outreach/finder/status").then(function (s) {
@@ -1067,22 +1082,32 @@
   });
   $("fStop").addEventListener("click", function () { api("POST", "/api/outreach/finder/stop", {}).then(function () { toast("Stopping…"); pollFinder(); }).catch(fail); });
   function loadFinderResults() {
-    api("GET", "/api/outreach/finder/results").then(function (r) {
-      var res = r.results; if (!res) { $("fBody").innerHTML = ""; return; }
-      var items = res.items, usable = items.filter(function (c) { return c.usable && !c.imported; });
-      var rows = items.map(function (c) {
-        var can = c.usable && !c.imported, site = safeHref(c.website);
-        return "<tr" + (can ? "" : ' style="opacity:.6"') + '><td><input type="checkbox" data-fid="' + esc(c.id) + '"' + (can ? " checked" : " disabled") + '></td><td><div style="font-weight:600">' + esc(c.name) + '</div><div class="hint">' + esc(c.address || [c.city, c.state].filter(Boolean).join(", ")) + "</div></td><td>" +
-          (c.email ? esc(c.email) + '<div class="hint">' + (c.emailSource === "website" ? "found on their website" : "listed on the map") + (c.role ? " · shared mailbox" : "") + (c.free ? " · free mail" : "") + "</div>" : '<span class="hint">no email</span>') + "</td><td>" +
-          (site ? '<a href="' + esc(site) + '" target="_blank" rel="noopener noreferrer">' + esc(c.domain || "site") + "</a>" : "–") + '</td><td class="hint">' + (c.imported ? '<span class="ok">imported</span>' : esc(can ? "" : c.reason || "")) + "</td></tr>";
+    Promise.all([api("GET", "/api/outreach/finder/results"), api("GET", "/api/outreach/finder/status")]).then(function (both) {
+      var res = both[0].results, st = both[1].results; if (!res) { $("fBody").innerHTML = ""; return; }
+      var bd = (st && st.breakdown) || {}, items = res.items, usable = items.filter(function (c) { return c.usable && !c.imported; }), isFile = res.query.type === "Google Maps file";
+      var rank = function (c) { return c.usable && !c.imported ? (c.offTarget ? 1 : 0) : c.imported ? 3 : c.email ? 2 : 4; }; // ready first, then off-target, then the rest
+      var rows = items.slice().sort(function (a, b) { return rank(a) - rank(b); }).map(function (c) {
+        var can = c.usable && !c.imported, site = safeHref(c.website), notes = (c.warn || []).slice();
+        var facts = [c.rating ? "★ " + c.rating + (c.reviews ? " (" + c.reviews + ")" : "") : "", c.phone, c.category && isFile ? c.category : ""].filter(Boolean).join(" · ");
+        return "<tr" + (can ? "" : ' style="opacity:.6"') + '><td><input type="checkbox" data-fid="' + esc(c.id) + '"' + (can ? (c.offTarget ? "" : " checked") : " disabled") + '></td><td><div style="font-weight:600">' + esc(c.name) + '</div><div class="hint">' + esc(c.address || [c.city, c.state].filter(Boolean).join(", ")) + "</div>" + (facts ? '<div class="hint">' + esc(facts) + "</div>" : "") + "</td><td>" +
+          (c.email ? esc(c.email) + '<div class="hint">' + (c.emailSource === "website" ? "found on their website" : c.emailSource === "file" ? "from your file" : "listed on the map") + (c.free ? " · free mail" : "") + "</div>" + ((c.alternatives || []).length ? '<div class="hint" title="' + esc(c.alternatives.join(", ")) + '">+ ' + c.alternatives.length + " other email" + (c.alternatives.length === 1 ? "" : "s") + " in the file</div>" : "") : '<span class="hint">no email</span>') + "</td><td>" +
+          (site ? '<a href="' + esc(site) + '" target="_blank" rel="noopener noreferrer">' + esc(c.domain || "site") + "</a>" : "–") + '</td><td class="hint">' + (c.imported ? '<span class="ok">imported</span>' : esc(can ? "" : c.reason || "")) + (can && notes.length ? '<span class="warn">' + esc(notes.join(" · ")) + "</span>" : "") + "</td></tr>";
       }).join("");
-      $("fBody").innerHTML = '<div class="hint" style="margin:8px 0">' + esc(res.query.type) + " in " + esc(res.query.place) + ": <b>" + items.length + "</b> businesses, <b>" + usable.length + "</b> with a usable email to import.</div>" +
-        '<div class="scroll" style="max-height:420px;overflow:auto"><table><tr><th></th><th>Business</th><th>Email</th><th>Website</th><th>Note</th></tr>' + rows + "</table></div>" +
+      var parts = ['<b class="ok">' + usable.length + "</b> ready to import"];
+      if (bd.canSearch) parts.push("<b>" + bd.canSearch + "</b> have a website but no email");
+      else if (bd.noEmail) parts.push("<b>" + bd.noEmail + "</b> have no email (their websites were searched)");
+      if (bd.duplicates) parts.push("<b>" + bd.duplicates + "</b> duplicates or already yours");
+      if (bd.blocked) parts.push("<b>" + bd.blocked + "</b> blocked (closed, country, no contact)");
+      if (bd.offTarget) parts.push('<b class="warn">' + bd.offTarget + "</b> off-target (unticked)");
+      $("fBody").innerHTML = '<div style="margin:8px 0"><b>' + esc(res.query.type) + (res.query.place ? ": " + esc(res.query.place) : "") + "</b> · " + items.length + " businesses → " + parts.join(" · ") + "</div>" +
+        (bd.canSearch ? '<div class="toolbar" style="margin:0 0 8px"><button class="btn sm" id="fEnrich" type="button">Search the websites of those ' + bd.canSearch + " businesses for emails (free)</button><span class=\"hint\">Reads each business's public contact pages; capped per day.</span></div>" : "") +
+        '<div class="scroll" style="max-height:440px;overflow:auto"><table><tr><th></th><th>Business</th><th>Email</th><th>Website</th><th>Note</th></tr>' + rows + "</table></div>" +
         '<div class="toolbar" style="margin:12px 0 0"><button class="btn primary sm" id="fImport"' + (usable.length ? "" : " disabled") + '>Import selected</button><button class="btn sm" id="fAll" type="button">Select all usable</button><button class="btn ghost sm" id="fNone" type="button">Select none</button><button class="btn ghost sm" id="fClear" type="button">Clear results</button><span class="hint">Imported leads go through the list cleaner and your country rules, then into the campaign that fits them.</span></div>';
     }).catch(fail);
   }
   $("fBody").addEventListener("click", function (e) {
     var boxes = function () { return $("fBody").querySelectorAll("input[data-fid]:not(:disabled)"); };
+    if (e.target.id === "fEnrich") { e.target.disabled = true; api("POST", "/api/outreach/finder/enrich", {}).then(function () { pollFinder(); }).catch(function (err) { fail(err); e.target.disabled = false; }); return; }
     if (e.target.id === "fAll") boxes().forEach(function (b) { b.checked = true; });
     if (e.target.id === "fNone") boxes().forEach(function (b) { b.checked = false; });
     if (e.target.id === "fClear") api("POST", "/api/outreach/finder/clear", {}).then(function () { $("fBody").innerHTML = ""; $("fMsg").textContent = ""; }).catch(fail);

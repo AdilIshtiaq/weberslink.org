@@ -400,7 +400,7 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
           <a href="/api/outreach/export?file=sent" download>Export sent log</a>
         </div></details>
         <button class="btn sm" id="findBtn" type="button">🔎 Find new leads</button>
-        <label class="btn primary sm" style="margin:0;cursor:pointer">Import leads<input type="file" id="importFile" accept=".xlsx,.xls,.csv" hidden></label>
+        <label class="btn primary sm" style="margin:0;cursor:pointer">Import leads<input type="file" id="importFile" accept=".xlsx,.xls,.csv,.json" hidden></label>
       </div>
       <div class="toolbar" id="leadFilters">
         <select id="leadStage" aria-label="Stage"></select>
@@ -422,15 +422,21 @@ iframe.preview{width:100%;height:340px;border:1px solid var(--line);border-radiu
         <button class="btn ghost sm" id="bulkClear" type="button">Clear selection</button>
       </div>
       <div class="panel" id="finderBox" hidden><h3>Find new leads <small>free: OpenStreetMap plus each business's own public website</small></h3>
-        <div class="row">
+        <div class="tabs" id="fTabs" style="margin-bottom:14px"><button type="button" class="on" data-ftab="map">Search the map</button><button type="button" data-ftab="file">Import a Google Maps file</button></div>
+        <div id="fPaneFile" hidden>
+          <p class="hint" style="margin-bottom:12px">Have an export from Apify's Google Maps scraper or similar (.csv or .json)? It is read here instead of imported blindly: placeholder and job-application emails are removed, the best email per business is chosen, offices of the same firm are merged, closed and off-target results are flagged, and everything is checked against your leads and never-contact list. You review the result, then import. (The normal <b>Import leads</b> button sends a Google Maps file here automatically.) You remain responsible for emailing lawfully: honour opt-outs and include your postal address (both are built into every email).</p>
+          <label class="btn primary sm" style="margin:0;cursor:pointer">Choose a Google Maps file<input type="file" id="fFile" accept=".csv,.json" hidden></label>
+        </div>
+        <div id="fPaneMap"><div class="row">
           <div class="field"><label>Business type</label><input type="text" id="fType" list="fTypes" placeholder="e.g. roofing contractor" maxlength="80"><datalist id="fTypes"></datalist></div>
           <div class="field"><label>Where</label><input type="text" id="fPlace" placeholder="e.g. Austin, TX" maxlength="80"></div>
           <div class="field"><label>How many businesses</label><select id="fLimit"><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option></select></div>
         </div>
-        <div class="toolbar"><button class="btn primary sm" id="fGo" type="button">Search</button><button class="btn danger sm" id="fStop" type="button" hidden>Stop</button><button class="btn ghost sm" id="fTest" type="button" title="Checks every step from your server and shows where it breaks">Test connection</button><span class="hint" id="fMsg"></span></div>
+        <div class="toolbar"><button class="btn primary sm" id="fGo" type="button">Search</button><button class="btn ghost sm" id="fTest" type="button" title="Checks every step from your server and shows where it breaks">Test connection</button></div></div>
+        <div class="toolbar" style="margin-top:10px"><button class="btn danger sm" id="fStop" type="button" hidden>Stop</button><span class="hint" id="fMsg"></span></div>
         <div class="bar" id="fBar" hidden><b id="fBarIn" style="width:0"></b></div>
         <div id="fBody"></div>
-        <p class="hint" style="margin-top:12px">Map data © OpenStreetMap contributors. Only public contact details on business websites are read, and each site's robots.txt is respected. Not every business lists a website or email, so expect a share of the results to be unusable. You are responsible for emailing lawfully: honour opt-outs and include your postal address (both are built into every email).</p>
+        <p class="hint" id="fCredit" style="margin-top:12px">Map data © OpenStreetMap contributors. Only public contact details on business websites are read, and each site's robots.txt is respected. Not every business lists a website or email, so expect a share of the results to be unusable. You are responsible for emailing lawfully: honour opt-outs and include your postal address (both are built into every email).</p>
       </div>
       <div class="panel" id="aiBox" hidden><h3>Personalise with Gemini <small>one factual opening line per store, from its own website. You approve every line.</small></h3><div id="aiBody"></div></div>
       <div class="panel" id="cleanBox" hidden><h3>List cleaner <small>finds addresses that would bounce or hurt your sender reputation</small></h3><div id="cleanBody"></div></div>
